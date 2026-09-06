@@ -12,7 +12,7 @@ import { motivationFor, MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
 import { restoreSession, type SavedSession } from "@/lib/helper/study-session";
 import { useFitText, type FitText } from "@/lib/helper/use-fit-text";
-import { examLabels, type ExamType } from "@/lib/types/common";
+import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
 import type {
   Flashcard,
   FlashcardProgressResponse,
@@ -45,15 +45,13 @@ const asSavedSession = (value: unknown): SavedSession | null =>
 const trackTitles: Record<ExamType, string> = {
   VUL: "VUL Track Review",
   TRADITIONAL_LIFE: "Traditional Life Review",
-  IIAP: "IIAP",
+  IIAP_A: "IIAP Set A Review",
+  IIAP_B: "IIAP Set B Review",
 };
 
 function FlashCardContent() {
   const searchParams = useSearchParams();
-  const type: ExamType =
-    searchParams.get("exam_type") === "TRADITIONAL_LIFE"
-      ? "TRADITIONAL_LIFE"
-      : "VUL";
+  const type = parseExamType(searchParams.get("exam_type"));
 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [index, setIndex] = useState(0);

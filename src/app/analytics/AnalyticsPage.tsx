@@ -23,7 +23,8 @@ const emptyRow = (exam_type: ExamType): ProgressSummaryRow => ({
 const trackTitles: Record<ExamType, string> = {
   VUL: "VUL Track Mastery",
   TRADITIONAL_LIFE: "Traditional Life Mastery",
-  IIAP: "IIAP Mastery",
+  IIAP_A: "IIAP (Set A) Mastery",
+  IIAP_B: "IIAP (Set B) Mastery",
 };
 
 function Donut({ value, accent }: { value: number; accent: string }) {
@@ -90,7 +91,8 @@ export function AnalyticsPage() {
   const [rows, setRows] = useState<Record<ExamType, ProgressSummaryRow>>({
     VUL: emptyRow("VUL"),
     TRADITIONAL_LIFE: emptyRow("TRADITIONAL_LIFE"),
-    IIAP: emptyRow("IIAP"),
+    IIAP_A: emptyRow("IIAP_A"),
+    IIAP_B: emptyRow("IIAP_B"),
   });
   const [loading, setLoading] = useState(true);
 
