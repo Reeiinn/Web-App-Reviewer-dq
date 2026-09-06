@@ -4,11 +4,12 @@ import { AppNav } from "@/components/ui/app-nav";
 import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
+import type { StudyMode } from "@/lib/types/study";
 import {
   ArrowRight,
-  BookOpen,
   BrainCircuit,
   ChevronDown,
+  ClipboardCheck,
   Layers,
   LineChart,
   Lock,
@@ -24,6 +25,33 @@ type ProgressSummaryRow = {
   memorize_pct: number;
   practice_exam_pct: number;
   overall_pct: number;
+};
+
+type RecentItem = {
+  exam_type: ExamType;
+  mode: StudyMode;
+  visited_at: string;
+};
+
+const modeMeta: Record<
+  StudyMode,
+  { title: string; icon: typeof Layers; href: (type: ExamType) => string }
+> = {
+  flashcard: {
+    title: "Flashcards",
+    icon: Layers,
+    href: (type) => `/learningMethods/flashCard?exam_type=${type}`,
+  },
+  memorize: {
+    title: "Memorize",
+    icon: BrainCircuit,
+    href: (type) => `/learningMethods/memorization?exam_type=${type}`,
+  },
+  practice: {
+    title: "Practice Exam",
+    icon: ClipboardCheck,
+    href: (type) => `/learningMethods/practiceExam?exam_type=${type}`,
+  },
 };
 
 const trackCopy: Record<ExamType, { title: string; blurb: string }> = {
@@ -222,29 +250,43 @@ function TrackCard({
   );
 }
 
-function QuickAccess() {
+function RecentCard({ exam_type, mode }: RecentItem) {
+  const { title, icon: Icon, href } = modeMeta[mode];
+  return (
+    <Link
+      href={href(exam_type)}
+      className="rv-card block p-5 transition hover:border-[#C9A227]"
+    >
+      <div className="flex items-center gap-2.5">
+        <Icon className="size-5 text-[#527087]" />
+        <h3 className="text-lg font-extrabold">{title}</h3>
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {examLabels[exam_type]}
+      </p>
+      <div className="mt-4 flex items-center justify-between">
+        <span className="text-sm font-semibold text-[#0B2340]">Continue</span>
+        <ArrowRight className="size-4 text-[#0B2340]" />
+      </div>
+    </Link>
+  );
+}
+
+function QuickAccess({ recent }: { recent: RecentItem[] }) {
   return (
     <aside>
       <h2 className="text-2xl font-extrabold">Quick Access</h2>
 
-      {/* Study modes are reached through a track above, so the glossary is the
-          only thing here that isn't track-specific. */}
-      <Link
-        href="/glossary"
-        className="mt-5 block rounded-xl bg-[#0B2340] p-5 text-white transition hover:bg-[#0F2E4D]"
-      >
-        <div className="flex items-center gap-2.5">
-          <BookOpen className="size-5 text-[#FFD400]" />
-          <h3 className="text-lg font-extrabold">Glossary</h3>
-        </div>
-        <p className="mt-2 text-sm text-white/75">
-          Comprehensive index of industry terms.
-        </p>
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm font-bold text-[#FFD400]">Browse A-Z</span>
-          <ArrowRight className="size-4 text-[#FFD400]" />
-        </div>
-      </Link>
+      <div className="mt-5 flex flex-col gap-4">
+        {recent.map((item) => (
+          <RecentCard
+            key={`${item.exam_type}-${item.mode}`}
+            exam_type={item.exam_type}
+            mode={item.mode}
+            visited_at={item.visited_at}
+          />
+        ))}
+      </div>
     </aside>
   );
 }
@@ -256,9 +298,17 @@ export function DashboardPage() {
     Partial<Record<ExamType, Eligibility>>
   >({});
   const [expanded, setExpanded] = useState<ExamType | null>(null);
+  const [recent, setRecent] = useState<RecentItem[]>([]);
 
   useEffect(() => {
     let active = true;
+
+    fetch("/api/recent-activity")
+      .then((response) => response.json())
+      .then((rows: RecentItem[]) => {
+        if (active && Array.isArray(rows)) setRecent(rows);
+      })
+      .catch((error) => console.error("Failed to load recent activity:", error));
 
     fetch("/api/progress")
       .then((response) => response.json())
@@ -325,7 +375,7 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <QuickAccess />
+          <QuickAccess recent={recent} />
         </div>
       </main>
     </div>
