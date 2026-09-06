@@ -16,13 +16,10 @@ import type {
 import type { StreakRow } from "@/lib/types/streak";
 import {
   Check,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  HelpCircle,
   Shuffle,
   X,
-  XCircle,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -309,9 +306,9 @@ function FlashCardContent() {
                 {message.headline}
               </p>
               {message.mood === "correct" ? (
-                <CheckCircle2 className="size-14" strokeWidth={2.5} />
+                <Check className="size-14" strokeWidth={3} />
               ) : (
-                <XCircle className="size-14" strokeWidth={2.5} />
+                <X className="size-14" strokeWidth={3} />
               )}
             </div>
           )}
@@ -330,7 +327,14 @@ function FlashCardContent() {
               }`}
             >
               <span className="rv-card col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-4 overflow-hidden p-6 [backface-visibility:hidden] sm:p-10">
-                <HelpCircle className="size-7 shrink-0 text-[#C9A227]" />
+                {/* A glyph rather than an icon: lucide encloses every question
+                    mark it has, and the bare mark matches the bare check. */}
+                <span
+                  aria-hidden="true"
+                  className="block shrink-0 text-3xl font-extrabold leading-none text-[#C9A227]"
+                >
+                  ?
+                </span>
 
                 <FitBox fit={frontFit}>
                   {front.prompt && (
@@ -360,7 +364,7 @@ function FlashCardContent() {
                 </span>
               </span>
 
-              <span className="col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-4 overflow-hidden rounded-xl bg-[#FFD400] p-6 text-[#0B2340] [backface-visibility:hidden] [transform:rotateY(180deg)] sm:p-10">
+              <span className="col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-4 overflow-hidden rounded-xl bg-[#0B2340] p-6 text-white [backface-visibility:hidden] [transform:rotateY(180deg)] sm:p-10">
                 <FitBox fit={backFit}>
                   {back.prompt && (
                     <span className="block text-[1.5em] font-bold leading-[1.35]">
@@ -373,7 +377,7 @@ function FlashCardContent() {
                       {back.statements.map((statement) => (
                         <span
                           key={statement}
-                          className="block rounded-lg bg-[#0B2340]/10 px-[0.9em] py-[0.65em] text-[1.25em] font-semibold leading-[1.5]"
+                          className="block rounded-lg bg-white/12 px-[0.9em] py-[0.65em] text-[1.25em] font-semibold leading-[1.5]"
                         >
                           {statement}
                         </span>
