@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { AppNav } from "@/components/ui/app-nav";
 import { Invite } from "@/components/ui/invite";
 import {
@@ -13,16 +14,27 @@ import {
   CheckCircle2,
   Flame,
   LoaderCircle,
+  Search,
   Trash2,
   Users,
   Zap,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
+
+type Recruiter = {
+  id: string;
+  name: string;
+  email: string;
+  role: "ADMIN" | "MANAGER";
+};
 
 type Reviewee = {
   id: string;
   name: string;
   email: string;
+  /** Whoever's invite link this reviewee signed up with. */
+  manager: Recruiter | null;
   readiness: number;
   status: ReadinessStatus;
   flashcards: { mastered: number; total: number };
@@ -105,8 +117,31 @@ function Meter({ value, tone }: { value: number; tone: string }) {
 }
 
 /**
- * Removing a reviewee destroys their history, so it takes a deliberate second
- * click naming the person rather than a single trash icon.
+ * What the admin has to type before the delete button turns on. Naming the
+ * person rather than a fixed word means a phrase copied from one dialog cannot
+ * confirm the removal of somebody else.
+ */
+const deletePhrase = (name: string) => `Delete ${name}`;
+
+/**
+ * Spacing, case and the quotes the label puts around the phrase should not
+ * stand between an admin and a deliberate delete.
+ */
+const tidy = (value: string) =>
+  value
+    .trim()
+    .replace(/^["'“”]+|["'“”]+$/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+const samePhrase = (a: string, b: string) => tidy(a) === tidy(b);
+
+/**
+ * Removing a reviewee destroys their history, and the delete cascades from
+ * users.id through progress, attempts, streaks and sessions. A trash icon is
+ * too cheap for that, so the action opens a dialog that names the person and
+ * only unlocks once the admin types the confirmation phrase.
  */
 function RemoveReviewee({
   reviewee,
@@ -115,11 +150,26 @@ function RemoveReviewee({
   reviewee: Reviewee;
   onRemoved: (id: string) => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState("");
 
+  const phrase = deletePhrase(reviewee.name);
+  const confirmed = samePhrase(typed, phrase);
+
+  function close(next: boolean) {
+    if (removing) return; // never yank the dialog out from under a request
+    setOpen(next);
+    if (!next) {
+      setTyped("");
+      setError("");
+    }
+  }
+
   async function remove() {
+    if (!confirmed || removing) return;
+
     setRemoving(true);
     setError("");
 
@@ -135,6 +185,9 @@ function RemoveReviewee({
         return;
       }
 
+      setRemoving(false);
+      setOpen(false);
+      setTyped("");
       onRemoved(reviewee.id);
     } catch {
       setError("Could not reach the server.");
@@ -142,51 +195,93 @@ function RemoveReviewee({
     }
   }
 
-  if (confirming) {
-    return (
-      <div className="min-w-[190px]">
-        <p className="text-xs font-semibold">
-          Remove {reviewee.name} and all their progress?
-        </p>
-        <div className="mt-2 flex gap-2">
-          <button
-            onClick={remove}
-            disabled={removing}
-            className="flex items-center gap-1.5 rounded-lg bg-destructive px-2.5 py-1.5 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-60"
-          >
-            {removing && <LoaderCircle className="size-3 animate-spin" />}
-            {removing ? "Removing…" : "Yes, remove"}
-          </button>
-          <button
-            onClick={() => setConfirming(false)}
-            disabled={removing}
-            className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold transition hover:border-[#C9A227]"
-          >
-            Cancel
-          </button>
-        </div>
-        {error && (
-          <p className="mt-1.5 text-xs font-semibold text-destructive">
-            {error}
-          </p>
-        )}
-      </div>
-    );
-  }
-
   return (
-    <button
-      onClick={() => setConfirming(true)}
-      aria-label={`Remove ${reviewee.name}`}
-      className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
-    >
-      <Trash2 className="size-3.5" />
-      Remove
-    </button>
+    <AlertDialog.Root open={open} onOpenChange={close}>
+      <AlertDialog.Trigger
+        aria-label={`Remove ${reviewee.name}`}
+        className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+      >
+        <Trash2 className="size-3.5" />
+        Remove
+      </AlertDialog.Trigger>
+
+      <AlertDialog.Portal>
+        <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-[#0B2340]/50 backdrop-blur-[2px]" />
+        <AlertDialog.Popup className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-6 text-left shadow-xl">
+          <div className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+              <AlertTriangle className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <AlertDialog.Title className="text-lg font-extrabold">
+                Remove {reviewee.name}?
+              </AlertDialog.Title>
+              <AlertDialog.Description className="mt-1 text-sm text-muted-foreground">
+                {reviewee.email}
+              </AlertDialog.Description>
+            </div>
+          </div>
+
+          <p className="mt-4 text-sm leading-6">
+            This deletes the account together with every flashcard and
+            memorization rating, practice exam attempt, streak and saved study
+            session. It cannot be undone.
+          </p>
+
+          <label
+            htmlFor={`confirm-${reviewee.id}`}
+            className="mt-5 block text-sm font-semibold"
+          >
+            Type <span className="font-mono">&quot;{phrase}&quot;</span> to
+            confirm
+          </label>
+          <input
+            id={`confirm-${reviewee.id}`}
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && confirmed) remove();
+            }}
+            disabled={removing}
+            autoComplete="off"
+            placeholder={phrase}
+            className="mt-2 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+          />
+
+          {error && (
+            <p className="mt-3 text-sm font-semibold text-destructive">
+              {error}
+            </p>
+          )}
+
+          <div className="mt-6 flex justify-end gap-2">
+            <AlertDialog.Close
+              disabled={removing}
+              className="rounded-lg border border-border px-3 py-2 text-sm font-bold transition hover:border-[#C9A227] disabled:opacity-60"
+            >
+              Cancel
+            </AlertDialog.Close>
+            <button
+              onClick={remove}
+              disabled={!confirmed || removing}
+              className="flex items-center gap-1.5 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {removing && <LoaderCircle className="size-4 animate-spin" />}
+              {removing ? "Removing…" : "Remove reviewee"}
+            </button>
+          </div>
+        </AlertDialog.Popup>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
   );
 }
 
 export function AdminPage() {
+  const { data: session } = useSession();
+  // Only an admin sees more than one recruiter's reviewees, so only an admin
+  // needs the column saying whose they are.
+  const isAdmin = session?.user?.role === "ADMIN";
+
   const [roster, setRoster] = useState<Reviewee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -195,6 +290,7 @@ export function AdminPage() {
     "ALL",
   );
   const [sort, setSort] = useState<SortKey>("readiness_desc");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -226,17 +322,29 @@ export function AdminPage() {
   );
 
   const visible = useMemo(() => {
-    const filtered =
-      statusFilter === "ALL"
-        ? roster
-        : roster.filter((row) => row.status === statusFilter);
+    const needle = search.trim().toLowerCase();
+
+    const filtered = roster.filter((row) => {
+      if (statusFilter !== "ALL" && row.status !== statusFilter) return false;
+      if (!needle) return true;
+
+      // An admin looking at everyone should be able to pull up a manager's
+      // whole intake by typing that manager's name.
+      const haystack = [
+        row.name,
+        row.email,
+        ...(isAdmin && row.manager ? [row.manager.name, row.manager.email] : []),
+      ];
+
+      return haystack.some((field) => field.toLowerCase().includes(needle));
+    });
 
     return [...filtered].sort((a, b) => {
       if (sort === "name_asc") return a.name.localeCompare(b.name);
       if (sort === "readiness_asc") return a.readiness - b.readiness;
       return b.readiness - a.readiness;
     });
-  }, [roster, statusFilter, sort]);
+  }, [roster, statusFilter, sort, search, isAdmin]);
 
   const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -257,7 +365,7 @@ export function AdminPage() {
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-extrabold">
-                Reviewee Directory &amp; Cohort Roster
+                Reviewee Directory
               </h1>
               <span className="rounded-full bg-[#0B2340] px-3 py-1 text-xs font-bold text-[#FFD400]">
                 {counts.total} Candidates
@@ -362,6 +470,23 @@ export function AdminPage() {
               </button>
             ))}
           </div>
+
+          <label className="ml-auto text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            {isAdmin ? "Search Reviewee or Manager" : "Search Reviewee"}
+            <div className="relative mt-1.5">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+                placeholder={isAdmin ? "Name, email or manager" : "Name or email"}
+                className="w-72 rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm font-semibold text-foreground outline-none focus:border-[#0B2340]"
+              />
+            </div>
+          </label>
         </div>
 
         {loading ? (
@@ -374,7 +499,9 @@ export function AdminPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {roster.length === 0
                 ? "No reviewees have been registered yet."
-                : "Try clearing the status filter."}
+                : search.trim()
+                  ? `Nothing matches "${search.trim()}". Try a different name or email.`
+                  : "Try clearing the status filter."}
             </p>
           </div>
         ) : (
@@ -385,6 +512,7 @@ export function AdminPage() {
                   <tr>
                     {[
                       "Reviewee / Candidate",
+                      ...(isAdmin ? ["Recruited By"] : []),
                       "Overall Readiness",
                       "Flashcards Mastery",
                       "Memorize Acc.",
@@ -416,6 +544,28 @@ export function AdminPage() {
                           {row.email}
                         </p>
                       </td>
+
+                      {isAdmin && (
+                        <td className="px-5 py-4">
+                          {row.manager ? (
+                            <>
+                              <p className="font-semibold">
+                                {row.manager.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                {row.manager.role === "ADMIN"
+                                  ? "Admin"
+                                  : "Manager"}{" "}
+                                · {row.manager.email}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              No recruiter on record
+                            </p>
+                          )}
+                        </td>
+                      )}
 
                       <td className="px-5 py-4">
                         <div className="flex items-baseline gap-2">

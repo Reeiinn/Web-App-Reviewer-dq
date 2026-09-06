@@ -1,3 +1,4 @@
+import type { StreakResult } from "./streak";
 import { ExamType } from "./common";
 
 export interface MemorizationChoice {
@@ -22,4 +23,9 @@ export interface MemorizationProgress {
   is_correct: boolean | null;
   reviewed_at: string;
   mastered: boolean;
+}
+
+/** POST /api/memorization/[id]/progress: the saved answer plus the updated streak. */
+export interface MemorizationProgressResponse extends MemorizationProgress {
+  streak: StreakResult;
 }

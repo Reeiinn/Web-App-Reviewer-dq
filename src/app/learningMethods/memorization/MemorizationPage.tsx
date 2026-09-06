@@ -1,6 +1,7 @@
 "use client";
 
 import { AppNav } from "@/components/ui/app-nav";
+import { BackLink } from "@/components/ui/back-link";
 import {
   AnswerFeedback,
   Confetti,
@@ -8,10 +9,12 @@ import {
   StreakBadge,
 } from "@/components/ui/motivation";
 import { Result } from "@/components/ui/result";
-import { motivationFor, type MotivationMessage } from "@/lib/motivation";
+import { motivationFor, type MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
 import { examLabels, type ExamType } from "@/lib/types/common";
+import type { MemorizationProgressResponse } from "@/lib/types/memo";
 import type { Question } from "@/lib/types/questions";
+import type { StreakRow } from "@/lib/types/streak";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -51,8 +54,8 @@ function MemorizationContent() {
         (response) => response.json() as Promise<Question[]>,
       ),
       fetch("/api/streaks")
-        .then((response) => response.json())
-        .catch(() => []),
+        .then((response) => response.json() as Promise<StreakRow[]>)
+        .catch((): StreakRow[] => []),
     ])
       .then(([items, streaks]) => {
         if (!active) return;
@@ -65,9 +68,7 @@ function MemorizationContent() {
         questionShownAt.current = Date.now();
 
         const mine = Array.isArray(streaks)
-          ? streaks.find(
-              (row: { exam_type: ExamType }) => row.exam_type === type,
-            )
+          ? streaks.find((row) => row.exam_type === type)
           : null;
         if (mine) {
           setStreak({ current: mine.current_streak, best: mine.best_streak });
@@ -149,8 +150,9 @@ function MemorizationContent() {
         },
       );
 
-      const data = await response.json();
-      if (data?.streak) {
+      const data =
+        (await response.json()) as Partial<MemorizationProgressResponse>;
+      if (data.streak) {
         setStreak({ current: data.streak.current, best: data.streak.best });
         setMessage(motivationFor(isCorrect, data.streak.current, index));
       }
@@ -187,6 +189,7 @@ function MemorizationContent() {
       <div className="min-h-screen bg-background text-foreground">
         <AppNav />
         <main className="rv-shell max-w-2xl py-10">
+          <BackLink />
           <Result
             correct={questions.length - wrong.length}
             wrong={wrong.length}
@@ -215,6 +218,7 @@ function MemorizationContent() {
       <AppNav />
 
       <main className="rv-shell py-8">
+        <BackLink />
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div>
             <span className="inline-block rounded-full bg-[#FFD400] px-3 py-1 text-xs font-bold text-[#0B2340]">
@@ -395,6 +399,7 @@ function Shell({
     <div className="min-h-screen bg-background text-foreground">
       <AppNav />
       <main className="rv-shell py-10">
+        <BackLink />
         <span className="inline-block rounded-full bg-[#FFD400] px-3 py-1 text-xs font-bold text-[#0B2340]">
           {examLabels[type]} Track
         </span>

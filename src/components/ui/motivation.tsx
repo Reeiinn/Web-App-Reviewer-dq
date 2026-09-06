@@ -1,6 +1,6 @@
 "use client";
 
-import type { MotivationMessage } from "@/lib/motivation";
+import type { MotivationMessage } from "@/lib/helper/motivation";
 import { CheckCircle2, Flame, Sparkles, XCircle } from "lucide-react";
 import { useMemo } from "react";
 

@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { fetchStreaks } from "@/lib/helper/streak-store";
+import { fetchStreaks } from "@/app/api/_lib/streak-store";
 import { NextResponse } from "next/server";
 
 export async function GET() {

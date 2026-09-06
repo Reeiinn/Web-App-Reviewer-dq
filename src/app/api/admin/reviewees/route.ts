@@ -27,15 +27,25 @@ export async function GET() {
   }
 
   try {
+    // manager_id is set at signup from the invite the reviewee used, so it is
+    // the recruiter. An admin sees every reviewee and who recruited them; a
+    // manager sees only the reviewees they recruited themselves.
+    const selectReviewees = `
+      SELECT u.id, u.email, u.name, u.role,
+             m.id    AS manager_id,
+             m.name  AS manager_name,
+             m.email AS manager_email,
+             m.role  AS manager_role
+        FROM users u
+        LEFT JOIN users m ON m.id = u.manager_id
+       WHERE u.role = 'USER'
+    `;
+
     const usersResult =
       role === "ADMIN"
-        ? await pool.query(
-            `SELECT id, email, name, role FROM users
-             WHERE role = 'USER' ORDER BY name ASC`,
-          )
+        ? await pool.query(`${selectReviewees} ORDER BY u.name ASC`)
         : await pool.query(
-            `SELECT id, email, name, role FROM users
-             WHERE manager_id = $1 ORDER BY name ASC`,
+            `${selectReviewees} AND u.manager_id = $1 ORDER BY u.name ASC`,
             [currentUserId],
           );
 
@@ -137,6 +147,15 @@ export async function GET() {
         id: user.id,
         name: user.name,
         email: user.email,
+        // Null when the account predates invite-only signup.
+        manager: user.manager_id
+          ? {
+              id: user.manager_id,
+              name: user.manager_name,
+              email: user.manager_email,
+              role: user.manager_role as "ADMIN" | "MANAGER",
+            }
+          : null,
         readiness,
         status: readinessStatus(readiness),
         flashcards: flashcardCounts,

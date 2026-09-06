@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
 import { lockReason } from "@/lib/helper/eligibility";
-import { fetchEligibility } from "@/lib/helper/mastery";
+import { fetchEligibility } from "@/app/api/_lib/mastery";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {

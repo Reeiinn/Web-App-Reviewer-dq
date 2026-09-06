@@ -1,8 +1,9 @@
 "use client";
 
 import { AppNav } from "@/components/ui/app-nav";
+import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
-import type { Eligibility } from "@/lib/helper/eligibility";
+import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
 import { examLabels, type ExamType } from "@/lib/types/common";
 import type { Question } from "@/lib/types/questions";
@@ -341,6 +342,7 @@ function Frame({
     <div className="min-h-screen bg-background text-foreground">
       <AppNav />
       <main className="rv-shell py-10">
+        <BackLink />
         <h1 className="mb-6 text-4xl font-extrabold md:text-5xl">{title}</h1>
         {children}
       </main>

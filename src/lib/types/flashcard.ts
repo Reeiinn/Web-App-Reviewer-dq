@@ -1,3 +1,4 @@
+import type { StreakResult } from "./streak";
 import { ExamType } from "./common";
 
 export interface Flashcard {
@@ -14,4 +15,9 @@ export interface FlashcardProgress {
   flashcard_id: string;
   reviewed_at: string;
   mastered: boolean;
+}
+
+/** POST /api/flashcards/[id]/progress: the saved review plus the updated streak. */
+export interface FlashcardProgressResponse extends FlashcardProgress {
+  streak: StreakResult;
 }

@@ -1,17 +1,78 @@
 import { auth } from "@/lib/auth";
-import {
-  clearSession,
-  loadSession,
-  saveSession,
-} from "@/lib/helper/session-store";
+import pool from "@/lib/db";
 import type { SavedSession } from "@/lib/helper/study-session";
 import { examTypes, type ExamType } from "@/lib/types/common";
+import type { StudyMode } from "@/lib/types/study";
 import { NextResponse } from "next/server";
 
-const MODE = "flashcard" as const;
+const MODE: StudyMode = "flashcard";
 
 const isExamType = (value: unknown): value is ExamType =>
   typeof value === "string" && examTypes.includes(value as ExamType);
+
+/**
+ * Persisted deck position for one learner, track and study mode. One row per
+ * combination, replaced on every answer, deleted when the deck is finished or
+ * restarted.
+ */
+async function loadSession(
+  userId: string,
+  examType: ExamType,
+  mode: StudyMode,
+): Promise<SavedSession | null> {
+  const result = await pool.query(
+    `SELECT card_order, card_index, ratings FROM study_sessions
+     WHERE user_id = $1 AND exam_type = $2 AND mode = $3`,
+    [userId, examType, mode],
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    card_order: Array.isArray(row.card_order) ? row.card_order : [],
+    card_index: Number(row.card_index) || 0,
+    ratings: row.ratings && typeof row.ratings === "object" ? row.ratings : {},
+  };
+}
+
+async function saveSession(
+  userId: string,
+  examType: ExamType,
+  mode: StudyMode,
+  saved: SavedSession,
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO study_sessions
+       (user_id, exam_type, mode, card_order, card_index, ratings, updated_at)
+     VALUES ($1, $2, $3, $4::jsonb, $5, $6::jsonb, now())
+     ON CONFLICT (user_id, exam_type, mode) DO UPDATE SET
+       card_order = EXCLUDED.card_order,
+       card_index = EXCLUDED.card_index,
+       ratings    = EXCLUDED.ratings,
+       updated_at = now()`,
+    [
+      userId,
+      examType,
+      mode,
+      JSON.stringify(saved.card_order),
+      saved.card_index,
+      JSON.stringify(saved.ratings),
+    ],
+  );
+}
+
+async function clearSession(
+  userId: string,
+  examType: ExamType,
+  mode: StudyMode,
+): Promise<void> {
+  await pool.query(
+    `DELETE FROM study_sessions
+     WHERE user_id = $1 AND exam_type = $2 AND mode = $3`,
+    [userId, examType, mode],
+  );
+}
 
 /** Rejects a body that is not a deck position we could resume into. */
 function parseSession(body: unknown): SavedSession | null {

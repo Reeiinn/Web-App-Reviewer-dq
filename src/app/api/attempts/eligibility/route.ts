@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { fetchEligibility } from "@/lib/helper/mastery";
+import { fetchEligibility } from "@/app/api/_lib/mastery";
 import { NextResponse } from "next/server";
 
 /**

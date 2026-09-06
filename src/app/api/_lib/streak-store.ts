@@ -1,13 +1,6 @@
 import pool from "@/lib/db";
-import {
-  nextStreak,
-  streakMilestone,
-  type StreakUpdate,
-} from "@/lib/helper/streaks";
-
-export type StreakResult = StreakUpdate & {
-  milestone: number | null;
-};
+import { nextStreak, streakMilestone } from "@/lib/helper/streaks";
+import type { StreakResult, StreakRow } from "@/lib/types/streak";
 
 /**
  * Applies one answer to the user's streak for a track and persists the result.
@@ -64,7 +57,7 @@ export async function applyStreak(
   };
 }
 
-export async function fetchStreaks(userId: string) {
+export async function fetchStreaks(userId: string): Promise<StreakRow[]> {
   const result = await pool.query(
     `SELECT exam_type, current_streak, best_streak, last_answer_at
      FROM study_streaks WHERE user_id = $1`,
