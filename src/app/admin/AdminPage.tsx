@@ -3,6 +3,7 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { AppNav } from "@/components/ui/app-nav";
 import { Invite } from "@/components/ui/invite";
+import { FilterSelect, type SelectOption } from "@/components/ui/select";
 import {
   readinessStatus,
   statusLabels,
@@ -53,6 +54,17 @@ const sorts = {
 } as const;
 
 type SortKey = keyof typeof sorts;
+
+const sortOptions: readonly SelectOption<SortKey>[] = Object.entries(sorts).map(
+  ([value, label]) => ({ value: value as SortKey, label }),
+);
+
+const statusOptions: readonly SelectOption<ReadinessStatus | "ALL">[] = [
+  { value: "ALL", label: "All Statuses" },
+  { value: "EXAM_READY", label: "Exam Ready" },
+  { value: "ON_TRACK", label: "On Track" },
+  { value: "AT_RISK", label: "At Risk" },
+];
 
 function relativeTime(value: string | null) {
   if (!value) return "No activity yet";
@@ -420,37 +432,23 @@ export function AdminPage() {
         </div>
 
         <div className="rv-card mt-6 flex flex-wrap items-end gap-6 p-5">
-          <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            Readiness Status
-            <select
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value as ReadinessStatus | "ALL");
-                setPage(1);
-              }}
-              className="mt-1.5 block w-56 rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground outline-none focus:border-[#0B2340]"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="EXAM_READY">Exam Ready</option>
-              <option value="ON_TRACK">On Track</option>
-              <option value="AT_RISK">At Risk</option>
-            </select>
-          </label>
+          <FilterSelect
+            label="Readiness Status"
+            value={statusFilter}
+            onValueChange={(next) => {
+              setStatusFilter(next);
+              setPage(1);
+            }}
+            options={statusOptions}
+          />
 
-          <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            Sort Candidates By
-            <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value as SortKey)}
-              className="mt-1.5 block w-64 rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground outline-none focus:border-[#0B2340]"
-            >
-              {Object.entries(sorts).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FilterSelect
+            label="Sort Candidates By"
+            value={sort}
+            onValueChange={setSort}
+            options={sortOptions}
+            triggerClassName="w-64"
+          />
 
           <div className="flex gap-2">
             {(["AT_RISK", "ON_TRACK", "EXAM_READY"] as const).map((status) => (
