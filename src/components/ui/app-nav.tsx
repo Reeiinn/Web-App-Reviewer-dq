@@ -108,7 +108,7 @@ export function AppNav() {
           href="/dashboard"
           className="text-lg font-extrabold tracking-tight text-foreground"
         >
-          RENEVIEW
+          INSURE
         </Link>
 
         <nav aria-label="Main" className="hidden md:block">

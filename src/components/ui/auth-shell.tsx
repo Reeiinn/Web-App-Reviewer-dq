@@ -24,7 +24,7 @@ export function AuthShell({
             className="relative z-10 flex items-center gap-2.5 text-xl"
           >
             <span className="inline-block size-[9px] rounded-full bg-[#FDB913]" />
-            RENEVIEW
+            INSURE
           </Link>
 
           <div className="pointer-events-none absolute inset-0">
@@ -53,7 +53,7 @@ export function AuthShell({
             className="mb-6 flex items-center gap-2 text-lg text-[#0B2340] md:hidden"
           >
             <span className="inline-block size-2 rounded-full bg-[#FDB913]" />
-            RENEVIEW
+            INSURE
           </Link>
 
           <h1 className="mb-2 text-4xl font-extrabold text-[#0B2340]">

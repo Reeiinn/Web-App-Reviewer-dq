@@ -53,7 +53,7 @@ export default function LoginPage() {
         <div className="relative hidden min-h-[560px] flex-col justify-between overflow-hidden bg-gradient-to-b from-[#123057] to-[#123059] p-8 text-white lg:flex xl:p-11">
           <div className="flex items-center gap-2.5 text-xl relative z-10">
             <span className="inline-block w-[9px] h-[9px] rounded-full bg-[#FDB913]" />
-            RENEVIEW
+            INSURE
           </div>
 
         
@@ -90,7 +90,7 @@ export default function LoginPage() {
        
           <div className="mb-6 flex items-center gap-2 text-lg text-[#0B2340] lg:hidden">
             <span className="inline-block w-[8px] h-[8px] rounded-full bg-[#FDB913]" />
-            RENEVIEW
+            INSURE
           </div>
 
           <h1 className="mb-2 text-display text-[#0B2340]">Welcome!</h1>

@@ -69,7 +69,7 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
         <div className="relative hidden min-h-[560px] flex-col justify-between overflow-hidden bg-gradient-to-b from-[#123057] to-[#123059] p-8 text-white lg:flex xl:p-11">
           <div className="flex items-center gap-2.5 text-xl relative z-10">
             <span className="inline-block w-[9px] h-[9px] rounded-full bg-[#FDB913]" />
-            RENEVIEW
+            INSURE
           </div>
 
           <div className="absolute inset-0 pointer-events-none">
@@ -102,12 +102,12 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
         <div className="flex flex-col justify-start p-6 sm:p-8 lg:min-h-[560px] lg:p-12">
           <div className="mb-6 flex items-center gap-2 text-lg text-[#0B2340] lg:hidden">
             <span className="inline-block w-[8px] h-[8px] rounded-full bg-[#FDB913]" />
-            RENEVIEW
+            INSURE
           </div>
 
           <h1 className="mb-2 text-display text-[#0B2340]">Create your account</h1>
           <p className="mb-6 text-base text-[#5B6472] sm:mb-8">
-            Start your insurance licensing journey with RENEVIEW.
+            Start your insurance licensing journey with INSURE.
           </p>
 
           {!initialCode && (
