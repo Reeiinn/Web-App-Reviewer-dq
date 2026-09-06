@@ -2,8 +2,12 @@ import { isStaff } from "@/lib/helper/roles";
 import type { NextAuthConfig } from "next-auth";
 import { NextResponse } from "next/server";
 
-/** Screens that exist to study a track, so they belong to reviewees alone. */
-const learnerOnly = ["/dashboard", "/learningMethods"];
+/**
+ * Screens that exist to study a track, so they belong to reviewees alone.
+ * Analytics is here because it charts the signed-in account's own mastery,
+ * which is empty for staff. Glossary stays open — it is reference material.
+ */
+const learnerOnly = ["/dashboard", "/learningMethods", "/analytics"];
 
 export const authConfig: NextAuthConfig = {
   session: { strategy: "jwt" },
