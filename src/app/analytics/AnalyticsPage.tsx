@@ -27,6 +27,18 @@ const trackTitles: Record<ExamType, string> = {
   IIAP_B: "IIAP (Set B) Mastery",
 };
 
+/**
+ * One ring colour per track, so two cards side by side are never the same
+ * dial twice. Every value is from the palette; the two IIAP sets take the
+ * furthest-apart hues left once gold and navy are spoken for.
+ */
+const trackAccents: Record<ExamType, string> = {
+  VUL: "#8A6D0B",
+  TRADITIONAL_LIFE: "#0B2340",
+  IIAP_A: "#0F7B52",
+  IIAP_B: "#527087",
+};
+
 function Donut({ value, accent }: { value: number; accent: string }) {
   const radius = 52;
   const circumference = 2 * Math.PI * radius;
@@ -136,7 +148,7 @@ export function AnalyticsPage() {
             {examTypes.map((type) => {
               const row = rows[type];
               const active = type === "VUL";
-              const accent = active ? "#8A6D0B" : "#0B2340";
+              const accent = trackAccents[type];
 
               return (
                 <section key={type} className="rv-card p-6">
