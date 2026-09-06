@@ -1,7 +1,7 @@
 export type ReadinessStatus = "EXAM_READY" | "ON_TRACK" | "AT_RISK";
 
 export const EXAM_READY_THRESHOLD = 90;
-export const ON_TRACK_THRESHOLD = 70;
+export const ON_TRACK_THRESHOLD = 60;
 
 export const statusLabels: Record<ReadinessStatus, string> = {
   EXAM_READY: "Exam Ready",

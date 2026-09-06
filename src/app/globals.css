@@ -266,3 +266,38 @@
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Page scrollbar
+
+   Scoped to html so the window bar on the right picks up the palette while
+   inner scrollers — the roster table's overflow-x-auto, popup lists — keep
+   their native bars. Fine pointers only: touch browsers draw an overlay bar
+   that costs no width, and styling it would reserve a gutter for nothing.
+   --------------------------------------------------------------------------- */
+@media (pointer: fine) {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-strong) var(--muted);
+  }
+
+  html::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  html::-webkit-scrollbar-track {
+    background: var(--muted);
+  }
+
+  html::-webkit-scrollbar-thumb {
+    /* The border plus padding-box clip insets the thumb inside the track. */
+    background: var(--primary-strong);
+    border: 2px solid var(--muted);
+    border-radius: 9999px;
+    background-clip: padding-box;
+  }
+
+  html::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+  }
+}

@@ -35,16 +35,21 @@ const trackCopy: Record<ExamType, { title: string; blurb: string }> = {
     title: "Traditional Life",
     blurb: "Core fundamentals of whole and term life insurance.",
   },
-  IIAP: {
-    title: "IIAP",
-    blurb: "",
+  IIAP_A: {
+    title: "IIAP (Set A)",
+    blurb: "The first IIAP question set, with its own deck and exam.",
+  },
+  IIAP_B: {
+    title: "IIAP (Set B)",
+    blurb: "The second IIAP question set, tracked separately from Set A.",
   },
 };
 
 const emptyProgress: Record<ExamType, number> = {
   VUL: 0,
   TRADITIONAL_LIFE: 0,
-  IIAP: 0,
+  IIAP_A: 0,
+  IIAP_B: 0,
 };
 
 function ModeOption({

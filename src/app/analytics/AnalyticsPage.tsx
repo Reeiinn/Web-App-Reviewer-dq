@@ -23,6 +23,20 @@ const emptyRow = (exam_type: ExamType): ProgressSummaryRow => ({
 const trackTitles: Record<ExamType, string> = {
   VUL: "VUL Track Mastery",
   TRADITIONAL_LIFE: "Traditional Life Mastery",
+  IIAP_A: "IIAP (Set A) Mastery",
+  IIAP_B: "IIAP (Set B) Mastery",
+};
+
+/**
+ * One ring colour per track, so two cards side by side are never the same
+ * dial twice. Every value is from the palette; the two IIAP sets take the
+ * furthest-apart hues left once gold and navy are spoken for.
+ */
+const trackAccents: Record<ExamType, string> = {
+  VUL: "#8A6D0B",
+  TRADITIONAL_LIFE: "#0B2340",
+  IIAP_A: "#0F7B52",
+  IIAP_B: "#527087",
 };
 
 function Donut({ value, accent }: { value: number; accent: string }) {
@@ -89,6 +103,8 @@ export function AnalyticsPage() {
   const [rows, setRows] = useState<Record<ExamType, ProgressSummaryRow>>({
     VUL: emptyRow("VUL"),
     TRADITIONAL_LIFE: emptyRow("TRADITIONAL_LIFE"),
+    IIAP_A: emptyRow("IIAP_A"),
+    IIAP_B: emptyRow("IIAP_B"),
   });
   const [loading, setLoading] = useState(true);
 
@@ -131,8 +147,12 @@ export function AnalyticsPage() {
           <div className="mt-9 grid gap-6 lg:grid-cols-2">
             {examTypes.map((type) => {
               const row = rows[type];
-              const active = type === "VUL";
-              const accent = active ? "#8A6D0B" : "#0B2340";
+              // The badge used to call VUL "Active" and everything else
+              // "Foundation", which was a two-track assumption rather than
+              // anything the data said. It now reports whether this learner
+              // has actually started the track.
+              const started = row.overall_pct > 0;
+              const accent = trackAccents[type];
 
               return (
                 <section key={type} className="rv-card p-6">
@@ -140,8 +160,14 @@ export function AnalyticsPage() {
                     <h2 className="text-xl font-extrabold">
                       {trackTitles[type]}
                     </h2>
-                    <span className="rounded bg-[#0B2340] px-2.5 py-1 text-[11px] font-bold text-white">
-                      {active ? "Active" : "Foundation"}
+                    <span
+                      className={`rounded px-2.5 py-1 text-[11px] font-bold ${
+                        started
+                          ? "bg-[#0B2340] text-white"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {started ? "In Progress" : "Not Started"}
                     </span>
                   </div>
 
@@ -162,7 +188,7 @@ export function AnalyticsPage() {
                       <Bar
                         label="Practice Questions"
                         value={row.practice_exam_pct}
-                        color="#FFD400"
+                        color="#0F7B52"
                       />
                     </div>
                   </div>

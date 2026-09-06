@@ -8,7 +8,8 @@ import {
   LockKeyhole,
   Mail,
 } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { landingFor } from "@/lib/helper/roles";
+import { getSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
@@ -40,9 +41,18 @@ export default function LoginPage() {
       return;
     }
 
-    setSuccess("Login successful! Redirecting to your dashboard...");
+    // signIn with redirect:false resolves before the session is readable, so
+    // the role that decides where to land is fetched rather than assumed.
+    const session = await getSession();
+    const target = landingFor(session?.user?.role);
+
+    setSuccess(
+      target === "/admin"
+        ? "Login successful! Redirecting to your console..."
+        : "Login successful! Redirecting to your dashboard...",
+    );
     setTimeout(() => {
-      router.replace("/dashboard");
+      router.replace(target);
       router.refresh();
     }, 1000);
   }

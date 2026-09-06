@@ -64,9 +64,9 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
     }, 1000);
   }
   return (
-    <main className="min-h-screen-safe app-gutter flex items-center justify-center bg-[#FBF7EE] py-6 sm:py-10">
-      <div className="grid w-full max-w-4xl grid-cols-1 overflow-hidden rounded-lg border border-[#E4DCC8] bg-white lg:min-h-[560px] lg:grid-cols-[1.05fr_1fr]">
-        <div className="relative hidden min-h-[560px] flex-col justify-between overflow-hidden bg-gradient-to-b from-[#123057] to-[#123059] p-8 text-white lg:flex xl:p-11">
+    <main className="flex min-h-screen items-center justify-center bg-[#FBF8F1] p-3 sm:p-6">
+      <div className="grid w-full max-w-[1120px] overflow-hidden rounded-lg border border-[#E5DDCF] bg-white shadow-sm md:grid-cols-[1.03fr_0.97fr]">
+        <div className="relative hidden min-h-[620px] overflow-hidden bg-[#183A63] p-10 text-white sm:p-12 md:flex md:flex-col md:justify-between">
           <div className="flex items-center gap-2.5 text-xl relative z-10">
             <span className="inline-block w-[9px] h-[9px] rounded-full bg-[#FDB913]" />
             INSURE
@@ -78,15 +78,15 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
             />
           </div>
 
-          <div className="relative z-10 max-w-[340px] -translate-y-6">
-            <h1 className="mb-4 text-3xl leading-snug xl:text-4xl">
+          <div className="relative z-10 max-w-[390px]">
+            <h1 className="text-4xl font-extrabold leading-tight mb-5">
               <span className="block text-white font-extrabold">OUR TARGET.</span>
               <span className="block text-[#FDB913] font-extrabold">OUR WIN.</span>
             </h1>
-            <p className="text-base font-semibold leading-relaxed text-white">
+            <p className="text-base font-semibold leading-6 text-white">
               &quot;Every action counts. Every conversation matters. Every submission brings us closer to our dreams.&quot;
             </p>
-            <p className="mt-4 text-2xl font-semibold italic text-[#FDB913] xl:text-3xl">
+            <p className="mt-4 text-3xl font-semibold italic text-[#FDB913]">
               Let&apos;s do this, Team!
             </p>
           </div>
@@ -99,23 +99,27 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
           </div>
         </div>
 
-        <div className="flex flex-col justify-start p-6 sm:p-8 lg:min-h-[560px] lg:p-12">
-          <div className="mb-6 flex items-center gap-2 text-lg text-[#0B2340] lg:hidden">
+        <div className="flex min-h-[620px] flex-col justify-center bg-white px-8 py-12 sm:px-12 lg:px-16">
+          <div className="flex md:hidden items-center gap-2 text-lg mb-6 text-[#0B2340]">
             <span className="inline-block w-[8px] h-[8px] rounded-full bg-[#FDB913]" />
             INSURE
           </div>
 
-          <h1 className="mb-2 text-display text-[#0B2340]">Create your account</h1>
-          <p className="mb-6 text-base text-[#5B6472] sm:mb-8">
+          <h1 className="max-w-[380px] text-5xl font-normal leading-none tracking-tight text-[#0B2340]">Create your account</h1>
+          <p className="mb-8 mt-4 max-w-[340px] text-base leading-6 text-[#66717D]">
             Start your insurance licensing journey with INSURE.
           </p>
 
+          {/* Registration is invite-only: /api/auth/register claims a row in
+              registration_invites and takes the new user's manager from it, so
+              a signup without a code can only ever be rejected. Say that up
+              front instead of showing a form that cannot succeed. */}
           {!initialCode && (
-            <div className="border border-[#E4DCC8] bg-[#FBF7EE] p-4 sm:p-6">
+            <div className="max-w-[440px] border border-[#E5DDCF] bg-[#FBF8F1] p-4 sm:p-6">
               <p className="text-base font-semibold text-[#0B2340]">
                 You need an invitation link
               </p>
-              <p className="mt-2 text-sm leading-6 text-[#5B6472]">
+              <p className="mt-2 text-sm leading-6 text-[#66717D]">
                 Accounts are created from an invitation link sent by your admin
                 or manager. Ask them for one, then open it to finish signing up.
               </p>
@@ -123,7 +127,7 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
           )}
 
           {initialCode && (
-          <form className="space-y-[18px]" onSubmit={handleSubmit}>
+          <form className="max-w-[440px] space-y-[18px]" onSubmit={handleSubmit}>
           <Field
             id="name"
             label="Full Name"
@@ -153,7 +157,7 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
                 type="button"
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="flex size-11 items-center justify-center text-[#A9A092] transition hover:text-[#0B2340]"
+                className="flex items-center justify-center text-[#A9A092] transition hover:text-[#0B2340]"
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
@@ -172,7 +176,7 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="mt-1.5 flex min-h-12 w-full items-center justify-center gap-2 bg-[#FDB913] px-4 py-3.5 text-base text-[#0B2340] shadow-sm transition-colors hover:bg-[#C98A00] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0B2340] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
+            className="mt-1.5 flex w-full items-center justify-center gap-2 bg-[#FDB913] px-4 py-3.5 text-base text-[#0B2340] shadow-sm transition-colors hover:bg-[#D99D00] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0B2340] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSubmitting ? (
                 <LoaderCircle className="size-4 animate-spin" />
@@ -183,7 +187,7 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
           </button>
           </form>
           )}
-          <p className="mt-6 text-center text-base text-[#5B6472] sm:mt-8">
+          <p className="mt-8 max-w-[440px] text-center text-base text-[#66717D]">
             Already have an account?{" "}
             <Link href="/" className="font-bold text-[#0B2340] hover:underline">
               Log in
@@ -226,11 +230,11 @@ function Field({
           id={id}
           name={id}
           required
-          className="block w-full border border-[#E4DCC8] bg-white py-3 pl-10 pr-12 text-base text-[#10151F] placeholder-[#A9A092] outline-none transition focus:border-[#0B2340] focus:ring-4 focus:ring-[#0B2340]/10"
+          className="block w-full pl-10 pr-10 py-3 border border-[#E4DCC8] bg-white text-[#10151F] placeholder-[#A9A092] text-base outline-none transition focus:border-[#0B2340] focus:ring-4 focus:ring-[#0B2340]/10"
           {...inputProps}
         />
         {trailingAction && (
-          <span className="absolute inset-y-0 right-1 flex items-center justify-center">
+          <span className="absolute inset-y-0 right-3.5 flex items-center justify-center">
             {trailingAction}
           </span>
         )}
