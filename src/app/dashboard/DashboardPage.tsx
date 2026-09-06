@@ -35,11 +35,16 @@ const trackCopy: Record<ExamType, { title: string; blurb: string }> = {
     title: "Traditional Life",
     blurb: "Core fundamentals of whole and term life insurance.",
   },
+  IIAP: {
+    title: "IIAP",
+    blurb: "",
+  },
 };
 
 const emptyProgress: Record<ExamType, number> = {
   VUL: 0,
   TRADITIONAL_LIFE: 0,
+  IIAP: 0,
 };
 
 function ModeOption({
