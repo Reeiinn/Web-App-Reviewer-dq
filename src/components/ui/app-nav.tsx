@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -135,18 +135,6 @@ export function AppNav() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <button
-            aria-label="Notifications"
-            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <Bell className="size-5" />
-          </button>
-          <button
-            aria-label="Settings"
-            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <Settings className="size-5" />
-          </button>
           <UserMenu />
         </div>
       </div>
