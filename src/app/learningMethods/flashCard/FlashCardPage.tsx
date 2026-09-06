@@ -45,6 +45,7 @@ const asSavedSession = (value: unknown): SavedSession | null =>
 const trackTitles: Record<ExamType, string> = {
   VUL: "VUL Track Review",
   TRADITIONAL_LIFE: "Traditional Life Review",
+  IIAP: "IIAP",
 };
 
 function FlashCardContent() {
@@ -216,7 +217,8 @@ function FlashCardContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mastered: isCorrect }),
       });
-      const data = (await response.json()) as Partial<FlashcardProgressResponse>;
+      const data =
+        (await response.json()) as Partial<FlashcardProgressResponse>;
       if (data.streak) {
         setStreak({ current: data.streak.current, best: data.streak.best });
       }
