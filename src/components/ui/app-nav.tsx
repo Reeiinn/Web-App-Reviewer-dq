@@ -19,10 +19,12 @@ const learnerLinks = [
   { href: "/analytics", label: "Analytics" },
 ];
 
+// No Analytics here: it charts the signed-in account's own per-track mastery,
+// which is empty for staff since they do not study. Reviewee performance is
+// what the console is for.
 const staffLinks = [
   { href: "/admin", label: "Admin Console" },
   { href: "/glossary", label: "Glossary" },
-  { href: "/analytics", label: "Analytics" },
 ];
 
 function UserMenu() {
