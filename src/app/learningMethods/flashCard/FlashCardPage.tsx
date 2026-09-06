@@ -367,8 +367,13 @@ function FlashCardContent() {
               <span className="col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-4 overflow-hidden rounded-xl bg-[#0B2340] p-6 text-white [backface-visibility:hidden] [transform:rotateY(180deg)] sm:p-10">
                 <FitBox fit={backFit}>
                   {back.prompt && (
-                    <span className="block text-[1.5em] font-bold leading-[1.35]">
-                      {back.prompt}
+                    <span className="flex flex-col items-center gap-1">
+                      <span className="text-[0.6em] font-semibold text-white/70">
+                        Answer:
+                      </span>
+                      <span className="block text-[1.5em] font-bold leading-[1.35]">
+                        {back.prompt}
+                      </span>
                     </span>
                   )}
 
