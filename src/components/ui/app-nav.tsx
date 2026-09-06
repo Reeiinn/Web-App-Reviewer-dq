@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOut, Settings, User } from "lucide-react";
+import { isStaff, landingFor } from "@/lib/helper/roles";
+import { LogOut, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,8 +10,17 @@ import { useEffect, useRef, useState } from "react";
 // Flashcards and Memorize are reached through a track on the dashboard, so
 // they are deliberately not top-level links — a nav entry here would have had
 // to guess a track.
-const links = [
+//
+// Staff get the console where a reviewee gets the dashboard: the study screens
+// redirect them away, so linking there would only bounce.
+const learnerLinks = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/glossary", label: "Glossary" },
+  { href: "/analytics", label: "Analytics" },
+];
+
+const staffLinks = [
+  { href: "/admin", label: "Admin Console" },
   { href: "/glossary", label: "Glossary" },
   { href: "/analytics", label: "Analytics" },
 ];
@@ -22,7 +32,6 @@ function UserMenu() {
 
   const name = session?.user?.name ?? "Scholar";
   const email = session?.user?.email ?? "";
-  const role = (session?.user as { role?: string } | undefined)?.role;
   const initials = name
     .split(" ")
     .slice(0, 2)
@@ -74,17 +83,6 @@ function UserMenu() {
             )}
           </div>
 
-          {(role === "ADMIN" || role === "MANAGER") && (
-            <Link
-              href="/admin"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-muted"
-            >
-              <Settings className="size-4 text-muted-foreground" />
-              Admin console
-            </Link>
-          )}
-
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
             className="flex w-full items-center gap-3 border-t border-border px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -100,12 +98,16 @@ function UserMenu() {
 
 export function AppNav() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const staff = isStaff(session?.user?.role);
+  const links = staff ? staffLinks : learnerLinks;
+  const home = landingFor(session?.user?.role);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="rv-shell flex h-16 items-center justify-between gap-6">
         <Link
-          href="/dashboard"
+          href={home}
           className="text-lg font-extrabold tracking-tight text-foreground"
         >
           INSURE

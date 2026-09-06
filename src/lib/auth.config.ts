@@ -1,4 +1,9 @@
+import { isStaff } from "@/lib/helper/roles";
 import type { NextAuthConfig } from "next-auth";
+import { NextResponse } from "next/server";
+
+/** Screens that exist to study a track, so they belong to reviewees alone. */
+const learnerOnly = ["/dashboard", "/learningMethods"];
 
 export const authConfig: NextAuthConfig = {
   session: { strategy: "jwt" },
@@ -7,12 +12,22 @@ export const authConfig: NextAuthConfig = {
     authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
       const { pathname } = request.nextUrl;
+      const staff = isStaff(auth?.user?.role);
 
       if (pathname.startsWith("/admin")) {
         // Managers see their own reports; admins see everyone. The roster API
         // applies the same rule to the data itself.
-        const role = auth?.user?.role;
-        return isLoggedIn && (role === "ADMIN" || role === "MANAGER");
+        return isLoggedIn && staff;
+      }
+
+      // Send staff to the console rather than refusing them: they have no
+      // learner record to build, so the study screens have nothing to show.
+      if (
+        isLoggedIn &&
+        staff &&
+        learnerOnly.some((prefix) => pathname.startsWith(prefix))
+      ) {
+        return NextResponse.redirect(new URL("/admin", request.nextUrl));
       }
 
       return isLoggedIn;
