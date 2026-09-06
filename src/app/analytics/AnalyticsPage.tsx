@@ -147,7 +147,11 @@ export function AnalyticsPage() {
           <div className="mt-9 grid gap-6 lg:grid-cols-2">
             {examTypes.map((type) => {
               const row = rows[type];
-              const active = type === "VUL";
+              // The badge used to call VUL "Active" and everything else
+              // "Foundation", which was a two-track assumption rather than
+              // anything the data said. It now reports whether this learner
+              // has actually started the track.
+              const started = row.overall_pct > 0;
               const accent = trackAccents[type];
 
               return (
@@ -156,8 +160,14 @@ export function AnalyticsPage() {
                     <h2 className="text-xl font-extrabold">
                       {trackTitles[type]}
                     </h2>
-                    <span className="rounded bg-[#0B2340] px-2.5 py-1 text-[11px] font-bold text-white">
-                      {active ? "Active" : "Foundation"}
+                    <span
+                      className={`rounded px-2.5 py-1 text-[11px] font-bold ${
+                        started
+                          ? "bg-[#0B2340] text-white"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {started ? "In Progress" : "Not Started"}
                     </span>
                   </div>
 
@@ -178,7 +188,7 @@ export function AnalyticsPage() {
                       <Bar
                         label="Practice Questions"
                         value={row.practice_exam_pct}
-                        color="#FFD400"
+                        color="#0F7B52"
                       />
                     </div>
                   </div>
