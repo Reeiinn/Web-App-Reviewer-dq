@@ -278,7 +278,7 @@
 @media (pointer: fine) {
   html {
     scrollbar-width: thin;
-    scrollbar-color: var(--input) transparent;
+    scrollbar-color: var(--primary-strong) var(--muted);
   }
 
   html::-webkit-scrollbar {
@@ -286,18 +286,18 @@
   }
 
   html::-webkit-scrollbar-track {
-    background: var(--background);
+    background: var(--muted);
   }
 
   html::-webkit-scrollbar-thumb {
     /* The border plus padding-box clip insets the thumb inside the track. */
-    background: var(--input);
-    border: 2px solid var(--background);
+    background: var(--primary-strong);
+    border: 2px solid var(--muted);
     border-radius: 9999px;
     background-clip: padding-box;
   }
 
   html::-webkit-scrollbar-thumb:hover {
-    background: var(--secondary);
+    background: var(--primary);
   }
 }

@@ -81,11 +81,13 @@ export function FilterSelect<Value extends string>({
                 <Select.Item
                   key={option.value}
                   value={option.value}
-                  className="flex cursor-default select-none items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-foreground outline-none data-[highlighted]:bg-muted"
+                  className="flex cursor-default select-none items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-foreground outline-none transition-colors data-[highlighted]:bg-accent data-[highlighted]:text-[#0B2340] data-[selected]:bg-[#0B2340] data-[selected]:text-white"
                 >
                   {/* The indicator only mounts on the selected row, so the slot
-                      is held open here to keep every label on one x-position. */}
-                  <span className="flex size-4 shrink-0 items-center justify-center text-[#0B2340]">
+                      is held open here to keep every label on one x-position.
+                      Colour comes from the row, since the selected row turns
+                      navy and a navy check would vanish into it. */}
+                  <span className="flex size-4 shrink-0 items-center justify-center">
                     <Select.ItemIndicator>
                       <Check className="size-4" />
                     </Select.ItemIndicator>
