@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
 import { readinessStatus } from "@/lib/helper/readiness";
+import { examTypes, type ExamType } from "@/lib/types/common";
 import { NextResponse } from "next/server";
 
 type Counts = { total: number; mastered: number };
@@ -8,13 +9,27 @@ type Counts = { total: number; mastered: number };
 const pct = (part: number, whole: number) =>
   whole > 0 ? Math.round((part / whole) * 100) : 0;
 
+/** Rows keyed by user and track, as (user_id, exam_type) pairs. */
+type TrackRow = { user_id: string; exam_type: ExamType };
+
+const trackKey = (userId: string, examType: string) => `${userId} ${examType}`;
+
+const indexByTrack = <T extends TrackRow>(rows: T[]) =>
+  new Map(rows.map((row) => [trackKey(row.user_id, row.exam_type), row]));
+
 /**
  * Roster for the admin console. ADMIN sees everyone; MANAGER sees only their
  * own reports. Every column here is backed by a real table — the mockup's
  * cohort badges and scheduled exam dates have no data behind them and are
  * deliberately absent.
+ *
+ * Accepts ?exam_type=<track> to scope every number to one track. Without it,
+ * readiness is the mean of the per-track readiness scores, so a track counts
+ * the same whether it holds 20 items or 200 — seeding a new track then moves
+ * the score by a known fraction rather than by however large the seed was.
+ * The count columns still show totals summed across tracks.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,6 +40,12 @@ export async function GET() {
   if (role !== "ADMIN" && role !== "MANAGER") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const requested = new URL(req.url).searchParams.get("exam_type");
+  const selected = examTypes.includes(requested as ExamType)
+    ? (requested as ExamType)
+    : null;
+  const tracks = selected ? [selected] : examTypes;
 
   try {
     // manager_id is set at signup from the invite the reviewee used, so it is
@@ -54,7 +75,8 @@ export async function GET() {
 
     const userIds = users.map((user) => user.id);
 
-    // Totals are per-track content counts, independent of any user.
+    // Progress tables reference content by id and carry no exam_type of their
+    // own, so each one joins its content table to learn which track it is in.
     const [
       contentTotals,
       flashcards,
@@ -64,84 +86,143 @@ export async function GET() {
       streaks,
     ] = await Promise.all([
       pool.query(
-        `SELECT
-             (SELECT COUNT(*) FROM flashcards)    AS flashcards,
-             (SELECT COUNT(*) FROM memorization)  AS memorization,
-             (SELECT COUNT(*) FROM questions)     AS questions`,
+        `SELECT exam_type, 'flashcards' AS kind, COUNT(*) AS total
+           FROM flashcards GROUP BY exam_type
+         UNION ALL
+         SELECT exam_type, 'memorization', COUNT(*)
+           FROM memorization GROUP BY exam_type
+         UNION ALL
+         SELECT exam_type, 'questions', COUNT(*)
+           FROM questions GROUP BY exam_type`,
       ),
       pool.query(
-        `SELECT user_id, COUNT(*) FILTER (WHERE mastered) AS mastered
-           FROM flashcard_progress WHERE user_id = ANY($1) GROUP BY user_id`,
+        `SELECT fp.user_id, f.exam_type,
+                COUNT(*) FILTER (WHERE fp.mastered) AS mastered
+           FROM flashcard_progress fp
+           JOIN flashcards f ON f.id = fp.flashcard_id
+          WHERE fp.user_id = ANY($1)
+          GROUP BY fp.user_id, f.exam_type`,
         [userIds],
       ),
       pool.query(
-        `SELECT user_id,
-                  COUNT(*) FILTER (WHERE mastered)   AS mastered,
-                  COUNT(*)                           AS answered,
-                  COUNT(*) FILTER (WHERE is_correct) AS correct
-           FROM memorization_progress WHERE user_id = ANY($1) GROUP BY user_id`,
+        `SELECT mp.user_id, m.exam_type,
+                COUNT(*) FILTER (WHERE mp.mastered)   AS mastered,
+                COUNT(*)                              AS answered,
+                COUNT(*) FILTER (WHERE mp.is_correct) AS correct
+           FROM memorization_progress mp
+           JOIN memorization m ON m.id = mp.memorization_id
+          WHERE mp.user_id = ANY($1)
+          GROUP BY mp.user_id, m.exam_type`,
         [userIds],
       ),
       pool.query(
-        `SELECT user_id, COUNT(*) FILTER (WHERE mastered) AS mastered
-           FROM question_progress WHERE user_id = ANY($1) GROUP BY user_id`,
+        `SELECT qp.user_id, q.exam_type,
+                COUNT(*) FILTER (WHERE qp.mastered) AS mastered
+           FROM question_progress qp
+           JOIN questions q ON q.id = qp.question_id
+          WHERE qp.user_id = ANY($1)
+          GROUP BY qp.user_id, q.exam_type`,
         [userIds],
       ),
       pool.query(
-        `SELECT user_id,
-                  COUNT(*)                       AS taken,
-                  COUNT(*) FILTER (WHERE passed) AS passed,
-                  AVG(CASE WHEN total_items > 0
-                           THEN score::numeric / total_items * 100 END) AS average
+        `SELECT user_id, exam_type,
+                COUNT(*)                       AS taken,
+                COUNT(*) FILTER (WHERE passed) AS passed,
+                AVG(CASE WHEN total_items > 0
+                         THEN score::numeric / total_items * 100 END) AS average
            FROM exam_attempts
-           WHERE user_id = ANY($1) AND completed_at IS NOT NULL
-           GROUP BY user_id`,
+          WHERE user_id = ANY($1) AND completed_at IS NOT NULL
+          GROUP BY user_id, exam_type`,
         [userIds],
       ),
       pool.query(
-        `SELECT user_id,
-                  MAX(current_streak) AS current_streak,
-                  MAX(best_streak)    AS best_streak,
-                  MAX(last_answer_at) AS last_answer_at
-           FROM study_streaks WHERE user_id = ANY($1) GROUP BY user_id`,
+        `SELECT user_id, exam_type, current_streak, best_streak, last_answer_at
+           FROM study_streaks WHERE user_id = ANY($1)`,
         [userIds],
       ),
     ]);
 
-    const totals = contentTotals.rows[0];
-    const index = <T extends { user_id: string }>(rows: T[]) =>
-      new Map(rows.map((row) => [row.user_id, row]));
+    // Content totals per track, so a track scores against its own item count.
+    const totalsByTrack = new Map<string, number>();
+    for (const row of contentTotals.rows) {
+      totalsByTrack.set(`${row.exam_type} ${row.kind}`, Number(row.total));
+    }
+    const totalFor = (track: ExamType, kind: string) =>
+      totalsByTrack.get(`${track} ${kind}`) ?? 0;
 
-    const flashcardsBy = index(flashcards.rows);
-    const memorizationBy = index(memorization.rows);
-    const questionsBy = index(questions.rows);
-    const attemptsBy = index(attempts.rows);
-    const streaksBy = index(streaks.rows);
+    const flashcardsBy = indexByTrack(flashcards.rows);
+    const memorizationBy = indexByTrack(memorization.rows);
+    const questionsBy = indexByTrack(questions.rows);
+    const attemptsBy = indexByTrack(attempts.rows);
+    const streaksBy = indexByTrack(streaks.rows);
 
     const roster = users.map((user) => {
-      const flashcardCounts: Counts = {
-        total: Number(totals.flashcards),
-        mastered: Number(flashcardsBy.get(user.id)?.mastered ?? 0),
-      };
-      const memorizationRow = memorizationBy.get(user.id);
-      const memorizationCounts: Counts = {
-        total: Number(totals.memorization),
-        mastered: Number(memorizationRow?.mastered ?? 0),
-      };
-      const practiceCounts: Counts = {
-        total: Number(totals.questions),
-        mastered: Number(questionsBy.get(user.id)?.mastered ?? 0),
-      };
+      const perTrack = tracks.map((track) => {
+        const key = trackKey(user.id, track);
+        const memorizationRow = memorizationBy.get(key);
+        const attemptRow = attemptsBy.get(key);
+        const streakRow = streaksBy.get(key);
 
+        const flashcardCounts: Counts = {
+          total: totalFor(track, "flashcards"),
+          mastered: Number(flashcardsBy.get(key)?.mastered ?? 0),
+        };
+        const memorizationCounts: Counts = {
+          total: totalFor(track, "memorization"),
+          mastered: Number(memorizationRow?.mastered ?? 0),
+        };
+        const practiceCounts: Counts = {
+          total: totalFor(track, "questions"),
+          mastered: Number(questionsBy.get(key)?.mastered ?? 0),
+        };
+
+        return {
+          readiness: Math.round(
+            (pct(flashcardCounts.mastered, flashcardCounts.total) +
+              pct(memorizationCounts.mastered, memorizationCounts.total) +
+              pct(practiceCounts.mastered, practiceCounts.total)) /
+              3,
+          ),
+          flashcards: flashcardCounts,
+          memorization: memorizationCounts,
+          practice: practiceCounts,
+          answered: Number(memorizationRow?.answered ?? 0),
+          correct: Number(memorizationRow?.correct ?? 0),
+          taken: Number(attemptRow?.taken ?? 0),
+          passed: Number(attemptRow?.passed ?? 0),
+          average: attemptRow?.average ? Number(attemptRow.average) : null,
+          current: Number(streakRow?.current_streak ?? 0),
+          best: Number(streakRow?.best_streak ?? 0),
+          lastActivity: (streakRow?.last_answer_at as string | null) ?? null,
+        };
+      });
+
+      const sum = (pick: (row: (typeof perTrack)[number]) => number) =>
+        perTrack.reduce((running, row) => running + pick(row), 0);
+
+      // Every track weighs the same here, whatever its item count.
       const readiness = Math.round(
-        (pct(flashcardCounts.mastered, flashcardCounts.total) +
-          pct(memorizationCounts.mastered, memorizationCounts.total) +
-          pct(practiceCounts.mastered, practiceCounts.total)) /
-          3,
+        sum((row) => row.readiness) / perTrack.length,
       );
 
-      const attemptRow = attemptsBy.get(user.id);
-      const streakRow = streaksBy.get(user.id);
+      // Tracks the reviewee never sat would drag a mean of averages to zero,
+      // so only tracks with a completed attempt count toward the score.
+      const scored = perTrack.filter((row) => row.average !== null);
+      const average = scored.length
+        ? Math.round(
+            (scored.reduce((running, row) => running + (row.average ?? 0), 0) /
+              scored.length) *
+              10,
+          ) / 10
+        : null;
+
+      const answered = sum((row) => row.answered);
+      const lastActivity =
+        perTrack
+          .map((row) => row.lastActivity)
+          .filter((value): value is string => Boolean(value))
+          .sort()
+          .at(-1) ?? null;
 
       return {
         id: user.id,
@@ -158,26 +239,31 @@ export async function GET() {
           : null,
         readiness,
         status: readinessStatus(readiness),
-        flashcards: flashcardCounts,
+        flashcards: {
+          total: sum((row) => row.flashcards.total),
+          mastered: sum((row) => row.flashcards.mastered),
+        },
         memorize: {
-          ...memorizationCounts,
+          total: sum((row) => row.memorization.total),
+          mastered: sum((row) => row.memorization.mastered),
           accuracy: pct(
-            Number(memorizationRow?.correct ?? 0),
-            Number(memorizationRow?.answered ?? 0),
+            sum((row) => row.correct),
+            answered,
           ),
         },
-        practice: practiceCounts,
+        practice: {
+          total: sum((row) => row.practice.total),
+          mastered: sum((row) => row.practice.mastered),
+        },
         mockExam: {
-          taken: Number(attemptRow?.taken ?? 0),
-          passed: Number(attemptRow?.passed ?? 0),
-          average: attemptRow?.average
-            ? Math.round(Number(attemptRow.average) * 10) / 10
-            : null,
+          taken: sum((row) => row.taken),
+          passed: sum((row) => row.passed),
+          average,
         },
         streak: {
-          current: Number(streakRow?.current_streak ?? 0),
-          best: Number(streakRow?.best_streak ?? 0),
-          lastActivity: streakRow?.last_answer_at ?? null,
+          current: Math.max(0, ...perTrack.map((row) => row.current)),
+          best: Math.max(0, ...perTrack.map((row) => row.best)),
+          lastActivity,
         },
       };
     });

@@ -4,6 +4,7 @@ import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { AppNav } from "@/components/ui/app-nav";
 import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
+import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import {
   readinessStatus,
   statusLabels,
@@ -58,6 +59,15 @@ type SortKey = keyof typeof sorts;
 const sortOptions: readonly SelectOption<SortKey>[] = Object.entries(sorts).map(
   ([value, label]) => ({ value: value as SortKey, label }),
 );
+
+/**
+ * "All Exams" is not a track the API knows — it means send no exam_type, which
+ * scores every track and averages them.
+ */
+const examOptions: readonly SelectOption<ExamType | "ALL">[] = [
+  { value: "ALL", label: "All Exams" },
+  ...examTypes.map((value) => ({ value, label: examLabels[value] })),
+];
 
 const statusOptions: readonly SelectOption<ReadinessStatus | "ALL">[] = [
   { value: "ALL", label: "All Statuses" },
@@ -304,11 +314,20 @@ export function AdminPage() {
   const [sort, setSort] = useState<SortKey>("readiness_desc");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [examType, setExamType] = useState<ExamType | "ALL">("ALL");
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
 
-    fetch("/api/admin/reviewees")
+    // The track scopes what every number means, so it is the server that
+    // recomputes the roster rather than the table filtering rows it already has.
+    const query =
+      examType === "ALL"
+        ? ""
+        : `?exam_type=${encodeURIComponent(examType)}`;
+
+    fetch(`/api/admin/reviewees${query}`)
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Failed to load");
@@ -321,7 +340,7 @@ export function AdminPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [examType]);
 
   const counts = useMemo(
     () => ({
@@ -384,8 +403,9 @@ export function AdminPage() {
               </span>
             </div>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Live performance tracking of every candidate across licensing
-              tracks.
+              {examType === "ALL"
+                ? "Live performance tracking of every candidate, scored across all licensing tracks."
+                : `Live performance tracking of every candidate, scored on ${examLabels[examType]} only.`}
             </p>
           </div>
 
@@ -432,6 +452,17 @@ export function AdminPage() {
         </div>
 
         <div className="rv-card mt-6 flex flex-wrap items-end gap-6 p-5">
+          <FilterSelect
+            label="Exam Type"
+            value={examType}
+            onValueChange={(next) => {
+              setExamType(next);
+              setPage(1);
+            }}
+            options={examOptions}
+            triggerClassName="w-60"
+          />
+
           <FilterSelect
             label="Readiness Status"
             value={statusFilter}
