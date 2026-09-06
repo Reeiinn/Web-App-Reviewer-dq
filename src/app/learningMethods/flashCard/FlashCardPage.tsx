@@ -2,11 +2,7 @@
 
 import { AppNav } from "@/components/ui/app-nav";
 import { BackLink } from "@/components/ui/back-link";
-import {
-  AnswerFeedback,
-  Confetti,
-  StreakBadge,
-} from "@/components/ui/motivation";
+import { AnswerFeedback, StreakBadge } from "@/components/ui/motivation";
 import { Result } from "@/components/ui/result";
 import { motivationFor, MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
@@ -62,7 +58,6 @@ function FlashCardContent() {
 
   const [streak, setStreak] = useState({ current: 0, best: 0 });
   const [message, setMessage] = useState<MotivationMessage | null>(null);
-  const [celebration, setCelebration] = useState(0);
   const advanceTimer = useRef<number | null>(null);
   /** Card the deck resumed on, so the learner sees where they left off. */
   const [resumedAt, setResumedAt] = useState<number | null>(null);
@@ -198,7 +193,6 @@ function FlashCardContent() {
       best: Math.max(current.best, optimistic),
     }));
     setMessage(motivationFor(isCorrect, optimistic, index));
-    if (isCorrect) setCelebration((run) => run + 1);
 
     advanceTimer.current = window.setTimeout(() => {
       setMessage(null);
@@ -299,11 +293,15 @@ function FlashCardContent() {
         )}
 
         <div className="relative mt-8">
-          <Confetti
-            active={message?.mood === "correct"}
-            runId={celebration}
-            pieces={message?.milestone ? 34 : 20}
-          />
+          {/* The verdict lands on the card itself, where the eye already is,
+              rather than in a banner below the buttons. */}
+          {message && (
+            <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-[var(--radius)] bg-background/80 p-6 backdrop-blur-[2px]">
+              <div className="w-full max-w-sm">
+                <AnswerFeedback message={message} />
+              </div>
+            </div>
+          )}
 
           <button
             type="button"
@@ -419,11 +417,6 @@ function FlashCardContent() {
           </button>
         </div>
 
-        {message && (
-          <div className="mx-auto mt-6 max-w-md text-left">
-            <AnswerFeedback message={message} />
-          </div>
-        )}
       </main>
     </div>
   );
