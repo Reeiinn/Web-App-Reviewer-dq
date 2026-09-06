@@ -2,7 +2,7 @@
 
 import { AppNav } from "@/components/ui/app-nav";
 import { BackLink } from "@/components/ui/back-link";
-import { AnswerFeedback, StreakBadge } from "@/components/ui/motivation";
+import { StreakBadge } from "@/components/ui/motivation";
 import { Result } from "@/components/ui/result";
 import { motivationFor, MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
@@ -16,11 +16,13 @@ import type {
 import type { StreakRow } from "@/lib/types/streak";
 import {
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   HelpCircle,
   Shuffle,
   X,
+  XCircle,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -293,13 +295,24 @@ function FlashCardContent() {
         )}
 
         <div className="relative mt-8">
-          {/* The verdict lands on the card itself, where the eye already is,
-              rather than in a banner below the buttons. */}
+          {/* The verdict takes the whole card face rather than floating in a
+              strip over it, so the colour alone reads as the answer from across
+              the room and the words carry the rest. */}
           {message && (
-            <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-[var(--radius)] bg-background/80 p-6 backdrop-blur-[2px]">
-              <div className="w-full max-w-sm">
-                <AnswerFeedback message={message} />
-              </div>
+            <div
+              role="status"
+              className={`rv-pop-in pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 rounded-[var(--radius)] p-8 text-center text-white ${
+                message.mood === "correct" ? "bg-[#0F7B52]" : "bg-[#C91D1D]"
+              }`}
+            >
+              <p className="text-3xl font-extrabold leading-tight sm:text-4xl">
+                {message.headline}
+              </p>
+              {message.mood === "correct" ? (
+                <CheckCircle2 className="size-14" strokeWidth={2.5} />
+              ) : (
+                <XCircle className="size-14" strokeWidth={2.5} />
+              )}
             </div>
           )}
 
