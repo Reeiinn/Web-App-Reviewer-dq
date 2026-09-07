@@ -363,7 +363,13 @@ export function DashboardPage() {
 
   const firstName = session?.user?.name?.split(" ")[0] ?? "Scholar";
 
-  const activeTrack = pickActiveTrack(examTypes, activity);
+  // A visit is the truer "current": opening a track counts straight away,
+  // where last_activity_at only moves once an answer is saved, so a track
+  // opened but not answered yet still left the badge on the previous one.
+  // Progress timestamps stay the fallback for accounts recorded before the
+  // visit feed existed.
+  const activeTrack =
+    recent[0]?.exam_type ?? pickActiveTrack(examTypes, activity);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
