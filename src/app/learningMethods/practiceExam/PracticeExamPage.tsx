@@ -196,7 +196,7 @@ function PracticeExamContent() {
   if (eligibility && !eligibility.eligible) {
     return (
       <Frame title="Practice exam locked">
-        <section className="rv-card max-w-xl p-7">
+        <section className="rv-card mx-auto w-full max-w-xl p-[clamp(1.25rem,5vw,1.75rem)]">
           <span className="flex size-11 items-center justify-center rounded-full bg-muted">
             <Lock className="size-5 text-muted-foreground" />
           </span>
@@ -242,12 +242,12 @@ function PracticeExamContent() {
 
     return (
       <Frame title={`${examLabels[type]} Results`}>
-        <div className="max-w-2xl">
+        <div className="mx-auto w-full max-w-2xl">
           {/* The verdict first: a percentage does not say whether the sitting
               cleared the bar, and the counter says how much of the track is
               behind them. */}
           <section
-            className={`rv-card mb-4 flex flex-wrap items-center justify-between gap-3 p-5 ${
+            className={`rv-card mb-4 flex flex-col items-start justify-between gap-3 p-[clamp(1rem,4vw,1.25rem)] xs:flex-row xs:items-center ${
               outcome?.passed
                 ? "border-2 border-[#0F7B52]"
                 : "border-2 border-[#C91D1D]"
@@ -268,7 +268,7 @@ function PracticeExamContent() {
               </p>
             </div>
 
-            <div className="text-right">
+            <div className="w-full text-left xs:w-auto xs:text-right">
               <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 Exams passed
               </p>
@@ -319,7 +319,7 @@ function PracticeExamContent() {
 
   return (
     <Frame title={`${examLabels[type]} Practice Exam`}>
-      <div className="max-w-3xl">
+      <div className="w-full">
         <button
           onClick={() => {
             setQuestions((current) => shuffled(current));
@@ -434,10 +434,20 @@ function Frame({
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppNav />
-      <main className="rv-shell py-10">
-        <BackLink />
-        <h1 className="mb-6 text-4xl font-extrabold md:text-5xl">{title}</h1>
-        {children}
+      <main className="rv-shell py-[clamp(1.5rem,4vw,2.5rem)]">
+        {/* One column for the whole screen: the way back, the title and the
+            questions share an edge and centre together, instead of the heading
+            hugging the shell while the cards sat in a narrower column of their
+            own. */}
+        <div className="mx-auto w-full max-w-3xl">
+          <BackLink />
+          {/* Fluid rather than a jump at md: the title is the tallest thing
+              here, and on a short window that jump costs a question. */}
+          <h1 className="mb-[clamp(1rem,3vw,1.5rem)] text-[clamp(1.75rem,5.5vw,3rem)] font-extrabold leading-tight">
+            {title}
+          </h1>
+          {children}
+        </div>
       </main>
     </div>
   );
