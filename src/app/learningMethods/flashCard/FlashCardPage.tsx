@@ -14,13 +14,7 @@ import type {
   FlashcardProgressResponse,
 } from "@/lib/types/flashcard";
 import type { StreakRow } from "@/lib/types/streak";
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Shuffle,
-  X,
-} from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Shuffle, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
@@ -444,7 +438,6 @@ function FlashCardContent() {
             <ChevronRight className="size-4" />
           </button>
         </div>
-
       </main>
     </div>
   );

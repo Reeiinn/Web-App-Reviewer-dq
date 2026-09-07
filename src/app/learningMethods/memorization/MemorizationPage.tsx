@@ -301,10 +301,7 @@ function MemorizationContent() {
           </h1>
           <span className="ml-auto shrink-0 whitespace-nowrap text-sm font-extrabold tabular-nums">
             {index + 1}
-            <span className="text-muted-foreground">
-              {" "}
-              / {questions.length}
-            </span>
+            <span className="text-muted-foreground"> / {questions.length}</span>
           </span>
           <StreakBadge
             compact
@@ -356,64 +353,64 @@ function MemorizationContent() {
                   style={{ fontSize: fit.fontSize }}
                   className="my-auto w-full"
                 >
-                <h2 className="text-[1.3em] font-extrabold leading-[1.4]">
-                  {parts?.prompt}
-                </h2>
+                  <h2 className="text-[1.3em] font-extrabold leading-[1.4]">
+                    {parts?.prompt}
+                  </h2>
 
-                {parts && parts.statements.length > 0 && (
-                  <div className="mt-[0.6em] flex flex-col gap-[0.4em]">
-                    {parts.statements.map((statement) => (
-                      <p
-                        key={statement}
-                        className="rounded-lg bg-muted px-[0.9em] py-[0.55em] text-[0.95em] leading-[1.45]"
-                      >
-                        {statement}
-                      </p>
-                    ))}
-                  </div>
-                )}
-
-                <div
-                  className={`mt-[0.7em] grid gap-[0.45em] ${
-                    pairChoices ? "sm:grid-cols-2" : ""
-                  }`}
-                >
-                  {question.choices.map((choice, choiceIndex) => {
-                    const isChosen = selected === choice.id;
-                    const isCorrect = choice.id === correctChoiceId;
-
-                    const state = checked
-                      ? isCorrect
-                        ? "border-emerald-500 bg-emerald-50"
-                        : isChosen
-                          ? "border-rose-500 bg-rose-50"
-                          : "border-border opacity-60"
-                      : isChosen
-                        ? "border-[#8A6D0B] bg-[#FBF7EE]"
-                        : "border-border hover:border-[#C9A227]";
-
-                    return (
-                      <button
-                        key={choice.id}
-                        type="button"
-                        disabled={checked}
-                        onClick={() => setSelected(choice.id)}
-                        className={`flex items-center gap-[0.8em] rounded-lg border-2 px-[0.9em] py-[0.65em] text-left text-[1.05em] leading-[1.35] transition disabled:cursor-default ${state}`}
-                      >
-                        <span
-                          className={`flex size-[1.9em] shrink-0 items-center justify-center rounded-full border text-[0.8em] font-bold ${
-                            isChosen && !checked
-                              ? "border-[#8A6D0B] bg-[#FFD400] text-[#0B2340]"
-                              : "border-border text-muted-foreground"
-                          }`}
+                  {parts && parts.statements.length > 0 && (
+                    <div className="mt-[0.6em] flex flex-col gap-[0.4em]">
+                      {parts.statements.map((statement) => (
+                        <p
+                          key={statement}
+                          className="rounded-lg bg-muted px-[0.9em] py-[0.55em] text-[0.95em] leading-[1.45]"
                         >
-                          {String.fromCharCode(65 + choiceIndex)}
-                        </span>
-                        {choice.text}
-                      </button>
-                    );
-                  })}
-                </div>
+                          {statement}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
+                  <div
+                    className={`mt-[0.7em] grid gap-[0.45em] ${
+                      pairChoices ? "sm:grid-cols-2" : ""
+                    }`}
+                  >
+                    {question.choices.map((choice, choiceIndex) => {
+                      const isChosen = selected === choice.id;
+                      const isCorrect = choice.id === correctChoiceId;
+
+                      const state = checked
+                        ? isCorrect
+                          ? "border-emerald-500 bg-emerald-50"
+                          : isChosen
+                            ? "border-rose-500 bg-rose-50"
+                            : "border-border opacity-60"
+                        : isChosen
+                          ? "border-[#8A6D0B] bg-[#FBF7EE]"
+                          : "border-border hover:border-[#C9A227]";
+
+                      return (
+                        <button
+                          key={choice.id}
+                          type="button"
+                          disabled={checked}
+                          onClick={() => setSelected(choice.id)}
+                          className={`flex items-center gap-[0.8em] rounded-lg border-2 px-[0.9em] py-[0.65em] text-left text-[1.05em] leading-[1.35] transition disabled:cursor-default ${state}`}
+                        >
+                          <span
+                            className={`flex size-[1.9em] shrink-0 items-center justify-center rounded-full border text-[0.8em] font-bold ${
+                              isChosen && !checked
+                                ? "border-[#8A6D0B] bg-[#FFD400] text-[#0B2340]"
+                                : "border-border text-muted-foreground"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + choiceIndex)}
+                          </span>
+                          {choice.text}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </section>
