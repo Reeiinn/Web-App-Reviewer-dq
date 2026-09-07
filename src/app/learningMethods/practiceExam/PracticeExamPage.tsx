@@ -483,15 +483,24 @@ function PracticeExamContent() {
               const wasRight = chosen === correctId;
 
               return (
+                // The verdict is the whole edge of the card, so a scan down the
+                // review finds the wrong answers by colour rather than by
+                // reading the label on each one.
                 <section
                   key={`${question.id}-${index}`}
-                  className="rv-card p-5"
+                  className={`rv-card border-2 p-5 ${
+                    wasRight ? "border-[#0F7B52]" : "border-[#C91D1D]"
+                  }`}
                 >
-                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  <p
+                    className={`text-xs font-bold uppercase tracking-wide ${
+                      wasRight ? "text-[#0F7B52]" : "text-[#C91D1D]"
+                    }`}
+                  >
                     Question {index + 1} · {wasRight ? "Correct" : "Incorrect"}
                   </p>
                   <QuestionText text={question.text} />
-                  <p className="mt-3 text-sm text-emerald-700">
+                  <p className="mt-3 text-sm text-[#0F7B52]">
                     <strong>Correct answer:</strong>{" "}
                     {question.choices.find((choice) => choice.is_correct)?.text}
                   </p>
