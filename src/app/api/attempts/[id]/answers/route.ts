@@ -54,10 +54,17 @@ export async function POST(
 
     const isCorrect = choiceResult.rows[0].is_correct;
 
+    // Answers are saved as they are picked, so the same question arrives again
+    // whenever the learner changes their mind. The row is replaced rather than
+    // added to: two rows for one question would both count toward the score.
     const result = await pool.query(
-      `INSERT INTO exam_attempt_answers 
+      `INSERT INTO exam_attempt_answers
         (attempt_id, question_id, selected_choice_id, is_correct)
        VALUES ($1, $2, $3, $4)
+       ON CONFLICT (attempt_id, question_id)
+       DO UPDATE SET
+         selected_choice_id = EXCLUDED.selected_choice_id,
+         is_correct = EXCLUDED.is_correct
        RETURNING *`,
       [attemptId, question_id, selected_choice_id, isCorrect],
     );

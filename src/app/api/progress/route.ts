@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
+import { PASSES_REQUIRED, cappedPasses } from "@/lib/helper/practice-exam";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -41,6 +42,14 @@ export async function GET() {
           ON qp.question_id = q.id AND qp.user_id = $1
         GROUP BY q.exam_type
       ),
+      -- Passing sittings per track: what the x / 5 counter reads, and the
+      -- only thing that decides whether a track is passed.
+      exam_pass_stats AS (
+        SELECT exam_type, COUNT(*) AS passes
+        FROM exam_attempts
+        WHERE user_id = $1 AND passed = true AND completed_at IS NOT NULL
+        GROUP BY exam_type
+      ),
       activity_stats AS (
         SELECT exam_type, MAX(reviewed_at) AS last_activity_at
         FROM (
@@ -69,12 +78,15 @@ export async function GET() {
         COALESCE(m.total, 0) AS memorize_total,
         COALESCE(m.mastered, 0) AS memorize_mastered,
         COALESCE(q.total, 0) AS practice_total,
-        COALESCE(q.mastered, 0) AS practice_mastered
+        COALESCE(q.mastered, 0) AS practice_mastered,
+        COALESCE(p.passes, 0) AS exam_passes
       FROM flashcard_stats f
       FULL OUTER JOIN memorization_stats m ON m.exam_type = f.exam_type
       FULL OUTER JOIN question_stats q ON q.exam_type = COALESCE(f.exam_type, m.exam_type)
       LEFT JOIN activity_stats a
         ON a.exam_type = COALESCE(f.exam_type, m.exam_type, q.exam_type)
+      LEFT JOIN exam_pass_stats p
+        ON p.exam_type = COALESCE(f.exam_type, m.exam_type, q.exam_type)
     `;
 
     const result = await pool.query(query, [userId]);
@@ -103,6 +115,8 @@ export async function GET() {
         memorize_pct: Math.round(memorizePct),
         practice_exam_pct: Math.round(practicePct),
         overall_pct: Math.round(overallPct),
+        exam_passes: cappedPasses(Number(row.exam_passes ?? 0)),
+        passes_required: PASSES_REQUIRED,
       };
     });
 

@@ -54,4 +54,10 @@ export interface ResultProps {
   wrong?: number;
   onTryAgain?: () => void;
   onRedoMistakes?: () => void;
+  /**
+   * Which colour the primary action wears. Study modes keep the yellow the
+   * rest of the app uses for "keep going"; the practice exam is blue, so the
+   * exam reads as its own kind of action from the dashboard onwards.
+   */
+  accent?: "study" | "exam";
 }

@@ -2,7 +2,6 @@
 
 import { AppNav } from "@/components/ui/app-nav";
 import { BackLink } from "@/components/ui/back-link";
-import { StreakBadge } from "@/components/ui/motivation";
 import { Result } from "@/components/ui/result";
 import { motivationFor, MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
@@ -13,7 +12,6 @@ import type {
   Flashcard,
   FlashcardProgressResponse,
 } from "@/lib/types/flashcard";
-import type { StreakRow } from "@/lib/types/streak";
 import { Check, ChevronLeft, ChevronRight, Shuffle, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -49,7 +47,9 @@ function FlashCardContent() {
   const [loading, setLoading] = useState(true);
   const [finished, setFinished] = useState(false);
 
-  const [streak, setStreak] = useState({ current: 0, best: 0 });
+  /** Correct answers in a row this sitting, for the milestone celebrations.
+      Nothing persists it: it is a in-session run, not a streak record. */
+  const [run, setRun] = useState(0);
   const [message, setMessage] = useState<MotivationMessage | null>(null);
   const advanceTimer = useRef<number | null>(null);
   /** Card the deck resumed on, so the learner sees where they left off. */
@@ -62,14 +62,11 @@ function FlashCardContent() {
       fetch(`/api/flashcards?exam_type=${encodeURIComponent(type)}`).then(
         (response) => response.json() as Promise<Flashcard[]>,
       ),
-      fetch("/api/streaks")
-        .then((response) => response.json() as Promise<StreakRow[]>)
-        .catch((): StreakRow[] => []),
       fetch(sessionUrl(type))
         .then((response) => response.json() as Promise<unknown>)
         .catch((): unknown => null),
     ])
-      .then(([items, streaks, saved]) => {
+      .then(([items, saved]) => {
         if (!active) return;
 
         const deck = Array.isArray(items) ? items : [];
@@ -92,13 +89,6 @@ function FlashCardContent() {
         setRatings(session.ratings);
         setFinished(false);
         setResumedAt(session.resumed ? session.index : null);
-
-        const mine = Array.isArray(streaks)
-          ? streaks.find((row) => row.exam_type === type)
-          : null;
-        if (mine) {
-          setStreak({ current: mine.current_streak, best: mine.best_streak });
-        }
       })
       .catch(() => active && setCards([]))
       .finally(() => active && setLoading(false));
@@ -180,12 +170,9 @@ function FlashCardContent() {
 
     setRatings((current) => ({ ...current, [card.id]: isCorrect }));
 
-    const optimistic = isCorrect ? streak.current + 1 : 0;
-    setStreak((current) => ({
-      current: optimistic,
-      best: Math.max(current.best, optimistic),
-    }));
-    setMessage(motivationFor(isCorrect, optimistic, index));
+    const nextRun = isCorrect ? run + 1 : 0;
+    setRun(nextRun);
+    setMessage(motivationFor(isCorrect, nextRun, index));
 
     advanceTimer.current = window.setTimeout(() => {
       setMessage(null);
@@ -202,11 +189,7 @@ function FlashCardContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mastered: isCorrect }),
       });
-      const data =
-        (await response.json()) as Partial<FlashcardProgressResponse>;
-      if (data.streak) {
-        setStreak({ current: data.streak.current, best: data.streak.best });
-      }
+      await response.json();
     } catch (error) {
       console.error("Failed to save flashcard progress:", error);
     }
@@ -253,13 +236,7 @@ function FlashCardContent() {
       <main className="rv-shell flex min-h-0 max-w-3xl flex-1 flex-col py-4 text-center md:py-6">
         <BackLink />
         <div className="flex shrink-0 items-center justify-between">
-          <div className="flex items-center gap-2 text-left">
-            <StreakBadge
-              current={streak.current}
-              best={streak.best}
-              pulse={message?.mood === "correct"}
-            />
-          </div>
+          <div />
           <button
             onClick={() => {
               setCards((current) => shuffled(current));

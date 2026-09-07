@@ -2,11 +2,7 @@
 
 import { AppNav } from "@/components/ui/app-nav";
 import { BackLink } from "@/components/ui/back-link";
-import {
-  Confetti,
-  SessionMastery,
-  StreakBadge,
-} from "@/components/ui/motivation";
+import { Confetti, SessionMastery } from "@/components/ui/motivation";
 import { Result } from "@/components/ui/result";
 import { motivationFor, type MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
@@ -18,7 +14,6 @@ import type {
   MemorizationProgressResponse,
   MemorizationQuestion,
 } from "@/lib/types/memo";
-import type { StreakRow } from "@/lib/types/streak";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X } from "lucide-react";
@@ -36,8 +31,6 @@ const asSavedSession = (value: unknown): SavedSession | null =>
     ? (value as SavedSession)
     : null;
 
-type StreakState = { current: number; best: number };
-
 function MemorizationContent() {
   const searchParams = useSearchParams();
   const type = parseExamType(searchParams.get("exam_type"));
@@ -54,7 +47,9 @@ function MemorizationContent() {
   /** Question the sitting picked up on, so a resume never looks like a restart. */
   const [resumedAt, setResumedAt] = useState<number | null>(null);
 
-  const [streak, setStreak] = useState<StreakState>({ current: 0, best: 0 });
+  /** Correct answers in a row this sitting, for the milestone celebrations.
+      Nothing persists it: it is an in-session run, not a streak record. */
+  const [run, setRun] = useState(0);
   const [message, setMessage] = useState<MotivationMessage | null>(null);
   /** The flashcard-style verdict over the card: shown on an answer given here,
       never on a resumed one, and gone again after a beat. */
@@ -103,14 +98,11 @@ function MemorizationContent() {
       fetch(`/api/memorization?exam_type=${encodeURIComponent(type)}`).then(
         (response) => response.json() as Promise<MemorizationQuestion[]>,
       ),
-      fetch("/api/streaks")
-        .then((response) => response.json() as Promise<StreakRow[]>)
-        .catch((): StreakRow[] => []),
       fetch(sessionUrl(type))
         .then((response) => response.json() as Promise<unknown>)
         .catch((): unknown => null),
     ])
-      .then(([items, streaks, saved]) => {
+      .then(([items, saved]) => {
         if (!active) return;
 
         // Pick the sitting up where it stopped: same order, same question,
@@ -119,10 +111,6 @@ function MemorizationContent() {
           Array.isArray(items) ? items : [],
           asSavedSession(saved),
         );
-
-        const mine = Array.isArray(streaks)
-          ? streaks.find((row) => row.exam_type === type)
-          : null;
 
         // A question answered before the learner left comes back answered:
         // their choice locked in, the result shown, Next waiting. Only an
@@ -141,15 +129,11 @@ function MemorizationContent() {
         setChecked(answeredChoiceId !== null);
         setMessage(
           answeredChoiceId !== null && answer !== undefined
-            ? motivationFor(answer, mine?.current_streak ?? 0, session.index)
+            ? motivationFor(answer, 0, session.index)
             : null,
         );
         setFinished(false);
         questionShownAt.current = Date.now();
-
-        if (mine) {
-          setStreak({ current: mine.current_streak, best: mine.best_streak });
-        }
       })
       .catch(() => active && setQuestions([]))
       .finally(() => active && setLoading(false));
@@ -237,13 +221,9 @@ function MemorizationContent() {
     setElapsedMs((total) => total + (Date.now() - questionShownAt.current));
     setTimedCount((count) => count + 1);
 
-    // Optimistic so the celebration is immediate; the server value replaces it.
-    const optimistic = isCorrect ? streak.current + 1 : 0;
-    setStreak((current) => ({
-      current: optimistic,
-      best: Math.max(current.best, optimistic),
-    }));
-    const verdictNow = motivationFor(isCorrect, optimistic, index);
+    const nextRun = isCorrect ? run + 1 : 0;
+    setRun(nextRun);
+    const verdictNow = motivationFor(isCorrect, nextRun, index);
     setMessage(verdictNow);
     flashVerdict(verdictNow);
     if (isCorrect) setCelebration((run) => run + 1);
@@ -262,16 +242,7 @@ function MemorizationContent() {
         },
       );
 
-      const data =
-        (await response.json()) as Partial<MemorizationProgressResponse>;
-      if (data.streak) {
-        setStreak({ current: data.streak.current, best: data.streak.best });
-        const settled = motivationFor(isCorrect, data.streak.current, index);
-        setMessage(settled);
-        // The server may promote the message to a milestone: keep the card
-        // face and the message saying the same thing while it is still up.
-        setVerdict((current) => (current ? settled : current));
-      }
+      await response.json();
     } catch (error) {
       console.error("Failed to save memorization progress:", error);
     }
@@ -361,12 +332,6 @@ function MemorizationContent() {
             {index + 1}
             <span className="text-muted-foreground"> / {questions.length}</span>
           </span>
-          <StreakBadge
-            compact
-            current={streak.current}
-            best={streak.best}
-            pulse={checked && message?.mood === "correct"}
-          />
         </div>
 
         {/* Says where the set picked up, so a resumed sitting never looks like
@@ -406,9 +371,7 @@ function MemorizationContent() {
                 <div
                   role="status"
                   className={`rv-pop-in pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 rounded-[var(--radius)] p-8 text-center text-white ${
-                    verdict.mood === "correct"
-                      ? "bg-[#0F7B52]"
-                      : "bg-[#C91D1D]"
+                    verdict.mood === "correct" ? "bg-[#0F7B52]" : "bg-[#C91D1D]"
                   }`}
                 >
                   <p className="text-3xl font-extrabold leading-tight sm:text-4xl">
@@ -541,7 +504,6 @@ function MemorizationContent() {
                 averageSeconds={averageSeconds}
               />
             </div>
-
           </aside>
         </div>
       </main>

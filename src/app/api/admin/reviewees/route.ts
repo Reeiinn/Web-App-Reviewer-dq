@@ -2,6 +2,11 @@ import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
 import { readinessStatus } from "@/lib/helper/readiness";
 import { examTypes, type ExamType } from "@/lib/types/common";
+import {
+  PASSES_REQUIRED,
+  cappedPasses,
+  hasPassedTrack,
+} from "@/lib/helper/practice-exam";
 import { NextResponse } from "next/server";
 
 type Counts = { total: number; mastered: number };
@@ -128,16 +133,16 @@ export async function GET(req: Request) {
       pool.query(
         `SELECT user_id, exam_type,
                 COUNT(*)                       AS taken,
-                COUNT(*) FILTER (WHERE passed) AS passed,
-                AVG(CASE WHEN total_items > 0
-                         THEN score::numeric / total_items * 100 END) AS average
+                COUNT(*) FILTER (WHERE passed) AS passed
            FROM exam_attempts
           WHERE user_id = ANY($1) AND completed_at IS NOT NULL
           GROUP BY user_id, exam_type`,
         [userIds],
       ),
       pool.query(
-        `SELECT user_id, exam_type, current_streak, best_streak, last_answer_at
+        // study_streaks is read for its timestamp alone: it is the one table
+        // that records when a learner last answered anything on a track.
+        `SELECT user_id, exam_type, last_answer_at
            FROM study_streaks WHERE user_id = ANY($1)`,
         [userIds],
       ),
@@ -178,6 +183,7 @@ export async function GET(req: Request) {
         };
 
         return {
+          track,
           readiness: Math.round(
             (pct(flashcardCounts.mastered, flashcardCounts.total) +
               pct(memorizationCounts.mastered, memorizationCounts.total) +
@@ -190,10 +196,7 @@ export async function GET(req: Request) {
           answered: Number(memorizationRow?.answered ?? 0),
           correct: Number(memorizationRow?.correct ?? 0),
           taken: Number(attemptRow?.taken ?? 0),
-          passed: Number(attemptRow?.passed ?? 0),
-          average: attemptRow?.average ? Number(attemptRow.average) : null,
-          current: Number(streakRow?.current_streak ?? 0),
-          best: Number(streakRow?.best_streak ?? 0),
+          passes: cappedPasses(Number(attemptRow?.passed ?? 0)),
           lastActivity: (streakRow?.last_answer_at as string | null) ?? null,
         };
       });
@@ -206,16 +209,16 @@ export async function GET(req: Request) {
         sum((row) => row.readiness) / perTrack.length,
       );
 
-      // Tracks the reviewee never sat would drag a mean of averages to zero,
-      // so only tracks with a completed attempt count toward the score.
-      const scored = perTrack.filter((row) => row.average !== null);
-      const average = scored.length
-        ? Math.round(
-            (scored.reduce((running, row) => running + (row.average ?? 0), 0) /
-              scored.length) *
-              10,
-          ) / 10
-        : null;
+      // A track is passed only once the reviewee has cleared the practice exam
+      // PASSES_REQUIRED times, so the roster reports how many tracks are done
+      // rather than an average that hid whether anything was finished.
+      const examTracks = perTrack.map((row) => ({
+        examType: row.track,
+        taken: row.taken,
+        passes: row.passes,
+        required: PASSES_REQUIRED,
+        passed: hasPassedTrack(row.passes),
+      }));
 
       const answered = sum((row) => row.answered);
       const lastActivity =
@@ -260,14 +263,10 @@ export async function GET(req: Request) {
         },
         practiceExam: {
           taken: sum((row) => row.taken),
-          passed: sum((row) => row.passed),
-          average,
+          passedTracks: examTracks.filter((row) => row.passed).length,
+          tracks: examTracks,
         },
-        streak: {
-          current: Math.max(0, ...perTrack.map((row) => row.current)),
-          best: Math.max(0, ...perTrack.map((row) => row.best)),
-          lastActivity,
-        },
+        activity: { lastActivity },
       };
     });
 
