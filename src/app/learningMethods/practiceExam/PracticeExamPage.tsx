@@ -46,11 +46,17 @@ function dealt(
   return [...inOrder, ...items.filter((item) => !seen.has(item.id))];
 }
 
-/** Jumps to the top of the page, honouring a reduced-motion preference. */
+/**
+ * Jumps to the top of the page.
+ *
+ * Instant rather than smooth: a smooth scroll across a paper this long is slow,
+ * and browsers drop the animation — and with it the scroll — under a
+ * reduced-motion setting or an automated session. Landing on the verdict
+ * matters more than the travel looking nice.
+ */
 const toTop = () => {
   if (typeof window === "undefined") return;
-  const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
+  window.scrollTo({ top: 0, behavior: "auto" });
 };
 
 function PracticeExamContent() {
@@ -74,6 +80,11 @@ function PracticeExamContent() {
     passed: boolean;
     passes: number;
   } | null>(null);
+
+  /** Questions a submit found blank, marked until they are answered. */
+  const [missing, setMissing] = useState<Set<string>>(new Set());
+  /** The blank question to scroll to, once its mark has rendered. */
+  const [scrollTarget, setScrollTarget] = useState<string | null>(null);
 
   /** Questions whose save has not come back yet, re-sent at submit. */
   const unsaved = useRef<Set<string>>(new Set());
@@ -155,6 +166,23 @@ function PracticeExamContent() {
     };
   }, [type]);
 
+  // Scrolling inside submit ran while the page was still the exam, so the
+  // browser landed part-way down a page that was about to be replaced. Waiting
+  // for the result to render puts the verdict at the top, where it belongs.
+  useEffect(() => {
+    if (finished) toTop();
+  }, [finished]);
+
+  // The card has to carry its mark before it is scrolled to, or the browser
+  // chases an element whose size is about to change and stops short of it.
+  useEffect(() => {
+    if (!scrollTarget) return;
+
+    const card = document.getElementById(`question-${scrollTarget}`);
+    setScrollTarget(null);
+    card?.scrollIntoView({ block: "center", behavior: "auto" });
+  }, [scrollTarget]);
+
   const correctIdOf = (question: Question) =>
     question.choices.find((choice) => choice.is_correct)?.id;
 
@@ -175,6 +203,13 @@ function PracticeExamContent() {
    */
   const choose = (questionId: string, choiceId: string) => {
     setAnswers((current) => ({ ...current, [questionId]: choiceId }));
+    // Answering clears that question's mark; the ones still blank keep theirs.
+    setMissing((current) => {
+      if (!current.has(questionId)) return current;
+      const next = new Set(current);
+      next.delete(questionId);
+      return next;
+    });
     if (!attemptId) return;
 
     unsaved.current.add(questionId);
@@ -199,16 +234,25 @@ function PracticeExamContent() {
   const submit = async () => {
     if (!questions.length || !attemptId || submitting) return;
 
-    const unanswered = questions
-      .map((question, index) => (answers[question.id] ? null : index + 1))
-      .filter((index): index is number => index !== null);
+    const unanswered = questions.filter((question) => !answers[question.id]);
 
     if (unanswered.length) {
-      setError(
-        `Please answer question${unanswered.length === 1 ? "" : "s"}: ${unanswered.join(", ")}.`,
+      const numbers = unanswered.map(
+        (question) => questions.indexOf(question) + 1,
       );
+
+      setError(
+        `Please answer question${numbers.length === 1 ? "" : "s"}: ${numbers.join(", ")}.`,
+      );
+      setMissing(new Set(unanswered.map((question) => question.id)));
+      // Naming the numbers is no help on a 58-question paper if the learner
+      // then has to hunt for them, so the first gap is brought into view once
+      // the marks have rendered — see the effect below.
+      setScrollTarget(unanswered[0].id);
       return;
     }
+
+    setMissing(new Set());
 
     setError("");
     setSubmitting(true);
@@ -248,10 +292,6 @@ function PracticeExamContent() {
         passes: Number(completed?.passes ?? 0),
       });
       setFinished(true);
-      // The verdict is at the top of a page as long as the exam was, and the
-      // submit button sits at the bottom of it. Without this the learner lands
-      // on the answer review and has to scroll up to learn whether they passed.
-      toTop();
     } catch (submitError) {
       console.error("Failed to submit practice exam:", submitError);
       setError("Something went wrong submitting your exam. Please try again.");
@@ -441,9 +481,22 @@ function PracticeExamContent() {
             would move questions under answers already given. */}
         <div className="flex flex-col gap-4">
           {questions.map((question, index) => (
-            <section key={`${question.id}-${index}`} className="rv-card p-5">
-              <p className="text-xs font-bold uppercase tracking-wide text-[#8A6D0B]">
+            <section
+              key={`${question.id}-${index}`}
+              id={`question-${question.id}`}
+              // A question the submit found blank keeps a red edge until it is
+              // answered, so scrolling away from it does not lose it again.
+              className={`rv-card scroll-mt-6 p-5 ${
+                missing.has(question.id) ? "border-2 border-[#C91D1D]" : ""
+              }`}
+            >
+              <p
+                className={`text-xs font-bold uppercase tracking-wide ${
+                  missing.has(question.id) ? "text-[#C91D1D]" : "text-[#8A6D0B]"
+                }`}
+              >
                 Question {index + 1}
+                {missing.has(question.id) && " · Not answered"}
               </p>
               <h2 className="mt-2 font-bold leading-7">{question.text}</h2>
 
