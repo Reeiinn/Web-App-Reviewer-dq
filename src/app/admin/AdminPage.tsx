@@ -46,7 +46,7 @@ type Reviewee = {
   flashcards: { mastered: number; total: number };
   memorize: { mastered: number; total: number; accuracy: number };
   practice: { mastered: number; total: number };
-  mockExam: { taken: number; passed: number; average: number | null };
+  practiceExam: { taken: number; passed: number; average: number | null };
   streak: { current: number; best: number; lastActivity: string | null };
 };
 
@@ -601,7 +601,7 @@ export function AdminPage() {
                       "Overall Readiness",
                       "Flashcards Mastery",
                       "Memorize Acc.",
-                      "Mock Exam Avg",
+                      "Prac Exam Avg",
                       "Streak & Activity",
                       "Status",
                       "Actions",
@@ -699,14 +699,14 @@ export function AdminPage() {
 
                       <td className="px-5 py-4">
                         <p className="font-semibold">
-                          {row.mockExam.average === null
+                          {row.practiceExam.average === null
                             ? "—"
-                            : `${row.mockExam.average}% Avg`}
+                            : `${row.practiceExam.average}% Avg`}
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {row.mockExam.taken === 0
-                            ? "No mocks taken"
-                            : `Passed ${row.mockExam.passed}/${row.mockExam.taken}`}
+                          {row.practiceExam.taken === 0
+                            ? "No practice exams taken"
+                            : `Passed ${row.practiceExam.passed}/${row.practiceExam.taken}`}
                         </p>
                       </td>
 

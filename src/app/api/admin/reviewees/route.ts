@@ -258,7 +258,7 @@ export async function GET(req: Request) {
           total: sum((row) => row.practice.total),
           mastered: sum((row) => row.practice.mastered),
         },
-        mockExam: {
+        practiceExam: {
           taken: sum((row) => row.taken),
           passed: sum((row) => row.passed),
           average,
