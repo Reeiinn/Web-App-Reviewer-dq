@@ -68,11 +68,12 @@
   --destructive: #c91d1d;
   --success: #0f7b52;
 
-  /* The practice exam's own colour. Yellow means "study" everywhere else, so
-     the exam reads as a different kind of action at a glance. */
-  --exam: #2f5fd0;
-  --exam-strong: #24499f;
-  --exam-soft: #eaf0fd;
+  /* The practice exam's own colour: the house navy, not a new blue. Yellow
+     means "study" everywhere else, so the exam still reads as a different
+     kind of action without introducing a hue the palette does not have. */
+  --exam: #0b2340;
+  --exam-strong: #0f2e4d;
+  --exam-soft: #e8edf3;
 
   --border: #eae3d2;
   --input: #e4dcc8;
