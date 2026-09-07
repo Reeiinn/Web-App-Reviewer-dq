@@ -15,6 +15,15 @@ export interface Memorization {
   choices: MemorizationChoice[];
 }
 
+/**
+ * A memorization item as the study page reads it: the question plus the choice
+ * this learner last picked, which is what lets a resumed sitting redraw an
+ * answered question instead of asking it again.
+ */
+export interface MemorizationQuestion extends Memorization {
+  answered_choice_id: string | null;
+}
+
 export interface MemorizationProgress {
   id: string;
   user_id: string;

@@ -15,8 +15,10 @@ import { restoreMemorization } from "@/lib/helper/memorization-session";
 import type { SavedSession } from "@/lib/helper/study-session";
 import { useFitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
-import type { MemorizationProgressResponse } from "@/lib/types/memo";
-import type { Question } from "@/lib/types/questions";
+import type {
+  MemorizationProgressResponse,
+  MemorizationQuestion,
+} from "@/lib/types/memo";
 import type { StreakRow } from "@/lib/types/streak";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -40,7 +42,7 @@ function MemorizationContent() {
   const searchParams = useSearchParams();
   const type = parseExamType(searchParams.get("exam_type"));
 
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<MemorizationQuestion[]>([]);
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
@@ -66,7 +68,7 @@ function MemorizationContent() {
 
     Promise.all([
       fetch(`/api/memorization?exam_type=${encodeURIComponent(type)}`).then(
-        (response) => response.json() as Promise<Question[]>,
+        (response) => response.json() as Promise<MemorizationQuestion[]>,
       ),
       fetch("/api/streaks")
         .then((response) => response.json() as Promise<StreakRow[]>)
@@ -85,18 +87,33 @@ function MemorizationContent() {
           asSavedSession(saved),
         );
 
+        const mine = Array.isArray(streaks)
+          ? streaks.find((row) => row.exam_type === type)
+          : null;
+
+        // A question answered before the learner left comes back answered:
+        // their choice locked in, the result shown, Next waiting. Only an
+        // unanswered one is dealt fresh. Without the saved choice there is
+        // nothing to redraw, so that question asks itself again.
+        const stoppedOn = session.questions[session.index];
+        const answer = stoppedOn ? session.ratings[stoppedOn.id] : undefined;
+        const answeredChoiceId =
+          answer === undefined ? null : (stoppedOn?.answered_choice_id ?? null);
+
         setQuestions(session.questions);
         setIndex(session.index);
         setRatings(session.ratings);
         setResumedAt(session.resumed ? session.index : null);
-        setSelected(null);
-        setChecked(false);
+        setSelected(answeredChoiceId);
+        setChecked(answeredChoiceId !== null);
+        setMessage(
+          answeredChoiceId !== null && answer !== undefined
+            ? motivationFor(answer, mine?.current_streak ?? 0, session.index)
+            : null,
+        );
         setFinished(false);
         questionShownAt.current = Date.now();
 
-        const mine = Array.isArray(streaks)
-          ? streaks.find((row) => row.exam_type === type)
-          : null;
         if (mine) {
           setStreak({ current: mine.current_streak, best: mine.best_streak });
         }
@@ -163,7 +180,7 @@ function MemorizationContent() {
     ? Math.round(elapsedMs / timedCount / 1000)
     : 0;
 
-  const resetSession = (nextQuestions: Question[]) => {
+  const resetSession = (nextQuestions: MemorizationQuestion[]) => {
     setQuestions(nextQuestions);
     setIndex(0);
     setSelected(null);
@@ -330,7 +347,12 @@ function MemorizationContent() {
           <div className="flex min-h-0 flex-col">
             <section className="rv-card relative flex min-h-0 flex-1 flex-col overflow-hidden p-4 sm:p-6 [@media(max-height:700px)]:p-3">
               <Confetti
-                active={checked && message?.mood === "correct"}
+                // celebration only moves on an answer given here, so a resumed
+                // correct answer redraws its feedback without firing the burst
+                // a second time.
+                active={
+                  checked && message?.mood === "correct" && celebration > 0
+                }
                 runId={celebration}
                 pieces={message?.milestone ? 34 : 20}
               />
