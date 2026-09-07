@@ -1,5 +1,6 @@
 "use client";
 
+import { PhotoCropper } from "@/components/ui/photo-cropper";
 import { isStaff, landingFor, staffTitleFor } from "@/lib/helper/roles";
 import { LogOut, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
@@ -30,7 +31,13 @@ const staffLinks = [
 function UserMenu() {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
+  const [image, setImage] = useState<string | null>(null);
+  /** The chosen file, held while the learner frames it in the cropper. */
+  const [pending, setPending] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const container = useRef<HTMLDivElement>(null);
+  const filePicker = useRef<HTMLInputElement>(null);
 
   const name = session?.user?.name ?? "Scholar";
   const email = session?.user?.email ?? "";
@@ -40,6 +47,50 @@ function UserMenu() {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+
+  // The photo is not in the session token, so it is read once per signed-in
+  // visit and then kept in step by the upload itself.
+  useEffect(() => {
+    if (!session?.user) return;
+
+    let active = true;
+    fetch("/api/user/avatar")
+      .then((response) => response.json() as Promise<{ image?: string | null }>)
+      .then((data) => active && setImage(data.image ?? null))
+      .catch(() => active && setImage(null));
+
+    return () => {
+      active = false;
+    };
+  }, [session?.user]);
+
+  async function upload(dataUrl: string) {
+    setUploadError("");
+    setUploading(true);
+
+    try {
+      const response = await fetch("/api/user/avatar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      const data = (await response.json()) as {
+        image?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !data.image) {
+        setUploadError(data.error ?? "Could not save that photo.");
+        return;
+      }
+      setImage(data.image);
+      setPending(null);
+    } catch {
+      setUploadError("Could not reach the server.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -66,21 +117,84 @@ function UserMenu() {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Open user menu"
-        className="flex size-9 items-center justify-center rounded-full border border-border bg-[#0B2340] text-xs font-bold text-white transition hover:border-[#0B2340]"
+        className="flex size-9 items-center justify-center overflow-hidden rounded-full border border-border bg-[#0B2340] text-xs font-bold text-white transition hover:border-[#0B2340]"
       >
-        {initials || <User className="size-4" />}
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a data URL has
+          // nothing for the image loader to optimise.
+          <img
+            src={image}
+            alt=""
+            className="size-full object-cover"
+            draggable={false}
+          />
+        ) : (
+          initials || <User className="size-4" />
+        )}
       </button>
 
       {open && (
         <div
           role="menu"
-          className="rv-pop-in absolute right-0 top-11 z-50 w-64 overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
+          className="rv-pop-in absolute right-0 top-11 z-50 w-72 overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
         >
           <div className="border-b border-border px-4 py-3">
-            <p className="font-bold">{name}</p>
-            {email && (
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {email}
+            {/* Photo, then who you are: the same left-to-right order the
+                trigger implies when the menu opens under it. */}
+            <div className="flex items-start gap-3">
+              <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-[#0B2340] text-sm font-bold text-white">
+                {image ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- a data
+                  // URL has nothing for the image loader to optimise.
+                  <img
+                    src={image}
+                    alt={`${name}'s profile photo`}
+                    className="size-full object-cover"
+                    draggable={false}
+                  />
+                ) : (
+                  initials || <User className="size-5" />
+                )}
+              </span>
+
+              <div className="min-w-0">
+                <p className="font-bold">{name}</p>
+                {email && (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {email}
+                  </p>
+                )}
+
+                <input
+                  ref={filePicker}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    // Clear the value so choosing the same file twice still
+                    // fires a change event.
+                    event.target.value = "";
+                    if (file) {
+                      setUploadError("");
+                      setPending(file);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => filePicker.current?.click()}
+                  disabled={uploading}
+                  className="mt-1.5 text-xs font-semibold text-[#8A6D0B] underline underline-offset-2 transition hover:text-[#0B2340] disabled:opacity-60"
+                >
+                  {uploading ? "Uploading…" : "Upload photo"}
+                </button>
+              </div>
+            </div>
+
+            {uploadError && (
+              <p className="mt-2 text-xs font-semibold text-destructive">
+                {uploadError}
               </p>
             )}
           </div>
@@ -93,6 +207,19 @@ function UserMenu() {
             Log out
           </button>
         </div>
+      )}
+
+      {/* The crop step owns the choice: nothing is uploaded until the square
+          in the circle is the one the learner confirmed. */}
+      {pending && (
+        <PhotoCropper
+          file={pending}
+          busy={uploading}
+          onCancel={() => {
+            if (!uploading) setPending(null);
+          }}
+          onConfirm={(dataUrl) => void upload(dataUrl)}
+        />
       )}
     </div>
   );
