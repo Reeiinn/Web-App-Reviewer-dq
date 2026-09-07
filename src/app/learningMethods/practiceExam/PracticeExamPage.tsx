@@ -5,6 +5,11 @@ import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
 import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
+import {
+  PASSING_PERCENTAGE,
+  hasPassedTrack,
+  passesLabel,
+} from "@/lib/helper/practice-exam";
 import { examLabels, parseExamType } from "@/lib/types/common";
 import type { Question } from "@/lib/types/questions";
 import { Lock, Shuffle } from "lucide-react";
@@ -26,6 +31,15 @@ function PracticeExamContent() {
   const [submitting, setSubmitting] = useState(false);
   const [eligibility, setEligibility] = useState<Eligibility | null>(null);
   const [error, setError] = useState("");
+  /**
+   * The verdict the server gave this sitting, plus where the track stands
+   * after it. A sitting is passed or failed on its own; the track needs
+   * PASSES_REQUIRED passes, so the result screen reports both.
+   */
+  const [outcome, setOutcome] = useState<{
+    passed: boolean;
+    passes: number;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -115,11 +129,55 @@ function PracticeExamContent() {
         ),
       );
 
-      await fetch(`/api/attempts/${attemptId}/complete`, { method: "POST" });
+      const completed = (await fetch(`/api/attempts/${attemptId}/complete`, {
+        method: "POST",
+      }).then((response) => response.json())) as {
+        passed?: boolean;
+        passes?: number;
+      };
+
+      setOutcome({
+        passed: Boolean(completed?.passed),
+        passes: Number(completed?.passes ?? 0),
+      });
       setFinished(true);
     } catch (submitError) {
       console.error("Failed to submit practice exam:", submitError);
       setError("Something went wrong submitting your exam. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /**
+   * Sitting again means a new attempt row: the finished one is scored and
+   * counted, and posting more answers to it would rewrite a result the roster
+   * has already read.
+   */
+  const retake = async () => {
+    setError("");
+    setSubmitting(true);
+
+    try {
+      const attempt = await fetch(`/api/attempts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exam_type: type }),
+      }).then((response) => response.json());
+
+      if (!attempt?.id) {
+        setError(attempt?.error ?? "Could not start another exam.");
+        return;
+      }
+
+      setAttemptId(attempt.id);
+      setQuestions((current) => shuffled(current));
+      setAnswers({});
+      setOutcome(null);
+      setFinished(false);
+    } catch (retakeError) {
+      console.error("Failed to start another practice exam:", retakeError);
+      setError("Could not reach the server. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -180,17 +238,55 @@ function PracticeExamContent() {
   }
 
   if (finished) {
+    const trackPassed = hasPassedTrack(outcome?.passes ?? 0);
+
     return (
       <Frame title={`${examLabels[type]} Results`}>
         <div className="max-w-2xl">
+          {/* The verdict first: a percentage does not say whether the sitting
+              cleared the bar, and the counter says how much of the track is
+              behind them. */}
+          <section
+            className={`rv-card mb-4 flex flex-wrap items-center justify-between gap-3 p-5 ${
+              outcome?.passed
+                ? "border-2 border-[#0F7B52]"
+                : "border-2 border-[#C91D1D]"
+            }`}
+          >
+            <div>
+              <p
+                className={`text-2xl font-extrabold ${
+                  outcome?.passed ? "text-[#0F7B52]" : "text-[#C91D1D]"
+                }`}
+              >
+                {outcome?.passed ? "PASSED" : "FAILED"}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {outcome?.passed
+                  ? `You cleared this sitting at ${PASSING_PERCENTAGE}% or better.`
+                  : `You need ${PASSING_PERCENTAGE}% to pass a sitting. Take it again.`}
+              </p>
+            </div>
+
+            <div className="text-right">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Exams passed
+              </p>
+              <p className="mt-1 text-2xl font-extrabold tabular-nums">
+                {passesLabel(outcome?.passes ?? 0)}
+              </p>
+              {trackPassed && (
+                <p className="text-xs font-bold text-[#0F7B52]">
+                  Track complete
+                </p>
+              )}
+            </div>
+          </section>
+
           <Result
             correct={score}
             wrong={wrongQuestions.length}
-            onTryAgain={() => {
-              setQuestions((current) => shuffled(current));
-              setAnswers({});
-              setFinished(false);
-            }}
+            onTryAgain={retake}
           />
 
           <div className="mt-6 flex flex-col gap-4">

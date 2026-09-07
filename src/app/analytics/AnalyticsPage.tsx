@@ -2,6 +2,7 @@
 
 import { AppNav } from "@/components/ui/app-nav";
 import { examTypes, type ExamType } from "@/lib/types/common";
+import { hasPassedTrack, passesLabel } from "@/lib/helper/practice-exam";
 import { useEffect, useState } from "react";
 
 type ProgressSummaryRow = {
@@ -10,6 +11,8 @@ type ProgressSummaryRow = {
   memorize_pct: number;
   practice_exam_pct: number;
   overall_pct: number;
+  /** Passing practice exams on this track, out of PASSES_REQUIRED. */
+  exam_passes: number;
 };
 
 const emptyRow = (exam_type: ExamType): ProgressSummaryRow => ({
@@ -18,6 +21,7 @@ const emptyRow = (exam_type: ExamType): ProgressSummaryRow => ({
   memorize_pct: 0,
   practice_exam_pct: 0,
   overall_pct: 0,
+  exam_passes: 0,
 });
 
 const trackTitles: Record<ExamType, string> = {
@@ -152,6 +156,9 @@ export function AnalyticsPage() {
               // anything the data said. It now reports whether this learner
               // has actually started the track.
               const started = row.overall_pct > 0;
+              // Studying is progress; five passed practice exams is the proof.
+              // Only that clears the track, so only that changes the badge.
+              const passed = hasPassedTrack(row.exam_passes);
               const accent = trackAccents[type];
 
               return (
@@ -162,12 +169,18 @@ export function AnalyticsPage() {
                     </h2>
                     <span
                       className={`rounded px-2.5 py-1 text-[11px] font-bold ${
-                        started
-                          ? "bg-[#0B2340] text-white"
-                          : "bg-muted text-muted-foreground"
+                        passed
+                          ? "bg-[#0F7B52] text-white"
+                          : started
+                            ? "bg-[#0B2340] text-white"
+                            : "bg-muted text-muted-foreground"
                       }`}
                     >
-                      {started ? "In Progress" : "Not Started"}
+                      {passed
+                        ? "Passed"
+                        : started
+                          ? "In Progress"
+                          : "Not Started"}
                     </span>
                   </div>
 
@@ -190,6 +203,19 @@ export function AnalyticsPage() {
                         value={row.practice_exam_pct}
                         color="#0F7B52"
                       />
+
+                      {/* The badge says whether the track is cleared; this
+                          says how far off it is. */}
+                      <div className="flex items-baseline justify-between text-xs font-bold">
+                        <span className="text-muted-foreground">
+                          Practice Exams Passed
+                        </span>
+                        <span
+                          className={`tabular-nums ${passed ? "text-[#0F7B52]" : ""}`}
+                        >
+                          {passesLabel(row.exam_passes)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </section>
