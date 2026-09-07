@@ -8,7 +8,8 @@ import {
   LockKeyhole,
   Mail,
 } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { landingFor } from "@/lib/helper/roles";
+import { getSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
@@ -16,14 +17,12 @@ import { FormEvent, useState } from "react";
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setSuccess("");
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -33,18 +32,22 @@ export default function LoginPage() {
       redirect: false,
     });
 
-    setIsSubmitting(false);
-
     if (result?.error) {
+      setIsSubmitting(false);
       setError("Invalid email or password. Please try again.");
       return;
     }
 
-    setSuccess("Login successful! Redirecting to your dashboard...");
-    setTimeout(() => {
-      router.replace("/dashboard");
-      router.refresh();
-    }, 1000);
+    // signIn with redirect:false resolves before the session is readable, so
+    // the role that decides where to land is fetched rather than assumed.
+    const session = await getSession();
+    const target = landingFor(session?.user?.role);
+
+    // Straight through to the landing page. The button keeps its spinner
+    // until the route changes, so the form cannot be submitted twice on the
+    // way out.
+    router.replace(target);
+    router.refresh();
   }
 
   return (
@@ -53,7 +56,7 @@ export default function LoginPage() {
         <div className="relative hidden min-h-[560px] flex-col justify-between overflow-hidden bg-gradient-to-b from-[#123057] to-[#123059] p-8 text-white lg:flex xl:p-11">
           <div className="flex items-center gap-2.5 text-xl relative z-10">
             <span className="inline-block w-[9px] h-[9px] rounded-full bg-[#FDB913]" />
-            RENEVIEW
+            INSURE
           </div>
 
         
@@ -90,7 +93,7 @@ export default function LoginPage() {
        
           <div className="mb-6 flex items-center gap-2 text-lg text-[#0B2340] lg:hidden">
             <span className="inline-block w-[8px] h-[8px] rounded-full bg-[#FDB913]" />
-            RENEVIEW
+            INSURE
           </div>
 
           <h1 className="mb-2 text-display text-[#0B2340]">Welcome!</h1>
@@ -168,12 +171,6 @@ export default function LoginPage() {
                 {error}
               </p>
             )}
-            {success && (
-              <p className="text-sm text-green-700" role="status">
-                {success}
-              </p>
-            )}
-
             <button
               type="submit"
               disabled={isSubmitting}

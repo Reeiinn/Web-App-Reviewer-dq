@@ -4,7 +4,7 @@ import "./globals.css";
 import { Providers } from "./provider";
 
 export const metadata: Metadata = {
-  title: "InsurePrep — Insurance Licensing Review",
+  title: "INSURE — Insurance Licensing Review",
   description:
     "Build confidence for your insurance licensing exam with focused review and practice.",
   generator: "v0.app",

@@ -1,6 +1,7 @@
 "use client";
 
-import { Bell, LogOut, Settings, User } from "lucide-react";
+import { isStaff, landingFor } from "@/lib/helper/roles";
+import { LogOut, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,10 +10,21 @@ import { useEffect, useRef, useState } from "react";
 // Flashcards and Memorize are reached through a track on the dashboard, so
 // they are deliberately not top-level links — a nav entry here would have had
 // to guess a track.
-const links = [
+//
+// Staff get the console where a reviewee gets the dashboard: the study screens
+// redirect them away, so linking there would only bounce.
+const learnerLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/glossary", label: "Glossary" },
   { href: "/analytics", label: "Analytics" },
+];
+
+// No Analytics here: it charts the signed-in account's own per-track mastery,
+// which is empty for staff since they do not study. Reviewee performance is
+// what the console is for.
+const staffLinks = [
+  { href: "/admin", label: "Admin Console" },
+  { href: "/glossary", label: "Glossary" },
 ];
 
 function UserMenu() {
@@ -22,7 +34,6 @@ function UserMenu() {
 
   const name = session?.user?.name ?? "Scholar";
   const email = session?.user?.email ?? "";
-  const role = (session?.user as { role?: string } | undefined)?.role;
   const initials = name
     .split(" ")
     .slice(0, 2)
@@ -74,17 +85,6 @@ function UserMenu() {
             )}
           </div>
 
-          {(role === "ADMIN" || role === "MANAGER") && (
-            <Link
-              href="/admin"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-muted"
-            >
-              <Settings className="size-4 text-muted-foreground" />
-              Admin console
-            </Link>
-          )}
-
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
             className="flex w-full items-center gap-3 border-t border-border px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -98,17 +98,34 @@ function UserMenu() {
   );
 }
 
-export function AppNav() {
+export function AppNav({
+  compact = false,
+}: {
+  /**
+   * Drops the mobile link row and shortens the bar. Study screens own the
+   * viewport and lead back through their own Back link, so on a phone those
+   * two rows of chrome are worth more to the question than to navigation.
+   */
+  compact?: boolean;
+} = {}) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const staff = isStaff(session?.user?.role);
+  const links = staff ? staffLinks : learnerLinks;
+  const home = landingFor(session?.user?.role);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-      <div className="rv-shell flex h-16 items-center justify-between gap-6">
+      <div
+        className={`rv-shell flex items-center justify-between gap-6 ${
+          compact ? "h-12" : "h-16"
+        }`}
+      >
         <Link
-          href="/dashboard"
+          href={home}
           className="text-lg font-extrabold tracking-tight text-foreground"
         >
-          RENEVIEW
+          INSURE
         </Link>
 
         <nav aria-label="Main" className="hidden md:block">
@@ -135,45 +152,35 @@ export function AppNav() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <button
-            aria-label="Notifications"
-            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <Bell className="size-5" />
-          </button>
-          <button
-            aria-label="Settings"
-            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <Settings className="size-5" />
-          </button>
           <UserMenu />
         </div>
       </div>
 
       {/* The link row wraps below the bar on narrow screens. */}
-      <nav aria-label="Main" className="rv-shell pb-3 md:hidden">
-        <ul className="flex items-center gap-5 overflow-x-auto">
-          {links.map((link) => {
-            const active = pathname.startsWith(link.href);
-            return (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  aria-current={active ? "page" : undefined}
-                  className={
-                    active
-                      ? "whitespace-nowrap border-b-2 border-[#C9A227] pb-1 text-sm font-bold text-[#8A6D0B]"
-                      : "whitespace-nowrap pb-1 text-sm font-semibold text-muted-foreground"
-                  }
-                >
-                  {link.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      {!compact && (
+        <nav aria-label="Main" className="rv-shell pb-3 md:hidden">
+          <ul className="flex items-center gap-5 overflow-x-auto">
+            {links.map((link) => {
+              const active = pathname.startsWith(link.href);
+              return (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      active
+                        ? "whitespace-nowrap border-b-2 border-[#C9A227] pb-1 text-sm font-bold text-[#8A6D0B]"
+                        : "whitespace-nowrap pb-1 text-sm font-semibold text-muted-foreground"
+                    }
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
     </header>
   );
 }

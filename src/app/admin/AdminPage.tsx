@@ -2,7 +2,10 @@
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { AppNav } from "@/components/ui/app-nav";
+import { ButtonHoldAndRelease } from "@/components/ui/hold-and-release-button";
 import { Invite } from "@/components/ui/invite";
+import { FilterSelect, type SelectOption } from "@/components/ui/select";
+import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import {
   readinessStatus,
   statusLabels,
@@ -13,7 +16,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Flame,
-  LoaderCircle,
   Search,
   Trash2,
   Users,
@@ -53,6 +55,26 @@ const sorts = {
 } as const;
 
 type SortKey = keyof typeof sorts;
+
+const sortOptions: readonly SelectOption<SortKey>[] = Object.entries(sorts).map(
+  ([value, label]) => ({ value: value as SortKey, label }),
+);
+
+/**
+ * "All Exams" is not a track the API knows — it means send no exam_type, which
+ * scores every track and averages them.
+ */
+const examOptions: readonly SelectOption<ExamType | "ALL">[] = [
+  { value: "ALL", label: "All Exams" },
+  ...examTypes.map((value) => ({ value, label: examLabels[value] })),
+];
+
+const statusOptions: readonly SelectOption<ReadinessStatus | "ALL">[] = [
+  { value: "ALL", label: "All Statuses" },
+  { value: "EXAM_READY", label: "Exam Ready" },
+  { value: "ON_TRACK", label: "On Track" },
+  { value: "AT_RISK", label: "At Risk" },
+];
 
 function relativeTime(value: string | null) {
   if (!value) return "No activity yet";
@@ -140,8 +162,13 @@ const samePhrase = (a: string, b: string) => tidy(a) === tidy(b);
 /**
  * Removing a reviewee destroys their history, and the delete cascades from
  * users.id through progress, attempts, streaks and sessions. A trash icon is
- * too cheap for that, so the action opens a dialog that names the person and
- * only unlocks once the admin types the confirmation phrase.
+ * too cheap for that, so the row only opens a dialog that names the person,
+ * unlocks once the phrase is typed, and sends the request on a held press.
+ * Opening the dialog stays a plain click: the weight belongs on the action,
+ * not on reading who is about to be removed.
+ *
+ * Managers see this control on the same terms admins do: the roster is filtered
+ * to their own reviewees, but the row itself is not role-gated.
  */
 function RemoveReviewee({
   reviewee,
@@ -261,14 +288,16 @@ function RemoveReviewee({
             >
               Cancel
             </AlertDialog.Close>
-            <button
-              onClick={remove}
+            {/* The phrase says who is being removed; the hold says the admin
+                meant it. A stray click cannot reach the request. */}
+            <ButtonHoldAndRelease
+              holdDuration={2000}
+              onHoldComplete={remove}
               disabled={!confirmed || removing}
-              className="flex items-center gap-1.5 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {removing && <LoaderCircle className="size-4 animate-spin" />}
-              {removing ? "Removing…" : "Remove reviewee"}
-            </button>
+              idleLabel={removing ? "Removing…" : "Hold to remove"}
+              holdingLabel="Keep holding…"
+              className="h-9 px-3 text-sm"
+            />
           </div>
         </AlertDialog.Popup>
       </AlertDialog.Portal>
@@ -292,11 +321,20 @@ export function AdminPage() {
   const [sort, setSort] = useState<SortKey>("readiness_desc");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [examType, setExamType] = useState<ExamType | "ALL">("ALL");
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
 
-    fetch("/api/admin/reviewees")
+    // The track scopes what every number means, so it is the server that
+    // recomputes the roster rather than the table filtering rows it already has.
+    const query =
+      examType === "ALL"
+        ? ""
+        : `?exam_type=${encodeURIComponent(examType)}`;
+
+    fetch(`/api/admin/reviewees${query}`)
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Failed to load");
@@ -309,7 +347,7 @@ export function AdminPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [examType]);
 
   const counts = useMemo(
     () => ({
@@ -372,8 +410,9 @@ export function AdminPage() {
               </span>
             </div>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Live performance tracking of every candidate across licensing
-              tracks.
+              {examType === "ALL"
+                ? "Live performance tracking of every candidate, scored across all licensing tracks."
+                : `Live performance tracking of every candidate, scored on ${examLabels[examType]} only.`}
             </p>
           </div>
 
@@ -420,37 +459,34 @@ export function AdminPage() {
         </div>
 
         <div className="rv-card mt-6 flex flex-wrap items-end gap-6 p-5">
-          <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            Readiness Status
-            <select
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value as ReadinessStatus | "ALL");
-                setPage(1);
-              }}
-              className="mt-1.5 block w-56 rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground outline-none focus:border-[#0B2340]"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="EXAM_READY">Exam Ready</option>
-              <option value="ON_TRACK">On Track</option>
-              <option value="AT_RISK">At Risk</option>
-            </select>
-          </label>
+          <FilterSelect
+            label="Exam Type"
+            value={examType}
+            onValueChange={(next) => {
+              setExamType(next);
+              setPage(1);
+            }}
+            options={examOptions}
+            triggerClassName="w-60"
+          />
 
-          <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            Sort Candidates By
-            <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value as SortKey)}
-              className="mt-1.5 block w-64 rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground outline-none focus:border-[#0B2340]"
-            >
-              {Object.entries(sorts).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FilterSelect
+            label="Readiness Status"
+            value={statusFilter}
+            onValueChange={(next) => {
+              setStatusFilter(next);
+              setPage(1);
+            }}
+            options={statusOptions}
+          />
+
+          <FilterSelect
+            label="Sort Candidates By"
+            value={sort}
+            onValueChange={setSort}
+            options={sortOptions}
+            triggerClassName="w-64"
+          />
 
           <div className="flex gap-2">
             {(["AT_RISK", "ON_TRACK", "EXAM_READY"] as const).map((status) => (
