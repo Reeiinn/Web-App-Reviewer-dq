@@ -9,6 +9,7 @@ import {
 import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
 import { staffTitleFor } from "@/lib/helper/roles";
+import { PASSES_REQUIRED, passesLabel } from "@/lib/helper/practice-exam";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import {
   readinessStatus,
@@ -19,7 +20,6 @@ import {
 import {
   AlertTriangle,
   CheckCircle2,
-  Flame,
   Search,
   Trash2,
   Users,
@@ -37,6 +37,16 @@ type Recruiter = {
   image: string | null;
 };
 
+/** Where one reviewee stands on one track's practice exam. */
+type ExamTrackResult = {
+  examType: ExamType;
+  /** Sittings completed, passed or not. */
+  taken: number;
+  passes: number;
+  required: number;
+  passed: boolean;
+};
+
 type Reviewee = {
   id: string;
   name: string;
@@ -49,8 +59,13 @@ type Reviewee = {
   flashcards: { mastered: number; total: number };
   memorize: { mastered: number; total: number; accuracy: number };
   practice: { mastered: number; total: number };
-  practiceExam: { taken: number; passed: number; average: number | null };
-  streak: { current: number; best: number; lastActivity: string | null };
+  practiceExam: {
+    taken: number;
+    /** Tracks cleared: five passing sittings each. */
+    passedTracks: number;
+    tracks: ExamTrackResult[];
+  };
+  activity: { lastActivity: string | null };
 };
 
 const PAGE_SIZE = 15;
@@ -174,6 +189,73 @@ function Avatar({
         initials || <Users className="size-4" />
       )}
     </span>
+  );
+}
+
+/**
+ * Per-track practice exam results for one reviewee.
+ *
+ * An average hid the thing a manager actually asks — which tracks has this
+ * person passed — because a 78% mean says nothing about whether any single
+ * track is finished. The dialog answers it one track at a time, with the
+ * counter showing how far along the unfinished ones are.
+ */
+function ExamResults({ reviewee }: { reviewee: Reviewee }) {
+  const { passedTracks, tracks } = reviewee.practiceExam;
+
+  return (
+    <AlertDialog.Root>
+      <AlertDialog.Trigger className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-[#0B2340] transition hover:border-[#C9A227] hover:bg-[#FFF8D6]">
+        View
+      </AlertDialog.Trigger>
+
+      <AlertDialog.Portal>
+        <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-[#0B2340]/50 backdrop-blur-[2px]" />
+        <AlertDialog.Popup className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-left shadow-xl">
+          <AlertDialog.Title className="text-lg font-extrabold">
+            Practice exams — {reviewee.name}
+          </AlertDialog.Title>
+          <AlertDialog.Description className="mt-1 text-sm text-muted-foreground">
+            {passedTracks} of {tracks.length} tracks passed. A track is passed
+            after {PASSES_REQUIRED} passing sittings.
+          </AlertDialog.Description>
+
+          <ul className="mt-4 flex flex-col gap-2">
+            {tracks.map((track) => (
+              <li
+                key={track.examType}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-bold">{examLabels[track.examType]}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {track.taken === 0
+                      ? "No exams taken yet"
+                      : `${track.taken} sitting${track.taken === 1 ? "" : "s"} · ${passesLabel(track.passes)} passed`}
+                  </p>
+                </div>
+
+                <span
+                  className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${
+                    track.passed
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {track.passed ? "Passed" : "Not passed"}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-6 flex justify-end">
+            <AlertDialog.Close className="rounded-lg border border-border px-3 py-2 text-sm font-bold transition hover:border-[#C9A227]">
+              Close
+            </AlertDialog.Close>
+          </div>
+        </AlertDialog.Popup>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
   );
 }
 
@@ -392,9 +474,7 @@ export function AdminPage() {
     // The track scopes what every number means, so it is the server that
     // recomputes the roster rather than the table filtering rows it already has.
     const query =
-      examType === "ALL"
-        ? ""
-        : `?exam_type=${encodeURIComponent(examType)}`;
+      examType === "ALL" ? "" : `?exam_type=${encodeURIComponent(examType)}`;
 
     fetch(`/api/admin/reviewees${query}`)
       .then(async (response) => {
@@ -433,7 +513,9 @@ export function AdminPage() {
       const haystack = [
         row.name,
         row.email,
-        ...(isAdmin && row.manager ? [row.manager.name, row.manager.email] : []),
+        ...(isAdmin && row.manager
+          ? [row.manager.name, row.manager.email]
+          : []),
       ];
 
       return haystack.some((field) => field.toLowerCase().includes(needle));
@@ -464,9 +546,7 @@ export function AdminPage() {
         <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] lg:items-start">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-extrabold">
-                Reviewee Directory
-              </h1>
+              <h1 className="text-3xl font-extrabold">Reviewee Directory</h1>
               <span className="rounded-full bg-[#0B2340] px-3 py-1 text-xs font-bold text-[#FFD400]">
                 {counts.total} Candidates
               </span>
@@ -616,8 +696,8 @@ export function AdminPage() {
                       "Overall Readiness",
                       "Flashcards Mastery",
                       "Memorize Acc.",
-                      "Prac Exam Avg",
-                      "Streak & Activity",
+                      "Practice Exams",
+                      "Activity",
                       "Status",
                       "Actions",
                     ].map((heading) => (
@@ -713,32 +793,15 @@ export function AdminPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <p className="font-semibold">
-                          {row.practiceExam.average === null
-                            ? "—"
-                            : `${row.practiceExam.average}% Avg`}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {row.practiceExam.taken === 0
-                            ? "No practice exams taken"
-                            : `Passed ${row.practiceExam.passed}/${row.practiceExam.taken}`}
+                        <ExamResults reviewee={row} />
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          {row.practiceExam.passedTracks} of{" "}
+                          {row.practiceExam.tracks.length} passed
                         </p>
                       </td>
 
-                      <td className="px-5 py-4">
-                        <p className="flex items-center gap-1.5 font-semibold">
-                          <Flame
-                            className={`size-3.5 ${
-                              row.streak.current > 0
-                                ? "text-[#C98A00]"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                          {row.streak.current} day streak
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {relativeTime(row.streak.lastActivity)}
-                        </p>
+                      <td className="px-5 py-4 font-semibold">
+                        {relativeTime(row.activity.lastActivity)}
                       </td>
 
                       <td className="px-5 py-4">

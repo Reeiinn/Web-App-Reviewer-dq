@@ -5,14 +5,90 @@ import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
 import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
+import { splitStatements } from "@/lib/helper/question-text";
+import {
+  PASSING_PERCENTAGE,
+  hasPassedTrack,
+  passesLabel,
+} from "@/lib/helper/practice-exam";
 import { examLabels, parseExamType } from "@/lib/types/common";
 import type { Question } from "@/lib/types/questions";
-import { Lock, Shuffle } from "lucide-react";
+import { Lock } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
+
+/**
+ * The paper this sitting was dealt, in the order the attempt recorded.
+ *
+ * The order belongs to the attempt rather than to the page, so a refresh
+ * returns to the same questions in the same places instead of reshuffling
+ * under answers already given. Questions added to the track since the sitting
+ * began go on the end; ones withdrawn since simply drop out. An attempt with
+ * no stored order — one dealt before this was kept — falls back to a shuffle.
+ */
+function dealt(
+  items: Question[],
+  attempt: { question_order?: unknown } | null,
+) {
+  const order = Array.isArray(attempt?.question_order)
+    ? (attempt.question_order as string[])
+    : null;
+  if (!order) return shuffled(items);
+
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const inOrder = order
+    .map((id) => byId.get(id))
+    .filter((item): item is Question => Boolean(item));
+
+  const seen = new Set(inOrder.map((item) => item.id));
+  return [...inOrder, ...items.filter((item) => !seen.has(item.id))];
+}
+
+/**
+ * A question, with any roman-numeral statements set out as their own lines.
+ *
+ * These questions enumerate "I. … II. … III." inside the sentence, and run
+ * together they read as one wall of text the learner has to parse before they
+ * can even look at the choices. Flashcards and memorization already break them
+ * out; this is the same split, so a question reads the same way in all three.
+ */
+function QuestionText({ text }: { text: string }) {
+  const { prompt, statements } = splitStatements(text);
+
+  return (
+    <>
+      <h2 className="mt-2 font-bold leading-7">{prompt}</h2>
+      {statements.length > 0 && (
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          {statements.map((statement) => (
+            <p
+              key={statement}
+              className="rounded-lg bg-muted px-3 py-2 text-sm leading-6"
+            >
+              {statement}
+            </p>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Jumps to the top of the page.
+ *
+ * Instant rather than smooth: a smooth scroll across a paper this long is slow,
+ * and browsers drop the animation — and with it the scroll — under a
+ * reduced-motion setting or an automated session. Landing on the verdict
+ * matters more than the travel looking nice.
+ */
+const toTop = () => {
+  if (typeof window === "undefined") return;
+  window.scrollTo({ top: 0, behavior: "auto" });
+};
 
 function PracticeExamContent() {
   const searchParams = useSearchParams();
@@ -26,6 +102,26 @@ function PracticeExamContent() {
   const [submitting, setSubmitting] = useState(false);
   const [eligibility, setEligibility] = useState<Eligibility | null>(null);
   const [error, setError] = useState("");
+  /**
+   * The verdict the server gave this sitting, plus where the track stands
+   * after it. A sitting is passed or failed on its own; the track needs
+   * PASSES_REQUIRED passes, so the result screen reports both.
+   */
+  const [outcome, setOutcome] = useState<{
+    passed: boolean;
+    passes: number;
+  } | null>(null);
+
+  /** Questions a submit found blank, marked until they are answered. */
+  const [missing, setMissing] = useState<Set<string>>(new Set());
+  /** The blank question to scroll to, once its mark has rendered. */
+  const [scrollTarget, setScrollTarget] = useState<string | null>(null);
+
+  /** Questions whose save has not come back yet, re-sent at submit. */
+  const unsaved = useRef<Set<string>>(new Set());
+  /** The current answers, readable inside a fetch callback. */
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
 
   useEffect(() => {
     let active = true;
@@ -56,10 +152,37 @@ function PracticeExamContent() {
         ]);
 
         if (!active) return;
-        setQuestions(shuffled(Array.isArray(items) ? items : []));
-        setAnswers({});
+        setQuestions(dealt(Array.isArray(items) ? items : [], attempt));
         setFinished(false);
         setAttemptId(attempt?.id ?? null);
+
+        // The sitting resumes with the answers already picked: they belong to
+        // the attempt, not to this page, so a refresh no longer clears them.
+        const saved = attempt?.id
+          ? await fetch(`/api/attempts/${attempt.id}`)
+              .then(
+                (response) =>
+                  response.json() as Promise<{
+                    answers?: {
+                      question_id: string;
+                      selected_choice_id: string | null;
+                    }[];
+                  }>,
+              )
+              .catch(() => ({ answers: [] }))
+          : { answers: [] };
+
+        if (!active) return;
+        setAnswers(
+          Object.fromEntries(
+            (saved.answers ?? [])
+              .filter((row) => row.selected_choice_id)
+              .map((row) => [
+                row.question_id,
+                row.selected_choice_id as string,
+              ]),
+          ),
+        );
         setLoading(false);
       } catch {
         if (active) {
@@ -74,6 +197,23 @@ function PracticeExamContent() {
     };
   }, [type]);
 
+  // Scrolling inside submit ran while the page was still the exam, so the
+  // browser landed part-way down a page that was about to be replaced. Waiting
+  // for the result to render puts the verdict at the top, where it belongs.
+  useEffect(() => {
+    if (finished) toTop();
+  }, [finished]);
+
+  // The card has to carry its mark before it is scrolled to, or the browser
+  // chases an element whose size is about to change and stops short of it.
+  useEffect(() => {
+    if (!scrollTarget) return;
+
+    const card = document.getElementById(`question-${scrollTarget}`);
+    setScrollTarget(null);
+    card?.scrollIntoView({ block: "center", behavior: "auto" });
+  }, [scrollTarget]);
+
   const correctIdOf = (question: Question) =>
     question.choices.find((choice) => choice.is_correct)?.id;
 
@@ -84,26 +224,80 @@ function PracticeExamContent() {
     (question) => answers[question.id] !== correctIdOf(question),
   );
 
+  /**
+   * Records a choice against the attempt as it is made.
+   *
+   * The selection shows immediately and the write follows, so picking an
+   * answer never waits on the network. A write that fails is remembered in
+   * `unsaved` and posted again at submit, which is what keeps a dropped
+   * request from quietly costing a question.
+   */
+  const choose = (questionId: string, choiceId: string) => {
+    setAnswers((current) => ({ ...current, [questionId]: choiceId }));
+    // Answering clears that question's mark; the ones still blank keep theirs.
+    setMissing((current) => {
+      if (!current.has(questionId)) return current;
+      const next = new Set(current);
+      next.delete(questionId);
+      return next;
+    });
+    if (!attemptId) return;
+
+    unsaved.current.add(questionId);
+    fetch(`/api/attempts/${attemptId}/answers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question_id: questionId,
+        selected_choice_id: choiceId,
+      }),
+    })
+      .then((response) => {
+        // Only clear it if this is still the answer that was saved: a quick
+        // second click must not be marked saved by the first request.
+        if (response.ok && answersRef.current[questionId] === choiceId) {
+          unsaved.current.delete(questionId);
+        }
+      })
+      .catch((error) => console.error("Failed to save answer:", error));
+  };
+
   const submit = async () => {
     if (!questions.length || !attemptId || submitting) return;
 
-    const unanswered = questions
-      .map((question, index) => (answers[question.id] ? null : index + 1))
-      .filter((index): index is number => index !== null);
+    const unanswered = questions.filter((question) => !answers[question.id]);
 
     if (unanswered.length) {
-      setError(
-        `Please answer question${unanswered.length === 1 ? "" : "s"}: ${unanswered.join(", ")}.`,
+      const numbers = unanswered.map(
+        (question) => questions.indexOf(question) + 1,
       );
+
+      setError(
+        `Please answer question${numbers.length === 1 ? "" : "s"}: ${numbers.join(", ")}.`,
+      );
+      setMissing(new Set(unanswered.map((question) => question.id)));
+      // Naming the numbers is no help on a 58-question paper if the learner
+      // then has to hunt for them, so the first gap is brought into view once
+      // the marks have rendered — see the effect below.
+      setScrollTarget(unanswered[0].id);
       return;
     }
+
+    setMissing(new Set());
 
     setError("");
     setSubmitting(true);
 
     try {
+      // Most answers were saved as they were picked; only the ones whose write
+      // has not come back go again here, so a dropped request cannot cost a
+      // question at the moment it is scored.
+      const pending = questions.filter((question) =>
+        unsaved.current.has(question.id),
+      );
+
       await Promise.all(
-        questions.map((question) =>
+        pending.map((question) =>
           fetch(`/api/attempts/${attemptId}/answers`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -111,15 +305,65 @@ function PracticeExamContent() {
               question_id: question.id,
               selected_choice_id: answers[question.id],
             }),
+          }).then((response) => {
+            if (response.ok) unsaved.current.delete(question.id);
           }),
         ),
       );
 
-      await fetch(`/api/attempts/${attemptId}/complete`, { method: "POST" });
+      const completed = (await fetch(`/api/attempts/${attemptId}/complete`, {
+        method: "POST",
+      }).then((response) => response.json())) as {
+        passed?: boolean;
+        passes?: number;
+      };
+
+      setOutcome({
+        passed: Boolean(completed?.passed),
+        passes: Number(completed?.passes ?? 0),
+      });
       setFinished(true);
     } catch (submitError) {
       console.error("Failed to submit practice exam:", submitError);
       setError("Something went wrong submitting your exam. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /**
+   * Sitting again means a new attempt row: the finished one is scored and
+   * counted, and posting more answers to it would rewrite a result the roster
+   * has already read.
+   */
+  const retake = async () => {
+    setError("");
+    setSubmitting(true);
+
+    try {
+      const attempt = await fetch(`/api/attempts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exam_type: type }),
+      }).then((response) => response.json());
+
+      if (!attempt?.id) {
+        setError(attempt?.error ?? "Could not start another exam.");
+        return;
+      }
+
+      setAttemptId(attempt.id);
+      // A new sitting is a new paper: the server dealt one with the attempt,
+      // and that is the only point at which the order changes.
+      setQuestions((current) => dealt(current, attempt));
+      setAnswers({});
+      unsaved.current.clear();
+      setOutcome(null);
+      setFinished(false);
+      toTop();
+    } catch (retakeError) {
+      console.error("Failed to start another practice exam:", retakeError);
+      setError("Could not reach the server. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -138,7 +382,7 @@ function PracticeExamContent() {
   if (eligibility && !eligibility.eligible) {
     return (
       <Frame title="Practice exam locked">
-        <section className="rv-card max-w-xl p-7">
+        <section className="rv-card mx-auto w-full max-w-xl p-[clamp(1.25rem,5vw,1.75rem)]">
           <span className="flex size-11 items-center justify-center rounded-full bg-muted">
             <Lock className="size-5 text-muted-foreground" />
           </span>
@@ -180,17 +424,56 @@ function PracticeExamContent() {
   }
 
   if (finished) {
+    const trackPassed = hasPassedTrack(outcome?.passes ?? 0);
+
     return (
-      <Frame title={`${examLabels[type]} Results`}>
-        <div className="max-w-2xl">
+      <Frame title={`${examLabels[type]} Results`} bare>
+        <div className="mx-auto w-full max-w-2xl">
+          {/* The verdict first: a percentage does not say whether the sitting
+              cleared the bar, and the counter says how much of the track is
+              behind them. */}
+          <section
+            className={`rv-card mb-4 flex flex-col items-start justify-between gap-3 p-[clamp(1rem,4vw,1.25rem)] xs:flex-row xs:items-center ${
+              outcome?.passed
+                ? "border-2 border-[#0F7B52]"
+                : "border-2 border-[#C91D1D]"
+            }`}
+          >
+            <div>
+              <p
+                className={`text-2xl font-extrabold ${
+                  outcome?.passed ? "text-[#0F7B52]" : "text-[#C91D1D]"
+                }`}
+              >
+                {outcome?.passed ? "PASSED" : "FAILED"}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {outcome?.passed
+                  ? `You cleared this sitting at ${PASSING_PERCENTAGE}% or better.`
+                  : `You need ${PASSING_PERCENTAGE}% to pass a sitting. Take it again.`}
+              </p>
+            </div>
+
+            <div className="w-full text-left xs:w-auto xs:text-right">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Exams passed
+              </p>
+              <p className="mt-1 text-2xl font-extrabold tabular-nums">
+                {passesLabel(outcome?.passes ?? 0)}
+              </p>
+              {trackPassed && (
+                <p className="text-xs font-bold text-[#0F7B52]">
+                  Track complete
+                </p>
+              )}
+            </div>
+          </section>
+
           <Result
             correct={score}
             wrong={wrongQuestions.length}
-            onTryAgain={() => {
-              setQuestions((current) => shuffled(current));
-              setAnswers({});
-              setFinished(false);
-            }}
+            onTryAgain={retake}
+            accent="exam"
           />
 
           <div className="mt-6 flex flex-col gap-4">
@@ -200,15 +483,24 @@ function PracticeExamContent() {
               const wasRight = chosen === correctId;
 
               return (
+                // The verdict is the whole edge of the card, so a scan down the
+                // review finds the wrong answers by colour rather than by
+                // reading the label on each one.
                 <section
                   key={`${question.id}-${index}`}
-                  className="rv-card p-5"
+                  className={`rv-card border-2 p-5 ${
+                    wasRight ? "border-[#0F7B52]" : "border-[#C91D1D]"
+                  }`}
                 >
-                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  <p
+                    className={`text-xs font-bold uppercase tracking-wide ${
+                      wasRight ? "text-[#0F7B52]" : "text-[#C91D1D]"
+                    }`}
+                  >
                     Question {index + 1} · {wasRight ? "Correct" : "Incorrect"}
                   </p>
-                  <h2 className="mt-2 font-bold leading-7">{question.text}</h2>
-                  <p className="mt-3 text-sm text-emerald-700">
+                  <QuestionText text={question.text} />
+                  <p className="mt-3 text-sm text-[#0F7B52]">
                     <strong>Correct answer:</strong>{" "}
                     {question.choices.find((choice) => choice.is_correct)?.text}
                   </p>
@@ -223,24 +515,30 @@ function PracticeExamContent() {
 
   return (
     <Frame title={`${examLabels[type]} Practice Exam`}>
-      <div className="max-w-3xl">
-        <button
-          onClick={() => {
-            setQuestions((current) => shuffled(current));
-            setAnswers({});
-          }}
-          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-bold transition hover:border-[#C9A227]"
-        >
-          <Shuffle className="size-3.5" /> Shuffle
-        </button>
-
-        <div className="mt-5 flex flex-col gap-4">
+      <div className="w-full">
+        {/* No shuffle control: the order is dealt with the sitting and holds
+            until the exam is finished and taken again, so a reorder mid-paper
+            would move questions under answers already given. */}
+        <div className="flex flex-col gap-4">
           {questions.map((question, index) => (
-            <section key={`${question.id}-${index}`} className="rv-card p-5">
-              <p className="text-xs font-bold uppercase tracking-wide text-[#8A6D0B]">
+            <section
+              key={`${question.id}-${index}`}
+              id={`question-${question.id}`}
+              // A question the submit found blank keeps a red edge until it is
+              // answered, so scrolling away from it does not lose it again.
+              className={`rv-card scroll-mt-6 p-5 ${
+                missing.has(question.id) ? "border-2 border-[#C91D1D]" : ""
+              }`}
+            >
+              <p
+                className={`text-xs font-bold uppercase tracking-wide ${
+                  missing.has(question.id) ? "text-[#C91D1D]" : "text-[#8A6D0B]"
+                }`}
+              >
                 Question {index + 1}
+                {missing.has(question.id) && " · Not answered"}
               </p>
-              <h2 className="mt-2 font-bold leading-7">{question.text}</h2>
+              <QuestionText text={question.text} />
 
               <div className="mt-4 flex flex-col gap-2.5">
                 {question.choices.map((choice, choiceIndex) => {
@@ -248,22 +546,17 @@ function PracticeExamContent() {
                   return (
                     <button
                       key={choice.id}
-                      onClick={() =>
-                        setAnswers((current) => ({
-                          ...current,
-                          [question.id]: choice.id,
-                        }))
-                      }
+                      onClick={() => choose(question.id, choice.id)}
                       className={`flex items-center gap-4 rounded-lg border-2 px-4 py-3 text-left text-sm transition ${
                         chosen
-                          ? "border-[#8A6D0B] bg-[#FBF7EE]"
-                          : "border-border hover:border-[#C9A227]"
+                          ? "border-[var(--exam)] bg-[var(--exam-soft)]"
+                          : "border-border hover:border-[var(--exam)]"
                       }`}
                     >
                       <span
                         className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
                           chosen
-                            ? "border-[#8A6D0B] bg-[#FFD400] text-[#0B2340]"
+                            ? "border-[var(--exam)] bg-[var(--exam)] text-white"
                             : "border-border text-muted-foreground"
                         }`}
                       >
@@ -290,7 +583,7 @@ function PracticeExamContent() {
         <button
           onClick={submit}
           disabled={submitting}
-          className="sticky bottom-5 mt-5 w-full rounded-lg bg-[#0B2340] px-5 py-3.5 font-bold text-white transition hover:bg-[#0F2E4D] disabled:opacity-60"
+          className="sticky bottom-5 mt-5 w-full rounded-lg bg-[var(--exam)] px-5 py-3.5 font-bold text-white transition hover:bg-[var(--exam-strong)] disabled:opacity-60"
         >
           {submitting ? "Submitting…" : "Finish exam"}
         </button>
@@ -331,17 +624,39 @@ function Meter({
 function Frame({
   title,
   children,
+  /**
+   * Drops the way back and the heading. The result screen leads with its own
+   * verdict, and a title repeating the track above it only pushes the thing
+   * the learner opened the page for further down.
+   */
+  bare = false,
 }: {
   title: string;
   children: React.ReactNode;
+  bare?: boolean;
 }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppNav />
-      <main className="rv-shell py-10">
-        <BackLink />
-        <h1 className="mb-6 text-4xl font-extrabold md:text-5xl">{title}</h1>
-        {children}
+      <main className="rv-shell py-[clamp(1.5rem,4vw,2.5rem)]">
+        {/* One column for the whole screen: the way back, the title and the
+            questions share an edge and centre together, instead of the heading
+            hugging the shell while the cards sat in a narrower column of their
+            own. */}
+        <div className="mx-auto w-full max-w-3xl">
+          {!bare && (
+            <>
+              <BackLink />
+              {/* Fluid rather than a jump at md: the title is the tallest
+                  thing here, and on a short window that jump costs a
+                  question. */}
+              <h1 className="mb-[clamp(1rem,3vw,1.5rem)] text-[clamp(1.75rem,5.5vw,3rem)] font-extrabold leading-tight">
+                {title}
+              </h1>
+            </>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );

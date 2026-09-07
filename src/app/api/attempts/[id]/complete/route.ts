@@ -1,8 +1,11 @@
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
+import {
+  PASSES_REQUIRED,
+  cappedPasses,
+  sittingPassed,
+} from "@/lib/helper/practice-exam";
 import { NextResponse } from "next/server";
-
-const PASSING_PERCENTAGE = 75;
 
 export async function POST(
   req: Request,
@@ -37,8 +40,7 @@ export async function POST(
 
     const totalItems = answersResult.rows.length;
     const score = answersResult.rows.filter((r) => r.is_correct).length;
-    const percentage = totalItems > 0 ? (score / totalItems) * 100 : 0;
-    const passed = percentage >= PASSING_PERCENTAGE;
+    const passed = sittingPassed(score, totalItems);
 
     const result = await pool.query(
       `UPDATE exam_attempts 
@@ -60,7 +62,25 @@ export async function POST(
       );
     }
 
-    return NextResponse.json(attempt);
+    // The passes are counted off the attempts themselves rather than the
+    // running total, so a result screen can never disagree with the roster
+    // that reads the same rows.
+    const passesResult = await pool.query(
+      `SELECT COUNT(*)::int AS passes
+         FROM exam_attempts
+        WHERE user_id = $1 AND exam_type = $2
+          AND passed = true AND completed_at IS NOT NULL`,
+      [attempt.user_id, attempt.exam_type],
+    );
+
+    const passes = cappedPasses(passesResult.rows[0]?.passes ?? 0);
+
+    return NextResponse.json({
+      ...attempt,
+      passes,
+      passes_required: PASSES_REQUIRED,
+      track_passed: passes >= PASSES_REQUIRED,
+    });
   } catch (error) {
     console.error("Error completing attempt:", error);
     return NextResponse.json(

@@ -3,6 +3,12 @@
 import { AppNav } from "@/components/ui/app-nav";
 import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
+import {
+  PASSES_REQUIRED,
+  cappedPasses,
+  hasPassedTrack,
+  passesLabel,
+} from "@/lib/helper/practice-exam";
 import { pickActiveTrack, type TrackActivity } from "@/lib/helper/active-track";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import type { StudyMode } from "@/lib/types/study";
@@ -28,6 +34,8 @@ type ProgressSummaryRow = {
   memorize_pct: number;
   practice_exam_pct: number;
   overall_pct: number;
+  /** Passing practice exams so far, capped at the target. */
+  exam_passes: number;
 };
 
 type RecentItem = {
@@ -83,6 +91,9 @@ const emptyProgress: Record<ExamType, number> = {
   IIAP_B: 0,
 };
 
+/** Every track starts at nought passes: nobody has sat an exam yet. */
+const emptyPasses: Record<ExamType, number> = { ...emptyProgress };
+
 function ModeOption({
   href,
   icon: Icon,
@@ -123,6 +134,7 @@ function ModeOption({
 function TrackCard({
   type,
   overall,
+  passes,
   eligibility,
   active,
   expanded,
@@ -131,6 +143,8 @@ function TrackCard({
 }: {
   type: ExamType;
   overall: number;
+  /** Practice exams passed on this track, out of PASSES_REQUIRED. */
+  passes: number;
   eligibility: Eligibility | null;
   active: boolean;
   expanded: boolean;
@@ -139,6 +153,7 @@ function TrackCard({
 }) {
   const { title, blurb } = trackCopy[type];
   const started = overall > 0;
+  const trackPassed = hasPassedTrack(passes);
   const locked = eligibility ? !eligibility.eligible : true;
   const reason = eligibility
     ? lockReason(eligibility.flashcards, eligibility.memorization)
@@ -262,6 +277,29 @@ function TrackCard({
         </div>
       </div>
 
+      {/* The exam counter sits under the progress bar because it answers a
+          different question: not how much of the track has been studied, but
+          how much of it has been proved. */}
+      <div className="mt-2 flex items-baseline justify-between text-xs font-bold">
+        <span className={trackPassed ? "text-[#0F7B52]" : ""}>
+          {trackPassed ? "Practice Exams Passed" : "Practice Exams"}
+        </span>
+        <span
+          className={`tabular-nums ${trackPassed ? "text-[#0F7B52]" : ""}`}
+          title={`${passesLabel(passes)} passing practice exams`}
+        >
+          {passesLabel(passes)}
+        </span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-[#0F7B52] transition-[width] duration-700"
+          style={{
+            width: `${(cappedPasses(passes) / PASSES_REQUIRED) * 100}%`,
+          }}
+        />
+      </div>
+
       {/* Side by side from sm up, where a wrapped row would cost ~44px of
           height the screen can't spare; stacked full-width on a phone, where
           the two-up card is too narrow to sit them next to each other. */}
@@ -293,11 +331,18 @@ function TrackCard({
             Practice Exam
           </span>
         ) : (
+          // Once the five passes are in, the exam stays open — it is revision
+          // from then on, and the label says so rather than sending them back
+          // to something they have already cleared.
           <Link
             href={`/learningMethods/practiceExam?exam_type=${type}`}
-            className="w-full whitespace-nowrap rounded-lg border-2 border-[#FFD400] px-3 py-2 text-center text-sm font-bold text-[#0B2340] transition hover:bg-[#FFF8D6] sm:w-auto"
+            className={`w-full whitespace-nowrap rounded-lg border-2 px-3 py-2 text-center text-sm font-bold transition sm:w-auto ${
+              trackPassed
+                ? "border-[#0F7B52] text-[#0F7B52] hover:bg-[#E7F4EE]"
+                : "border-[var(--exam)] text-[var(--exam)] hover:bg-[var(--exam-soft)]"
+            }`}
           >
-            Practice Exam
+            {trackPassed ? "Review Practice Exam" : "Practice Exam"}
           </Link>
         )}
 
@@ -409,6 +454,7 @@ function QuickAccess({ recent }: { recent: RecentItem[] }) {
 
 function ExamTracks({
   progress,
+  passes,
   eligibility,
   activeTrack,
   expanded,
@@ -416,6 +462,7 @@ function ExamTracks({
   onClose,
 }: {
   progress: Record<ExamType, number>;
+  passes: Record<ExamType, number>;
   eligibility: Partial<Record<ExamType, Eligibility>>;
   activeTrack: ExamType | undefined;
   expanded: ExamType | null;
@@ -432,6 +479,7 @@ function ExamTracks({
             key={type}
             type={type}
             overall={progress[type]}
+            passes={passes[type] ?? 0}
             eligibility={eligibility[type] ?? null}
             active={type === activeTrack}
             expanded={expanded === type}
@@ -447,6 +495,7 @@ function ExamTracks({
 export function DashboardPage() {
   const { data: session } = useSession();
   const [progress, setProgress] = useState(emptyProgress);
+  const [passes, setPasses] = useState(emptyPasses);
   const [activity, setActivity] = useState<TrackActivity>({});
   const [eligibility, setEligibility] = useState<
     Partial<Record<ExamType, Eligibility>>
@@ -463,19 +512,24 @@ export function DashboardPage() {
       .then((rows: RecentItem[]) => {
         if (active && Array.isArray(rows)) setRecent(rows);
       })
-      .catch((error) => console.error("Failed to load recent activity:", error));
+      .catch((error) =>
+        console.error("Failed to load recent activity:", error),
+      );
 
     fetch("/api/progress")
       .then((response) => response.json())
       .then((rows: ProgressSummaryRow[]) => {
         if (!active || !Array.isArray(rows)) return;
         const next = { ...emptyProgress };
+        const passCounts = { ...emptyPasses };
         const stamps: TrackActivity = {};
         for (const row of rows) {
           next[row.exam_type] = row.overall_pct;
+          passCounts[row.exam_type] = row.exam_passes ?? 0;
           stamps[row.exam_type] = row.last_activity_at;
         }
         setProgress(next);
+        setPasses(passCounts);
         setActivity(stamps);
       })
       .catch((error) => console.error("Failed to load progress:", error));
@@ -567,9 +621,12 @@ export function DashboardPage() {
             once, since a portal lands in the body where the copy's own
             `lg:hidden` no longer reaches it. */}
         <div className="mt-4 lg:grid lg:grid-cols-[1.8fr_1fr] lg:gap-6">
-          <div className={activeTab === "tracks" ? undefined : "hidden lg:block"}>
+          <div
+            className={activeTab === "tracks" ? undefined : "hidden lg:block"}
+          >
             <ExamTracks
               progress={progress}
+              passes={passes}
               eligibility={eligibility}
               activeTrack={activeTrack}
               expanded={expanded}
@@ -580,7 +637,9 @@ export function DashboardPage() {
             />
           </div>
 
-          <div className={activeTab === "quick" ? undefined : "hidden lg:block"}>
+          <div
+            className={activeTab === "quick" ? undefined : "hidden lg:block"}
+          >
             <QuickAccess recent={recent} />
           </div>
         </div>

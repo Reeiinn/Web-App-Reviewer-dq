@@ -10,6 +10,7 @@ export function Result({
   wrong = 0,
   onTryAgain,
   onRedoMistakes,
+  accent = "study",
 }: ResultProps) {
   const total = correct + wrong;
   const score = total ? Math.round((correct / total) * 100) : 0;
@@ -114,7 +115,11 @@ export function Result({
           {onTryAgain && (
             <button
               onClick={onTryAgain}
-              className="rounded-lg bg-[#FFD400] px-5 py-3 text-[clamp(0.95rem,3vw,1.05rem)] [@media(max-height:520px)]:py-2 font-bold text-[#0B2340] transition hover:bg-[#E8C200]"
+              className={`rounded-lg px-5 py-3 text-[clamp(0.95rem,3vw,1.05rem)] font-bold transition [@media(max-height:520px)]:py-2 ${
+                accent === "exam"
+                  ? "bg-[var(--exam)] text-white hover:bg-[var(--exam-strong)]"
+                  : "bg-[#FFD400] text-[#0B2340] hover:bg-[#E8C200]"
+              }`}
             >
               Try again
             </button>

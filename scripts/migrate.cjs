@@ -69,12 +69,27 @@ const statements = [
   // object storage for one small square per user.
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS image text`,
 
-  // When a staff account last loaded a screen, so an admin can tell which
-  // field managers are still opening the app. Written from the routes the
-  // console already calls rather than from a browser ping, so it records a
-  // visit rather than a live connection. Null until that account's first
-  // request after this column exists.
-  `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`,
+  // An answer is now saved the moment it is picked, so changing a choice has
+  // to overwrite the earlier row rather than add a second one — two rows for
+  // one question would both count toward the score. Older duplicates go first,
+  // newest kept, so the constraint can be added.
+  `DELETE FROM exam_attempt_answers a
+    USING exam_attempt_answers b
+    WHERE a.attempt_id = b.attempt_id
+      AND a.question_id = b.question_id
+      AND a.ctid < b.ctid`,
+
+  `ALTER TABLE exam_attempt_answers
+     DROP CONSTRAINT IF EXISTS exam_attempt_answers_attempt_question_key`,
+
+  `ALTER TABLE exam_attempt_answers
+     ADD CONSTRAINT exam_attempt_answers_attempt_question_key
+     UNIQUE (attempt_id, question_id)`,
+
+  // The paper is dealt once per sitting and kept with the attempt, so a
+  // refresh returns to the same questions in the same order rather than
+  // reshuffling under answers the learner has already given.
+  `ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS question_order jsonb`,
 ];
 
 // One example term so the Glossary renders against real data.
