@@ -48,6 +48,21 @@ const statements = [
 
   `CREATE INDEX IF NOT EXISTS study_sessions_user_id_idx
      ON study_sessions (user_id)`,
+
+  // Last time a learner opened a study mode on a track, for the dashboard's
+  // Quick Access panel. Unlike study_sessions this is never deleted, so a
+  // finished deck still shows up as recently visited.
+  `CREATE TABLE IF NOT EXISTS recent_activity (
+     id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     exam_type  exam_type NOT NULL,
+     mode       text NOT NULL,
+     visited_at timestamptz NOT NULL DEFAULT now(),
+     UNIQUE (user_id, exam_type, mode)
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS recent_activity_user_id_idx
+     ON recent_activity (user_id)`,
 ];
 
 // One example term so the Glossary renders against real data.

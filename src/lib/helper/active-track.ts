@@ -31,22 +31,3 @@ export function pickActiveTrack(
   return best;
 }
 
-/**
- * Lists the tracks the learner touched most recently, newest first.
- *
- * Quick Access uses this to surface where study left off. Tracks with no
- * recorded activity are left out, so a fresh account shows nothing rather than
- * an arbitrary slice of examTypes.
- */
-export function recentTracks(
-  tracks: readonly ExamType[],
-  activity: TrackActivity,
-  limit = 3,
-): ExamType[] {
-  return tracks
-    .map((track) => ({ track, time: Date.parse(activity[track] ?? "") }))
-    .filter((entry) => !Number.isNaN(entry.time))
-    .sort((a, b) => b.time - a.time)
-    .slice(0, limit)
-    .map((entry) => entry.track);
-}
