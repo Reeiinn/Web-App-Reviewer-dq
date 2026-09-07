@@ -3,6 +3,11 @@
 import { AppNav } from "@/components/ui/app-nav";
 import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
+import {
+  pickActiveTrack,
+  recentTracks,
+  type TrackActivity,
+} from "@/lib/helper/active-track";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import {
   ArrowRight,
@@ -20,6 +25,7 @@ import { useEffect, useState } from "react";
 
 type ProgressSummaryRow = {
   exam_type: ExamType;
+  last_activity_at: string | null;
   flashcard_pct: number;
   memorize_pct: number;
   practice_exam_pct: number;
@@ -119,7 +125,7 @@ function TrackCard({
     : null;
 
   return (
-    <section className="rv-card p-5">
+    <section id={`track-${type}`} className="rv-card p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
           {active && (
@@ -222,29 +228,73 @@ function TrackCard({
   );
 }
 
-function QuickAccess() {
+/** Turns a timestamp into the coarse "when did I last touch this" phrasing. */
+function lastStudiedLabel(stamp: string | null | undefined) {
+  const time = Date.parse(stamp ?? "");
+  if (Number.isNaN(time)) return "Not started yet";
+
+  const minutes = Math.floor((Date.now() - time) / 60000);
+  if (minutes < 1) return "Studied just now";
+  if (minutes < 60) return `Studied ${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Studied ${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "Studied yesterday" : `Studied ${days}d ago`;
+}
+
+function QuickAccess({
+  tracks,
+  activity,
+  onSelect,
+}: {
+  tracks: ExamType[];
+  activity: TrackActivity;
+  onSelect: (type: ExamType) => void;
+}) {
   return (
     <aside>
       <h2 className="text-2xl font-extrabold">Quick Access</h2>
 
-      {/* Study modes are reached through a track above, so the glossary is the
-          only thing here that isn't track-specific. */}
-      <Link
-        href="/glossary"
-        className="mt-5 block rounded-xl bg-[#0B2340] p-5 text-white transition hover:bg-[#0F2E4D]"
-      >
-        <div className="flex items-center gap-2.5">
-          <BookOpen className="size-5 text-[#FFD400]" />
-          <h3 className="text-lg font-extrabold">Glossary</h3>
+      {/* Study modes are reached through a track above, so this column jumps
+          back to the tracks last studied rather than repeating the mode links. */}
+      {tracks.length === 0 ? (
+        <div className="mt-5 rounded-xl bg-[#0B2340] p-5 text-white">
+          <div className="flex items-center gap-2.5">
+            <BookOpen className="size-5 text-[#FFD400]" />
+            <h3 className="text-lg font-extrabold">No recent tracks</h3>
+          </div>
+          <p className="mt-2 text-sm text-white/75">
+            Start a track and it will show up here for a one-tap return.
+          </p>
         </div>
-        <p className="mt-2 text-sm text-white/75">
-          Comprehensive index of industry terms.
-        </p>
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm font-bold text-[#FFD400]">Browse A-Z</span>
-          <ArrowRight className="size-4 text-[#FFD400]" />
+      ) : (
+        <div className="mt-5 flex flex-col gap-4">
+          {tracks.map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => onSelect(type)}
+              className="block w-full rounded-xl bg-[#0B2340] p-5 text-left text-white transition hover:bg-[#0F2E4D]"
+            >
+              <div className="flex items-center gap-2.5">
+                <BookOpen className="size-5 text-[#FFD400]" />
+                <h3 className="text-lg font-extrabold">{examLabels[type]}</h3>
+              </div>
+              <p className="mt-2 text-sm text-white/75">
+                {lastStudiedLabel(activity[type])}
+              </p>
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-sm font-bold text-[#FFD400]">
+                  Resume Study
+                </span>
+                <ArrowRight className="size-4 text-[#FFD400]" />
+              </div>
+            </button>
+          ))}
         </div>
-      </Link>
+      )}
     </aside>
   );
 }
@@ -252,6 +302,7 @@ function QuickAccess() {
 export function DashboardPage() {
   const { data: session } = useSession();
   const [progress, setProgress] = useState(emptyProgress);
+  const [activity, setActivity] = useState<TrackActivity>({});
   const [eligibility, setEligibility] = useState<
     Partial<Record<ExamType, Eligibility>>
   >({});
@@ -265,8 +316,13 @@ export function DashboardPage() {
       .then((rows: ProgressSummaryRow[]) => {
         if (!active || !Array.isArray(rows)) return;
         const next = { ...emptyProgress };
-        for (const row of rows) next[row.exam_type] = row.overall_pct;
+        const stamps: TrackActivity = {};
+        for (const row of rows) {
+          next[row.exam_type] = row.overall_pct;
+          stamps[row.exam_type] = row.last_activity_at;
+        }
         setProgress(next);
+        setActivity(stamps);
       })
       .catch((error) => console.error("Failed to load progress:", error));
 
@@ -289,9 +345,17 @@ export function DashboardPage() {
 
   const firstName = session?.user?.name?.split(" ")[0] ?? "Scholar";
 
-  const activeTrack = examTypes.reduce((best, type) =>
-    progress[type] > progress[best] ? type : best,
-  );
+  const activeTrack = pickActiveTrack(examTypes, activity);
+  const recent = recentTracks(examTypes, activity);
+
+  // Quick Access reuses the track card's own expand state, so a pick there
+  // opens the same study-mode panel the card's button opens.
+  const openTrack = (type: ExamType) => {
+    setExpanded(type);
+    document
+      .getElementById(`track-${type}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -315,7 +379,7 @@ export function DashboardPage() {
                   type={type}
                   overall={progress[type]}
                   eligibility={eligibility[type] ?? null}
-                  active={type === activeTrack && progress[type] > 0}
+                  active={type === activeTrack}
                   expanded={expanded === type}
                   onToggle={() =>
                     setExpanded((current) => (current === type ? null : type))
@@ -325,7 +389,11 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <QuickAccess />
+          <QuickAccess
+            tracks={recent}
+            activity={activity}
+            onSelect={openTrack}
+          />
         </div>
       </main>
     </div>
