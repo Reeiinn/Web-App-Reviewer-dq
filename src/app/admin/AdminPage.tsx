@@ -5,6 +5,7 @@ import { AppNav } from "@/components/ui/app-nav";
 import { ButtonHoldAndRelease } from "@/components/ui/hold-and-release-button";
 import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
+import { staffTitleFor } from "@/lib/helper/roles";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import {
   readinessStatus,
@@ -508,7 +509,7 @@ export function AdminPage() {
           </div>
 
           <label className="ml-auto text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            {isAdmin ? "Search Reviewee or Manager" : "Search Reviewee"}
+            {isAdmin ? "Search Reviewee or Field Manager" : "Search Reviewee"}
             <div className="relative mt-1.5">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -518,7 +519,9 @@ export function AdminPage() {
                   setSearch(event.target.value);
                   setPage(1);
                 }}
-                placeholder={isAdmin ? "Name, email or manager" : "Name or email"}
+                placeholder={
+                  isAdmin ? "Name, email or field manager" : "Name or email"
+                }
                 className="w-72 rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm font-semibold text-foreground outline-none focus:border-[#0B2340]"
               />
             </div>
@@ -589,10 +592,8 @@ export function AdminPage() {
                                 {row.manager.name}
                               </p>
                               <p className="mt-0.5 text-xs text-muted-foreground">
-                                {row.manager.role === "ADMIN"
-                                  ? "Admin"
-                                  : "Manager"}{" "}
-                                · {row.manager.email}
+                                {staffTitleFor(row.manager.role)} ·{" "}
+                                {row.manager.email}
                               </p>
                             </>
                           ) : (

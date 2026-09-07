@@ -1,6 +1,6 @@
 "use client";
 
-import { isStaff, landingFor } from "@/lib/helper/roles";
+import { isStaff, landingFor, staffTitleFor } from "@/lib/helper/roles";
 import { LogOut, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
@@ -113,6 +113,10 @@ export function AppNav({
   const staff = isStaff(session?.user?.role);
   const links = staff ? staffLinks : learnerLinks;
   const home = landingFor(session?.user?.role);
+  // A reviewee holds one role and needs no reminder of it; a staff account is
+  // read differently depending on whose reviewees it can see, so the wordmark
+  // carries the title.
+  const title = staffTitleFor(session?.user?.role);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
@@ -123,9 +127,17 @@ export function AppNav({
       >
         <Link
           href={home}
-          className="text-lg font-extrabold tracking-tight text-foreground"
+          className="flex items-baseline gap-2 tracking-tight text-foreground"
         >
-          INSURE
+          <span className="text-lg font-extrabold">INSURE</span>
+          {title && (
+            // Same size and case as the wordmark, only lighter and greyer:
+            // weight alone carries the hierarchy, so the title reads as part
+            // of one lockup rather than a tag stuck beside it.
+            <span className="hidden text-lg font-normal uppercase text-muted-foreground sm:inline">
+              {title}
+            </span>
+          )}
         </Link>
 
         <nav aria-label="Main" className="hidden md:block">
