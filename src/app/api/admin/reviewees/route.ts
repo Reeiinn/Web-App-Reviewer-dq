@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { touchLastSeen } from "@/app/api/_lib/presence-store";
 import pool from "@/lib/db";
 import { readinessStatus } from "@/lib/helper/readiness";
 import { examTypes, type ExamType } from "@/lib/types/common";
@@ -45,6 +46,10 @@ export async function GET(req: Request) {
   if (role !== "ADMIN" && role !== "MANAGER") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  // Loading the roster is what opening /admin does, so this is the stamp
+  // that says the account opened the app at all.
+  await touchLastSeen(currentUserId);
 
   const requested = new URL(req.url).searchParams.get("exam_type");
   const selected = examTypes.includes(requested as ExamType)

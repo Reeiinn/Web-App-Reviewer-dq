@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { touchLastSeen } from "@/app/api/_lib/presence-store";
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 
@@ -22,6 +23,8 @@ export async function DELETE(
   if (role !== "ADMIN" && role !== "MANAGER") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  await touchLastSeen(currentUserId);
 
   const { id } = await params;
 
