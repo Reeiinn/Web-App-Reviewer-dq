@@ -5,7 +5,7 @@ import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
 import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
-import { examLabels, type ExamType } from "@/lib/types/common";
+import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import type { Question } from "@/lib/types/questions";
 import { Lock, Shuffle } from "lucide-react";
 import Link from "next/link";
@@ -16,10 +16,10 @@ const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
 function PracticeExamContent() {
   const searchParams = useSearchParams();
-  const type: ExamType =
-    searchParams.get("exam_type") === "TRADITIONAL_LIFE"
-      ? "TRADITIONAL_LIFE"
-      : "VUL";
+  const requested = searchParams.get("exam_type");
+  const type: ExamType = examTypes.includes(requested as ExamType)
+    ? (requested as ExamType)
+    : "VUL";
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<Question["id"], string>>({});

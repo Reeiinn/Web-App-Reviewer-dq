@@ -11,7 +11,7 @@ import {
 import { Result } from "@/components/ui/result";
 import { motivationFor, type MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
-import { examLabels, type ExamType } from "@/lib/types/common";
+import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import type { MemorizationProgressResponse } from "@/lib/types/memo";
 import type { Question } from "@/lib/types/questions";
 import type { StreakRow } from "@/lib/types/streak";
@@ -24,10 +24,10 @@ type StreakState = { current: number; best: number };
 
 function MemorizationContent() {
   const searchParams = useSearchParams();
-  const type: ExamType =
-    searchParams.get("exam_type") === "TRADITIONAL_LIFE"
-      ? "TRADITIONAL_LIFE"
-      : "VUL";
+  const requested = searchParams.get("exam_type");
+  const type: ExamType = examTypes.includes(requested as ExamType)
+    ? (requested as ExamType)
+    : "VUL";
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [index, setIndex] = useState(0);

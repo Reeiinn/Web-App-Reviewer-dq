@@ -12,7 +12,7 @@ import { motivationFor, MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
 import { restoreSession, type SavedSession } from "@/lib/helper/study-session";
 import { useFitText, type FitText } from "@/lib/helper/use-fit-text";
-import { examLabels, type ExamType } from "@/lib/types/common";
+import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import type {
   Flashcard,
   FlashcardProgressResponse,
@@ -50,10 +50,10 @@ const trackTitles: Record<ExamType, string> = {
 
 function FlashCardContent() {
   const searchParams = useSearchParams();
-  const type: ExamType =
-    searchParams.get("exam_type") === "TRADITIONAL_LIFE"
-      ? "TRADITIONAL_LIFE"
-      : "VUL";
+  const requested = searchParams.get("exam_type");
+  const type: ExamType = examTypes.includes(requested as ExamType)
+    ? (requested as ExamType)
+    : "VUL";
 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [index, setIndex] = useState(0);
