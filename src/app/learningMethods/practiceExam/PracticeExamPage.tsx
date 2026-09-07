@@ -12,12 +12,39 @@ import {
 } from "@/lib/helper/practice-exam";
 import { examLabels, parseExamType } from "@/lib/types/common";
 import type { Question } from "@/lib/types/questions";
-import { Lock, Shuffle } from "lucide-react";
+import { Lock } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
+
+/**
+ * The paper this sitting was dealt, in the order the attempt recorded.
+ *
+ * The order belongs to the attempt rather than to the page, so a refresh
+ * returns to the same questions in the same places instead of reshuffling
+ * under answers already given. Questions added to the track since the sitting
+ * began go on the end; ones withdrawn since simply drop out. An attempt with
+ * no stored order — one dealt before this was kept — falls back to a shuffle.
+ */
+function dealt(
+  items: Question[],
+  attempt: { question_order?: unknown } | null,
+) {
+  const order = Array.isArray(attempt?.question_order)
+    ? (attempt.question_order as string[])
+    : null;
+  if (!order) return shuffled(items);
+
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const inOrder = order
+    .map((id) => byId.get(id))
+    .filter((item): item is Question => Boolean(item));
+
+  const seen = new Set(inOrder.map((item) => item.id));
+  return [...inOrder, ...items.filter((item) => !seen.has(item.id))];
+}
 
 /** Jumps to the top of the page, honouring a reduced-motion preference. */
 const toTop = () => {
@@ -83,7 +110,7 @@ function PracticeExamContent() {
         ]);
 
         if (!active) return;
-        setQuestions(shuffled(Array.isArray(items) ? items : []));
+        setQuestions(dealt(Array.isArray(items) ? items : [], attempt));
         setFinished(false);
         setAttemptId(attempt?.id ?? null);
 
@@ -108,7 +135,10 @@ function PracticeExamContent() {
           Object.fromEntries(
             (saved.answers ?? [])
               .filter((row) => row.selected_choice_id)
-              .map((row) => [row.question_id, row.selected_choice_id as string]),
+              .map((row) => [
+                row.question_id,
+                row.selected_choice_id as string,
+              ]),
           ),
         );
         setLoading(false);
@@ -252,7 +282,9 @@ function PracticeExamContent() {
       }
 
       setAttemptId(attempt.id);
-      setQuestions((current) => shuffled(current));
+      // A new sitting is a new paper: the server dealt one with the attempt,
+      // and that is the only point at which the order changes.
+      setQuestions((current) => dealt(current, attempt));
       setAnswers({});
       unsaved.current.clear();
       setOutcome(null);
@@ -404,16 +436,10 @@ function PracticeExamContent() {
   return (
     <Frame title={`${examLabels[type]} Practice Exam`}>
       <div className="w-full">
-        <button
-          // Reorders the paper only. The answers belong to the attempt, so
-          // wiping them here would contradict what the server has stored.
-          onClick={() => setQuestions((current) => shuffled(current))}
-          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-bold transition hover:border-[#C9A227]"
-        >
-          <Shuffle className="size-3.5" /> Shuffle
-        </button>
-
-        <div className="mt-5 flex flex-col gap-4">
+        {/* No shuffle control: the order is dealt with the sitting and holds
+            until the exam is finished and taken again, so a reorder mid-paper
+            would move questions under answers already given. */}
+        <div className="flex flex-col gap-4">
           {questions.map((question, index) => (
             <section key={`${question.id}-${index}`} className="rv-card p-5">
               <p className="text-xs font-bold uppercase tracking-wide text-[#8A6D0B]">

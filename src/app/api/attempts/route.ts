@@ -4,6 +4,15 @@ import { lockReason } from "@/lib/helper/eligibility";
 import { fetchEligibility } from "@/app/api/_lib/mastery";
 import { NextResponse } from "next/server";
 
+/** One sitting's question ids, in the order the learner will see them. */
+async function dealQuestions(examType: string): Promise<string[]> {
+  const result = await pool.query(
+    `SELECT id FROM questions WHERE exam_type = $1 ORDER BY random()`,
+    [examType],
+  );
+  return result.rows.map((row) => row.id as string);
+}
+
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -50,14 +59,35 @@ export async function POST(req: Request) {
     );
 
     if (open.rows[0]) {
-      return NextResponse.json(open.rows[0]);
+      const attempt = open.rows[0];
+
+      // Sittings that predate the stored order get one now, so every resume
+      // from here on returns the same paper.
+      if (!attempt.question_order) {
+        const filled = await pool.query(
+          `UPDATE exam_attempts SET question_order = $2 WHERE id = $1
+           RETURNING *`,
+          [attempt.id, JSON.stringify(await dealQuestions(exam_type))],
+        );
+        return NextResponse.json(filled.rows[0]);
+      }
+
+      return NextResponse.json(attempt);
     }
 
+    // The paper is dealt once, here, and kept with the attempt. Shuffling on
+    // the page instead meant every reload reordered questions the learner had
+    // already answered.
     const result = await pool.query(
-      `INSERT INTO exam_attempts (user_id, exam_type, score, total_items, passed)
-       VALUES ($1, $2, 0, 0, false)
+      `INSERT INTO exam_attempts
+         (user_id, exam_type, score, total_items, passed, question_order)
+       VALUES ($1, $2, 0, 0, false, $3)
        RETURNING *`,
-      [session.user.id, exam_type],
+      [
+        session.user.id,
+        exam_type,
+        JSON.stringify(await dealQuestions(exam_type)),
+      ],
     );
 
     return NextResponse.json(result.rows[0], { status: 201 });

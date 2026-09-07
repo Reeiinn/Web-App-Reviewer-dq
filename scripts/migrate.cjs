@@ -85,6 +85,11 @@ const statements = [
   `ALTER TABLE exam_attempt_answers
      ADD CONSTRAINT exam_attempt_answers_attempt_question_key
      UNIQUE (attempt_id, question_id)`,
+
+  // The paper is dealt once per sitting and kept with the attempt, so a
+  // refresh returns to the same questions in the same order rather than
+  // reshuffling under answers the learner has already given.
+  `ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS question_order jsonb`,
 ];
 
 // One example term so the Glossary renders against real data.
