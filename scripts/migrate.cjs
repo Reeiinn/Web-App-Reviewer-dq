@@ -68,6 +68,13 @@ const statements = [
   // few tens of kilobytes by the upload route, so a column beats standing up
   // object storage for one small square per user.
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS image text`,
+
+  // When a staff account last loaded a screen, so an admin can tell which
+  // field managers are still opening the app. Written from the routes the
+  // console already calls rather than from a browser ping, so it records a
+  // visit rather than a live connection. Null until that account's first
+  // request after this column exists.
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`,
 ];
 
 // One example term so the Glossary renders against real data.
