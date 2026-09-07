@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   Flame,
   Search,
-  Trash2,
   Users,
   Zap,
 } from "lucide-react";
@@ -162,9 +161,12 @@ const samePhrase = (a: string, b: string) => tidy(a) === tidy(b);
 /**
  * Removing a reviewee destroys their history, and the delete cascades from
  * users.id through progress, attempts, streaks and sessions. A trash icon is
- * too cheap for that, so the action opens a dialog that names the person, only
- * unlocks once the admin types the confirmation phrase, and then sends the
- * request on a press held long enough that no slip can reach it.
+ * too cheap for that, so it takes a held press in the roster row to even open
+ * the dialog, the dialog names the person and only unlocks once the phrase is
+ * typed, and a second held press sends the request.
+ *
+ * Managers see this control on the same terms admins do: the roster is filtered
+ * to their own reviewees, but the row itself is not role-gated.
  */
 function RemoveReviewee({
   reviewee,
@@ -220,13 +222,17 @@ function RemoveReviewee({
 
   return (
     <AlertDialog.Root open={open} onOpenChange={close}>
-      <AlertDialog.Trigger
+      {/* The row control is the hold too: a click cannot even open the dialog,
+          so the gesture is visible where the roster is rather than hiding
+          behind an ordinary Remove button. */}
+      <ButtonHoldAndRelease
         aria-label={`Remove ${reviewee.name}`}
-        className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
-      >
-        <Trash2 className="size-3.5" />
-        Remove
-      </AlertDialog.Trigger>
+        holdDuration={1200}
+        onHoldComplete={() => close(true)}
+        idleLabel="Hold to remove"
+        holdingLabel="Keep holding…"
+        className="h-8 min-w-0 px-2.5 text-xs"
+      />
 
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-[#0B2340]/50 backdrop-blur-[2px]" />
