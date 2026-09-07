@@ -11,6 +11,8 @@ import {
 import { Result } from "@/components/ui/result";
 import { motivationFor, type MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
+import { restoreMemorization } from "@/lib/helper/memorization-session";
+import type { SavedSession } from "@/lib/helper/study-session";
 import { useFitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
 import type { MemorizationProgressResponse } from "@/lib/types/memo";
@@ -20,6 +22,17 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
+
+const sessionUrl = (type: ExamType) =>
+  `/api/memorization/session?exam_type=${encodeURIComponent(type)}`;
+
+/** A body that is not a saved position (an error payload, say) resumes nothing. */
+const asSavedSession = (value: unknown): SavedSession | null =>
+  value &&
+  typeof value === "object" &&
+  Array.isArray((value as SavedSession).card_order)
+    ? (value as SavedSession)
+    : null;
 
 type StreakState = { current: number; best: number };
 
@@ -34,14 +47,17 @@ function MemorizationContent() {
   const [loading, setLoading] = useState(true);
   const [finished, setFinished] = useState(false);
 
-  const [wrong, setWrong] = useState<Question[]>([]);
+  /** Every answer so far, and the one thing this sitting saves and resumes. */
+  const [ratings, setRatings] = useState<Record<string, boolean>>({});
+  /** Question the sitting picked up on, so a resume never looks like a restart. */
+  const [resumedAt, setResumedAt] = useState<number | null>(null);
 
   const [streak, setStreak] = useState<StreakState>({ current: 0, best: 0 });
   const [message, setMessage] = useState<MotivationMessage | null>(null);
   const [celebration, setCelebration] = useState(0);
-  const [answeredCount, setAnsweredCount] = useState(0);
-  const [correctCount, setCorrectCount] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
+  /** Answers timed in this sitting: a resumed one has no clock for the rest. */
+  const [timedCount, setTimedCount] = useState(0);
 
   const questionShownAt = useRef<number>(Date.now());
 
@@ -55,14 +71,26 @@ function MemorizationContent() {
       fetch("/api/streaks")
         .then((response) => response.json() as Promise<StreakRow[]>)
         .catch((): StreakRow[] => []),
+      fetch(sessionUrl(type))
+        .then((response) => response.json() as Promise<unknown>)
+        .catch((): unknown => null),
     ])
-      .then(([items, streaks]) => {
+      .then(([items, streaks, saved]) => {
         if (!active) return;
-        setQuestions(shuffled(Array.isArray(items) ? items : []));
-        setIndex(0);
+
+        // Pick the sitting up where it stopped: same order, same question,
+        // same score. A visit with nothing saved deals a fresh shuffle.
+        const session = restoreMemorization(
+          Array.isArray(items) ? items : [],
+          asSavedSession(saved),
+        );
+
+        setQuestions(session.questions);
+        setIndex(session.index);
+        setRatings(session.ratings);
+        setResumedAt(session.resumed ? session.index : null);
         setSelected(null);
         setChecked(false);
-        setWrong([]);
         setFinished(false);
         questionShownAt.current = Date.now();
 
@@ -81,6 +109,34 @@ function MemorizationContent() {
     };
   }, [type]);
 
+  // Every position change is written through, so the sitting resumes on
+  // whatever device the learner opens next. A failed save costs the resume
+  // point and nothing else.
+  useEffect(() => {
+    if (loading || finished || questions.length === 0) return;
+
+    fetch(sessionUrl(type), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        card_order: questions.map((item) => item.id),
+        card_index: index,
+        ratings,
+      }),
+    }).catch((error) => {
+      console.error("Failed to save memorization session:", error);
+    });
+  }, [questions, index, ratings, loading, finished, type]);
+
+  // A finished set has nothing to resume into: the next visit starts over.
+  useEffect(() => {
+    if (!finished) return;
+
+    fetch(sessionUrl(type), { method: "DELETE" }).catch((error) => {
+      console.error("Failed to clear memorization session:", error);
+    });
+  }, [finished, type]);
+
   const question = questions[index];
   const correctChoiceId = question?.choices.find(
     (choice) => choice.is_correct,
@@ -93,11 +149,18 @@ function MemorizationContent() {
     `${question?.id ?? ""}:${question?.choices.length ?? 0}`,
   );
 
+  // The saved ratings are the score: counting them keeps the tallies and the
+  // resume point from ever disagreeing.
+  const answers = Object.values(ratings);
+  const answeredCount = answers.length;
+  const correctCount = answers.filter(Boolean).length;
+  const wrong = questions.filter((item) => ratings[item.id] === false);
+
   const accuracy = answeredCount
     ? Math.round((correctCount / answeredCount) * 100)
     : 0;
-  const averageSeconds = answeredCount
-    ? Math.round(elapsedMs / answeredCount / 1000)
+  const averageSeconds = timedCount
+    ? Math.round(elapsedMs / timedCount / 1000)
     : 0;
 
   const resetSession = (nextQuestions: Question[]) => {
@@ -105,12 +168,12 @@ function MemorizationContent() {
     setIndex(0);
     setSelected(null);
     setChecked(false);
-    setWrong([]);
     setFinished(false);
     setMessage(null);
-    setAnsweredCount(0);
-    setCorrectCount(0);
+    setRatings({});
+    setResumedAt(null);
     setElapsedMs(0);
+    setTimedCount(0);
     questionShownAt.current = Date.now();
   };
 
@@ -119,18 +182,9 @@ function MemorizationContent() {
 
     const isCorrect = selected === correctChoiceId;
     setChecked(true);
-    setAnsweredCount((count) => count + 1);
+    setRatings((current) => ({ ...current, [question.id]: isCorrect }));
     setElapsedMs((total) => total + (Date.now() - questionShownAt.current));
-
-    if (isCorrect) {
-      setCorrectCount((count) => count + 1);
-    } else {
-      setWrong((current) =>
-        current.some((item) => item.id === question.id)
-          ? current
-          : [...current, question],
-      );
-    }
+    setTimedCount((count) => count + 1);
 
     // Optimistic so the celebration is immediate; the server value replaces it.
     const optimistic = isCorrect ? streak.current + 1 : 0;
@@ -259,6 +313,14 @@ function MemorizationContent() {
             pulse={checked && message?.mood === "correct"}
           />
         </div>
+
+        {/* Says where the set picked up, so a resumed sitting never looks like
+            a restarted one. */}
+        {resumedAt === index && (
+          <p className="rv-pop-in mt-2 w-fit shrink-0 rounded-lg border border-[#C9A227] bg-[#FFF8D6] px-3 py-1 text-xs font-bold text-[#0B2340]">
+            Resumed at {index + 1} of {questions.length}
+          </p>
+        )}
 
         <div className="mt-3 h-2 shrink-0 overflow-hidden rounded-full bg-muted">
           <div
