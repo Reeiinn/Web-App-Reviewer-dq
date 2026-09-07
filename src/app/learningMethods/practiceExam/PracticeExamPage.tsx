@@ -19,6 +19,13 @@ import { Suspense, useEffect, useState } from "react";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
+/** Jumps to the top of the page, honouring a reduced-motion preference. */
+const toTop = () => {
+  if (typeof window === "undefined") return;
+  const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
+};
+
 function PracticeExamContent() {
   const searchParams = useSearchParams();
   const type = parseExamType(searchParams.get("exam_type"));
@@ -141,6 +148,10 @@ function PracticeExamContent() {
         passes: Number(completed?.passes ?? 0),
       });
       setFinished(true);
+      // The verdict is at the top of a page as long as the exam was, and the
+      // submit button sits at the bottom of it. Without this the learner lands
+      // on the answer review and has to scroll up to learn whether they passed.
+      toTop();
     } catch (submitError) {
       console.error("Failed to submit practice exam:", submitError);
       setError("Something went wrong submitting your exam. Please try again.");
@@ -175,6 +186,7 @@ function PracticeExamContent() {
       setAnswers({});
       setOutcome(null);
       setFinished(false);
+      toTop();
     } catch (retakeError) {
       console.error("Failed to start another practice exam:", retakeError);
       setError("Could not reach the server. Try again.");
@@ -287,6 +299,7 @@ function PracticeExamContent() {
             correct={score}
             wrong={wrongQuestions.length}
             onTryAgain={retake}
+            accent="exam"
           />
 
           <div className="mt-6 flex flex-col gap-4">
@@ -352,14 +365,14 @@ function PracticeExamContent() {
                       }
                       className={`flex items-center gap-4 rounded-lg border-2 px-4 py-3 text-left text-sm transition ${
                         chosen
-                          ? "border-[#8A6D0B] bg-[#FBF7EE]"
-                          : "border-border hover:border-[#C9A227]"
+                          ? "border-[var(--exam)] bg-[var(--exam-soft)]"
+                          : "border-border hover:border-[var(--exam)]"
                       }`}
                     >
                       <span
                         className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
                           chosen
-                            ? "border-[#8A6D0B] bg-[#FFD400] text-[#0B2340]"
+                            ? "border-[var(--exam)] bg-[var(--exam)] text-white"
                             : "border-border text-muted-foreground"
                         }`}
                       >
@@ -386,7 +399,7 @@ function PracticeExamContent() {
         <button
           onClick={submit}
           disabled={submitting}
-          className="sticky bottom-5 mt-5 w-full rounded-lg bg-[#0B2340] px-5 py-3.5 font-bold text-white transition hover:bg-[#0F2E4D] disabled:opacity-60"
+          className="sticky bottom-5 mt-5 w-full rounded-lg bg-[var(--exam)] px-5 py-3.5 font-bold text-white transition hover:bg-[var(--exam-strong)] disabled:opacity-60"
         >
           {submitting ? "Submitting…" : "Finish exam"}
         </button>

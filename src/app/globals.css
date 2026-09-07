@@ -1,10 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap');
-@import 'tailwindcss';
-@import 'tw-animate-css';
-@import 'shadcn/tailwind.css';
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @theme inline {
-  --font-sans: 'Hanken Grotesk', sans-serif;
+  --font-sans: "Hanken Grotesk", sans-serif;
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -67,6 +67,12 @@
 
   --destructive: #c91d1d;
   --success: #0f7b52;
+
+  /* The practice exam's own colour. Yellow means "study" everywhere else, so
+     the exam reads as a different kind of action at a glance. */
+  --exam: #2f5fd0;
+  --exam-strong: #24499f;
+  --exam-soft: #eaf0fd;
 
   --border: #eae3d2;
   --input: #e4dcc8;
@@ -157,7 +163,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Hanken Grotesk', sans-serif;
+    font-family: "Hanken Grotesk", sans-serif;
     /* Long words (URLs, uninterrupted terms) wrap instead of forcing the page
        to scroll sideways. */
     overflow-wrap: break-word;

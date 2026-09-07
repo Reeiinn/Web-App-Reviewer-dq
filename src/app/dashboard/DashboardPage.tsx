@@ -339,7 +339,7 @@ function TrackCard({
             className={`w-full whitespace-nowrap rounded-lg border-2 px-3 py-2 text-center text-sm font-bold transition sm:w-auto ${
               trackPassed
                 ? "border-[#0F7B52] text-[#0F7B52] hover:bg-[#E7F4EE]"
-                : "border-[#FFD400] text-[#0B2340] hover:bg-[#FFF8D6]"
+                : "border-[var(--exam)] text-[var(--exam)] hover:bg-[var(--exam-soft)]"
             }`}
           >
             {trackPassed ? "Review Practice Exam" : "Practice Exam"}
