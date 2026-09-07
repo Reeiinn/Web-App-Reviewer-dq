@@ -11,6 +11,7 @@ import {
 import { Result } from "@/components/ui/result";
 import { motivationFor, type MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
+import { useFitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
 import type { MemorizationProgressResponse } from "@/lib/types/memo";
 import type { Question } from "@/lib/types/questions";
@@ -30,9 +31,10 @@ function MemorizationContent() {
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
-  const [wrong, setWrong] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [finished, setFinished] = useState(false);
+
+  const [wrong, setWrong] = useState<Question[]>([]);
 
   const [streak, setStreak] = useState<StreakState>({ current: 0, best: 0 });
   const [message, setMessage] = useState<MotivationMessage | null>(null);
@@ -84,6 +86,12 @@ function MemorizationContent() {
     (choice) => choice.is_correct,
   )?.id;
   const parts = question ? splitStatements(question.text) : null;
+
+  // Refits when the question changes, and again when the window resizes, so
+  // the card never needs a scrollbar of its own.
+  const fit = useFitText<HTMLDivElement, HTMLDivElement>(
+    `${question?.id ?? ""}:${question?.choices.length ?? 0}`,
+  );
 
   const accuracy = answeredCount
     ? Math.round((correctCount / answeredCount) * 100)
@@ -210,131 +218,145 @@ function MemorizationContent() {
 
   const progressPct = ((index + (checked ? 1 : 0)) / questions.length) * 100;
 
+  // Very short choices ("I and II") pair up on a wide card: half the rows is
+  // half the height the fit has to swallow, so the question reads a size or
+  // two larger. Anything longer keeps the full width and stays on one line.
+  const pairChoices =
+    question.choices.length >= 4 &&
+    question.choices.every((choice) => choice.text.length <= 24);
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <AppNav />
+    // The reviewer is a single screen: the shell owns the viewport height and
+    // the question column takes whatever the chrome leaves, so the page itself
+    // never scrolls on a short or narrow window.
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
+      <AppNav compact />
 
-      <main className="rv-shell py-8">
-        <BackLink />
-        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-          <div>
-            <span className="inline-block rounded-full bg-[#FFD400] px-3 py-1 text-xs font-bold text-[#0B2340]">
-              {examLabels[type]} Track
+      <main className="rv-shell flex min-h-0 flex-1 flex-col py-4 md:py-6">
+        {/* Way out, track and position ride on one line: every row of chrome
+            here is a row the question cannot use. */}
+        {/* One line at every width: the label and counters never wrap, and the
+            title is the only thing wide enough to be worth dropping. */}
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <BackLink className="[@media(max-height:800px)]:min-h-9" />
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-[#FFD400] px-2.5 py-1 text-[11px] font-bold text-[#0B2340] sm:px-3 sm:text-xs">
+            {examLabels[type]}
+          </span>
+          <h1 className="hidden truncate text-xl font-extrabold md:block [@media(max-height:850px)]:sr-only [@media(min-height:900px)]:text-2xl">
+            Memorization Mode
+          </h1>
+          <span className="ml-auto shrink-0 whitespace-nowrap text-sm font-extrabold tabular-nums">
+            {index + 1}
+            <span className="text-muted-foreground">
+              {" "}
+              / {questions.length}
             </span>
-            <h1 className="mt-3 text-4xl font-extrabold md:text-5xl">
-              Memorization Mode
-            </h1>
-            <p className="mt-2 max-w-xl text-muted-foreground">
-              Master key concepts through spaced repetition and high-intensity
-              recall. Select the correct answer to advance your streak.
-            </p>
-          </div>
-
-          <div className="rv-card flex shrink-0 divide-x divide-border">
-            <div className="px-6 py-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                Current Streak
-              </p>
-              <div className="mt-2">
-                <StreakBadge
-                  current={streak.current}
-                  best={streak.best}
-                  pulse={checked && message?.mood === "correct"}
-                />
-              </div>
-            </div>
-            <div className="px-6 py-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                Session Progress
-              </p>
-              <p className="mt-2 text-2xl font-extrabold leading-none">
-                {index + 1}
-                <span className="text-base text-muted-foreground">
-                  {" "}
-                  / {questions.length}
-                </span>
-              </p>
-            </div>
-          </div>
+          </span>
+          <StreakBadge
+            compact
+            current={streak.current}
+            best={streak.best}
+            pulse={checked && message?.mood === "correct"}
+          />
         </div>
 
-        <div className="mt-7 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="mt-3 h-2 shrink-0 overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-[#8A6D0B] transition-[width] duration-500"
             style={{ width: `${progressPct}%` }}
           />
         </div>
 
-        <div className="mt-7 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          <div>
-            <section className="rv-card relative overflow-hidden p-6">
+        <div className="mt-4 grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-[2.6fr_1fr] lg:overflow-hidden">
+          <div className="flex min-h-0 flex-col">
+            <section className="rv-card relative flex min-h-0 flex-1 flex-col overflow-hidden p-4 sm:p-6 [@media(max-height:700px)]:p-3">
               <Confetti
                 active={checked && message?.mood === "correct"}
                 runId={celebration}
                 pieces={message?.milestone ? 34 : 20}
               />
 
-              <span className="inline-block rounded-full bg-[#0B2340] px-3 py-1 text-xs font-bold text-[#FFD400]">
+              {/* The concept tag is the first thing the card drops when the
+                  window is too short to hold the question at a legible size. */}
+              <span className="inline-block w-fit shrink-0 rounded-full bg-[#0B2340] px-3 py-1 text-xs font-bold text-[#FFD400] [@media(max-height:700px)]:hidden">
                 Concept: {question.category}
               </span>
 
-              <h2 className="mt-5 text-xl font-extrabold leading-8">
-                {parts?.prompt}
-              </h2>
+              {/* Question and choices share the room the card has left. Every
+                  size below is an em of the fitted base, so a long question
+                  scales itself down rather than scrolling the screen away. */}
+              <div
+                ref={fit.boxRef}
+                className="mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"
+              >
+                <div
+                  ref={fit.contentRef}
+                  style={{ fontSize: fit.fontSize }}
+                  className="my-auto w-full"
+                >
+                <h2 className="text-[1.3em] font-extrabold leading-[1.4]">
+                  {parts?.prompt}
+                </h2>
 
-              {parts && parts.statements.length > 0 && (
-                <div className="mt-4 flex flex-col gap-2">
-                  {parts.statements.map((statement) => (
-                    <p
-                      key={statement}
-                      className="rounded-lg bg-muted px-4 py-3 text-sm leading-6"
-                    >
-                      {statement}
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-6 flex flex-col gap-3">
-                {question.choices.map((choice, choiceIndex) => {
-                  const isChosen = selected === choice.id;
-                  const isCorrect = choice.id === correctChoiceId;
-
-                  const state = checked
-                    ? isCorrect
-                      ? "border-emerald-500 bg-emerald-50"
-                      : isChosen
-                        ? "border-rose-500 bg-rose-50"
-                        : "border-border opacity-60"
-                    : isChosen
-                      ? "border-[#8A6D0B] bg-[#FBF7EE]"
-                      : "border-border hover:border-[#C9A227]";
-
-                  return (
-                    <button
-                      key={choice.id}
-                      type="button"
-                      disabled={checked}
-                      onClick={() => setSelected(choice.id)}
-                      className={`flex items-center gap-4 rounded-lg border-2 px-4 py-3.5 text-left text-sm transition disabled:cursor-default ${state}`}
-                    >
-                      <span
-                        className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
-                          isChosen && !checked
-                            ? "border-[#8A6D0B] bg-[#FFD400] text-[#0B2340]"
-                            : "border-border text-muted-foreground"
-                        }`}
+                {parts && parts.statements.length > 0 && (
+                  <div className="mt-[0.6em] flex flex-col gap-[0.4em]">
+                    {parts.statements.map((statement) => (
+                      <p
+                        key={statement}
+                        className="rounded-lg bg-muted px-[0.9em] py-[0.55em] text-[0.95em] leading-[1.45]"
                       >
-                        {String.fromCharCode(65 + choiceIndex)}
-                      </span>
-                      {choice.text}
-                    </button>
-                  );
-                })}
+                        {statement}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                <div
+                  className={`mt-[0.7em] grid gap-[0.45em] ${
+                    pairChoices ? "sm:grid-cols-2" : ""
+                  }`}
+                >
+                  {question.choices.map((choice, choiceIndex) => {
+                    const isChosen = selected === choice.id;
+                    const isCorrect = choice.id === correctChoiceId;
+
+                    const state = checked
+                      ? isCorrect
+                        ? "border-emerald-500 bg-emerald-50"
+                        : isChosen
+                          ? "border-rose-500 bg-rose-50"
+                          : "border-border opacity-60"
+                      : isChosen
+                        ? "border-[#8A6D0B] bg-[#FBF7EE]"
+                        : "border-border hover:border-[#C9A227]";
+
+                    return (
+                      <button
+                        key={choice.id}
+                        type="button"
+                        disabled={checked}
+                        onClick={() => setSelected(choice.id)}
+                        className={`flex items-center gap-[0.8em] rounded-lg border-2 px-[0.9em] py-[0.65em] text-left text-[1.05em] leading-[1.35] transition disabled:cursor-default ${state}`}
+                      >
+                        <span
+                          className={`flex size-[1.9em] shrink-0 items-center justify-center rounded-full border text-[0.8em] font-bold ${
+                            isChosen && !checked
+                              ? "border-[#8A6D0B] bg-[#FFD400] text-[#0B2340]"
+                              : "border-border text-muted-foreground"
+                          }`}
+                        >
+                          {String.fromCharCode(65 + choiceIndex)}
+                        </span>
+                        {choice.text}
+                      </button>
+                    );
+                  })}
+                </div>
+                </div>
               </div>
             </section>
 
-            <div className="mt-5 flex items-center justify-between gap-4 rounded-xl bg-[#0B2340] px-6 py-4">
+            <div className="mt-3 flex shrink-0 items-center justify-between gap-4 rounded-xl bg-[#0B2340] px-4 py-2.5 sm:px-6">
               <button
                 onClick={skip}
                 disabled={checked}
@@ -364,11 +386,15 @@ function MemorizationContent() {
             </div>
           </div>
 
-          <aside className="flex flex-col gap-5">
-            <SessionMastery
-              accuracy={accuracy}
-              averageSeconds={averageSeconds}
-            />
+          <aside className="flex min-h-0 flex-col gap-4 lg:overflow-y-auto">
+            {/* Below the two-column breakpoint the sidebar would steal a row
+                from the question, so the stats wait for a wide window. */}
+            <div className="hidden lg:block">
+              <SessionMastery
+                accuracy={accuracy}
+                averageSeconds={averageSeconds}
+              />
+            </div>
 
             {message && (
               <AnswerFeedback
