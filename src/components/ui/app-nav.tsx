@@ -28,6 +28,22 @@ const staffLinks = [
   { href: "/glossary", label: "Glossary" },
 ];
 
+// The field manager console ranks managers against each other, which is the
+// Sales Manager's view of their team and nobody else's — a field manager
+// signed in here would be reading their own standing among colleagues. The
+// route and the API refuse them too; this only keeps the link out of a nav
+// that would bounce them.
+const adminLinks = [
+  { href: "/admin", label: "Admin Console" },
+  { href: "/admin/field-managers", label: "Field Managers" },
+  { href: "/glossary", label: "Glossary" },
+];
+
+const linksFor = (role?: string | null) => {
+  if (role === "ADMIN") return adminLinks;
+  return isStaff(role) ? staffLinks : learnerLinks;
+};
+
 function UserMenu() {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
@@ -237,13 +253,25 @@ export function AppNav({
 } = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const staff = isStaff(session?.user?.role);
-  const links = staff ? staffLinks : learnerLinks;
+  const links = linksFor(session?.user?.role);
   const home = landingFor(session?.user?.role);
   // A reviewee holds one role and needs no reminder of it; a staff account is
   // read differently depending on whose reviewees it can see, so the wordmark
   // carries the title.
   const title = staffTitleFor(session?.user?.role);
+
+  // "/admin" is a prefix of "/admin/field-managers", so a plain startsWith lit
+  // both links at once. The longest match wins instead, which leaves every
+  // other link behaving exactly as it did.
+  const activeHref = links
+    .filter(
+      (link) => pathname === link.href || pathname.startsWith(`${link.href}/`),
+    )
+    .reduce<string | null>(
+      (longest, link) =>
+        !longest || link.href.length > longest.length ? link.href : longest,
+      null,
+    );
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
@@ -270,7 +298,7 @@ export function AppNav({
         <nav aria-label="Main" className="hidden md:block">
           <ul className="flex items-center gap-7">
             {links.map((link) => {
-              const active = pathname.startsWith(link.href);
+              const active = link.href === activeHref;
               return (
                 <li key={link.href}>
                   <Link
@@ -300,7 +328,7 @@ export function AppNav({
         <nav aria-label="Main" className="rv-shell pb-3 md:hidden">
           <ul className="flex items-center gap-5 overflow-x-auto">
             {links.map((link) => {
-              const active = pathname.startsWith(link.href);
+              const active = link.href === activeHref;
               return (
                 <li key={link.href}>
                   <Link

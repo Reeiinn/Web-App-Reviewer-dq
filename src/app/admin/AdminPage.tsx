@@ -2,12 +2,14 @@
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { AppNav } from "@/components/ui/app-nav";
+import { Avatar } from "@/components/ui/avatar";
 import {
   ButtonHoldAndRelease,
   type HoldHandle,
 } from "@/components/ui/hold-and-release-button";
 import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
+import { SummaryTile } from "@/components/ui/summary-tile";
 import { staffTitleFor } from "@/lib/helper/roles";
 import { PASSES_REQUIRED, passesLabel } from "@/lib/helper/practice-exam";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
@@ -26,6 +28,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type Recruiter = {
@@ -110,86 +113,6 @@ function relativeTime(value: string | null) {
 
   const days = Math.round(hours / 24);
   return `Inactive ${days}d`;
-}
-
-function SummaryTile({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  icon: typeof Users;
-  tone: string;
-}) {
-  return (
-    <div className="rv-card flex items-center justify-between p-5">
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-2 text-3xl font-extrabold">
-          {value}
-          {hint && (
-            <span className="ml-1.5 text-sm font-semibold text-muted-foreground">
-              {hint}
-            </span>
-          )}
-        </p>
-      </div>
-      <span
-        className={`flex size-10 items-center justify-center rounded-lg ${tone}`}
-      >
-        <Icon className="size-5" />
-      </span>
-    </div>
-  );
-}
-
-/**
- * The account's photo, or its initials while there is none.
- *
- * A roster is a list of people, so the row leads with a face: the photo comes
- * down with the roster itself, already cropped to the square it is drawn at.
- */
-function Avatar({
-  name,
-  image,
-  size = "size-9",
-}: {
-  name: string;
-  image: string | null;
-  /** Tailwind size class: reviewees lead the row, recruiters sit beside it. */
-  size?: string;
-}) {
-  const initials = name
-    .split(" ")
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-
-  return (
-    <span
-      className={`flex ${size} shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-[#0B2340] text-[11px] font-bold text-white`}
-    >
-      {image ? (
-        // eslint-disable-next-line @next/next/no-img-element -- a data URL has
-        // nothing for the image loader to optimise.
-        <img
-          src={image}
-          alt=""
-          className="size-full object-cover"
-          draggable={false}
-        />
-      ) : (
-        initials || <Users className="size-4" />
-      )}
-    </span>
-  );
 }
 
 /**
@@ -455,6 +378,13 @@ export function AdminPage() {
   // needs the column saying whose they are.
   const isAdmin = session?.user?.role === "ADMIN";
 
+  // "View recruits" on a field manager's card lands here carrying that
+  // manager's email. The roster already searches the recruiter's address for an
+  // admin, so the link only has to seed the box the admin could have typed into
+  // themselves — which leaves the filter visible, and clearable, rather than
+  // hiding rows behind a mode the screen does not explain.
+  const managerFilter = useSearchParams().get("manager") ?? "";
+
   const [roster, setRoster] = useState<Reviewee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -463,7 +393,7 @@ export function AdminPage() {
     "ALL",
   );
   const [sort, setSort] = useState<SortKey>("readiness_desc");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(managerFilter);
   const [page, setPage] = useState(1);
   const [examType, setExamType] = useState<ExamType | "ALL">("ALL");
 
