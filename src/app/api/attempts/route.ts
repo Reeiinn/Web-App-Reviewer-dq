@@ -37,6 +37,22 @@ export async function POST(req: Request) {
       );
     }
 
+    // Reopening the exam picks the unfinished sitting back up rather than
+    // starting a second one. Every page load used to insert a row, so a
+    // refresh abandoned the answers already saved against the old attempt and
+    // left an empty row behind it.
+    const open = await pool.query(
+      `SELECT * FROM exam_attempts
+        WHERE user_id = $1 AND exam_type = $2 AND completed_at IS NULL
+        ORDER BY started_at DESC
+        LIMIT 1`,
+      [session.user.id, exam_type],
+    );
+
+    if (open.rows[0]) {
+      return NextResponse.json(open.rows[0]);
+    }
+
     const result = await pool.query(
       `INSERT INTO exam_attempts (user_id, exam_type, score, total_items, passed)
        VALUES ($1, $2, 0, 0, false)

@@ -15,7 +15,7 @@ import type { Question } from "@/lib/types/questions";
 import { Lock, Shuffle } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -48,6 +48,12 @@ function PracticeExamContent() {
     passes: number;
   } | null>(null);
 
+  /** Questions whose save has not come back yet, re-sent at submit. */
+  const unsaved = useRef<Set<string>>(new Set());
+  /** The current answers, readable inside a fetch callback. */
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
+
   useEffect(() => {
     let active = true;
 
@@ -78,9 +84,33 @@ function PracticeExamContent() {
 
         if (!active) return;
         setQuestions(shuffled(Array.isArray(items) ? items : []));
-        setAnswers({});
         setFinished(false);
         setAttemptId(attempt?.id ?? null);
+
+        // The sitting resumes with the answers already picked: they belong to
+        // the attempt, not to this page, so a refresh no longer clears them.
+        const saved = attempt?.id
+          ? await fetch(`/api/attempts/${attempt.id}`)
+              .then(
+                (response) =>
+                  response.json() as Promise<{
+                    answers?: {
+                      question_id: string;
+                      selected_choice_id: string | null;
+                    }[];
+                  }>,
+              )
+              .catch(() => ({ answers: [] }))
+          : { answers: [] };
+
+        if (!active) return;
+        setAnswers(
+          Object.fromEntries(
+            (saved.answers ?? [])
+              .filter((row) => row.selected_choice_id)
+              .map((row) => [row.question_id, row.selected_choice_id as string]),
+          ),
+        );
         setLoading(false);
       } catch {
         if (active) {
@@ -105,6 +135,37 @@ function PracticeExamContent() {
     (question) => answers[question.id] !== correctIdOf(question),
   );
 
+  /**
+   * Records a choice against the attempt as it is made.
+   *
+   * The selection shows immediately and the write follows, so picking an
+   * answer never waits on the network. A write that fails is remembered in
+   * `unsaved` and posted again at submit, which is what keeps a dropped
+   * request from quietly costing a question.
+   */
+  const choose = (questionId: string, choiceId: string) => {
+    setAnswers((current) => ({ ...current, [questionId]: choiceId }));
+    if (!attemptId) return;
+
+    unsaved.current.add(questionId);
+    fetch(`/api/attempts/${attemptId}/answers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question_id: questionId,
+        selected_choice_id: choiceId,
+      }),
+    })
+      .then((response) => {
+        // Only clear it if this is still the answer that was saved: a quick
+        // second click must not be marked saved by the first request.
+        if (response.ok && answersRef.current[questionId] === choiceId) {
+          unsaved.current.delete(questionId);
+        }
+      })
+      .catch((error) => console.error("Failed to save answer:", error));
+  };
+
   const submit = async () => {
     if (!questions.length || !attemptId || submitting) return;
 
@@ -123,8 +184,15 @@ function PracticeExamContent() {
     setSubmitting(true);
 
     try {
+      // Most answers were saved as they were picked; only the ones whose write
+      // has not come back go again here, so a dropped request cannot cost a
+      // question at the moment it is scored.
+      const pending = questions.filter((question) =>
+        unsaved.current.has(question.id),
+      );
+
       await Promise.all(
-        questions.map((question) =>
+        pending.map((question) =>
           fetch(`/api/attempts/${attemptId}/answers`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -132,6 +200,8 @@ function PracticeExamContent() {
               question_id: question.id,
               selected_choice_id: answers[question.id],
             }),
+          }).then((response) => {
+            if (response.ok) unsaved.current.delete(question.id);
           }),
         ),
       );
@@ -184,6 +254,7 @@ function PracticeExamContent() {
       setAttemptId(attempt.id);
       setQuestions((current) => shuffled(current));
       setAnswers({});
+      unsaved.current.clear();
       setOutcome(null);
       setFinished(false);
       toTop();
@@ -334,10 +405,9 @@ function PracticeExamContent() {
     <Frame title={`${examLabels[type]} Practice Exam`}>
       <div className="w-full">
         <button
-          onClick={() => {
-            setQuestions((current) => shuffled(current));
-            setAnswers({});
-          }}
+          // Reorders the paper only. The answers belong to the attempt, so
+          // wiping them here would contradict what the server has stored.
+          onClick={() => setQuestions((current) => shuffled(current))}
           className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-bold transition hover:border-[#C9A227]"
         >
           <Shuffle className="size-3.5" /> Shuffle
@@ -357,12 +427,7 @@ function PracticeExamContent() {
                   return (
                     <button
                       key={choice.id}
-                      onClick={() =>
-                        setAnswers((current) => ({
-                          ...current,
-                          [question.id]: choice.id,
-                        }))
-                      }
+                      onClick={() => choose(question.id, choice.id)}
                       className={`flex items-center gap-4 rounded-lg border-2 px-4 py-3 text-left text-sm transition ${
                         chosen
                           ? "border-[var(--exam)] bg-[var(--exam-soft)]"

@@ -68,6 +68,23 @@ const statements = [
   // few tens of kilobytes by the upload route, so a column beats standing up
   // object storage for one small square per user.
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS image text`,
+
+  // An answer is now saved the moment it is picked, so changing a choice has
+  // to overwrite the earlier row rather than add a second one — two rows for
+  // one question would both count toward the score. Older duplicates go first,
+  // newest kept, so the constraint can be added.
+  `DELETE FROM exam_attempt_answers a
+    USING exam_attempt_answers b
+    WHERE a.attempt_id = b.attempt_id
+      AND a.question_id = b.question_id
+      AND a.ctid < b.ctid`,
+
+  `ALTER TABLE exam_attempt_answers
+     DROP CONSTRAINT IF EXISTS exam_attempt_answers_attempt_question_key`,
+
+  `ALTER TABLE exam_attempt_answers
+     ADD CONSTRAINT exam_attempt_answers_attempt_question_key
+     UNIQUE (attempt_id, question_id)`,
 ];
 
 // One example term so the Glossary renders against real data.
