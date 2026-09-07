@@ -2,7 +2,10 @@
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { AppNav } from "@/components/ui/app-nav";
-import { ButtonHoldAndRelease } from "@/components/ui/hold-and-release-button";
+import {
+  ButtonHoldAndRelease,
+  type HoldHandle,
+} from "@/components/ui/hold-and-release-button";
 import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
@@ -22,7 +25,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Recruiter = {
   id: string;
@@ -181,6 +184,8 @@ function RemoveReviewee({
   const [typed, setTyped] = useState("");
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState("");
+  /** Lets a held Enter in the confirm field drive the hold button's fill. */
+  const hold = useRef<HoldHandle>(null);
 
   const phrase = deletePhrase(reviewee.name);
   const confirmed = samePhrase(typed, phrase);
@@ -266,9 +271,18 @@ function RemoveReviewee({
             id={`confirm-${reviewee.id}`}
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
+            // Enter is a hold here too: tapping it does nothing, holding it
+            // fills the button's bar and only then removes the account.
             onKeyDown={(event) => {
-              if (event.key === "Enter" && confirmed) remove();
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              if (event.repeat || !confirmed || removing) return;
+              hold.current?.startHold();
             }}
+            onKeyUp={(event) => {
+              if (event.key === "Enter") hold.current?.endHold();
+            }}
+            onBlur={() => hold.current?.endHold()}
             disabled={removing}
             autoComplete="off"
             placeholder={phrase}
@@ -291,6 +305,7 @@ function RemoveReviewee({
             {/* The phrase says who is being removed; the hold says the admin
                 meant it. A stray click cannot reach the request. */}
             <ButtonHoldAndRelease
+              ref={hold}
               holdDuration={2000}
               onHoldComplete={remove}
               disabled={!confirmed || removing}
