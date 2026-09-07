@@ -30,12 +30,15 @@ type Recruiter = {
   name: string;
   email: string;
   role: "ADMIN" | "MANAGER";
+  /** Profile photo as a data URL, null until the account uploads one. */
+  image: string | null;
 };
 
 type Reviewee = {
   id: string;
   name: string;
   email: string;
+  image: string | null;
   /** Whoever's invite link this reviewee signed up with. */
   manager: Recruiter | null;
   readiness: number;
@@ -125,6 +128,49 @@ function SummaryTile({
         <Icon className="size-5" />
       </span>
     </div>
+  );
+}
+
+/**
+ * The account's photo, or its initials while there is none.
+ *
+ * A roster is a list of people, so the row leads with a face: the photo comes
+ * down with the roster itself, already cropped to the square it is drawn at.
+ */
+function Avatar({
+  name,
+  image,
+  size = "size-9",
+}: {
+  name: string;
+  image: string | null;
+  /** Tailwind size class: reviewees lead the row, recruiters sit beside it. */
+  size?: string;
+}) {
+  const initials = name
+    .split(" ")
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+
+  return (
+    <span
+      className={`flex ${size} shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-[#0B2340] text-[11px] font-bold text-white`}
+    >
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a data URL has
+        // nothing for the image loader to optimise.
+        <img
+          src={image}
+          alt=""
+          className="size-full object-cover"
+          draggable={false}
+        />
+      ) : (
+        initials || <Users className="size-4" />
+      )}
+    </span>
   );
 }
 
@@ -578,24 +624,36 @@ export function AdminPage() {
                       className="border-t border-border align-top"
                     >
                       <td className="px-5 py-4">
-                        <p className="font-bold">{row.name}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {row.email}
-                        </p>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={row.name} image={row.image} />
+                          <div className="min-w-0">
+                            <p className="font-bold">{row.name}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {row.email}
+                            </p>
+                          </div>
+                        </div>
                       </td>
 
                       {isAdmin && (
                         <td className="px-5 py-4">
                           {row.manager ? (
-                            <>
-                              <p className="font-semibold">
-                                {row.manager.name}
-                              </p>
-                              <p className="mt-0.5 text-xs text-muted-foreground">
-                                {staffTitleFor(row.manager.role)} ·{" "}
-                                {row.manager.email}
-                              </p>
-                            </>
+                            <div className="flex items-center gap-2.5">
+                              <Avatar
+                                name={row.manager.name}
+                                image={row.manager.image}
+                                size="size-8"
+                              />
+                              <div className="min-w-0">
+                                <p className="font-semibold">
+                                  {row.manager.name}
+                                </p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {staffTitleFor(row.manager.role)} ·{" "}
+                                  {row.manager.email}
+                                </p>
+                              </div>
+                            </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">
                               No recruiter on record
