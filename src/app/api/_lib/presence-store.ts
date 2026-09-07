@@ -3,11 +3,11 @@ import pool from "@/lib/db";
 /**
  * Records that a staff account just loaded a screen.
  *
- * The roster query is what an admin or a field manager hits by simply opening
- * /admin, so stamping from the routes the console already calls answers "did
- * they open the app" without the browser having to ping anything. What it
- * marks is arrival, not presence: a console left open all morning still reads
- * as the single visit that loaded it.
+ * The avatar lookup behind AppNav is what every screen calls on load, so
+ * stamping from the routes the app already hits answers "did they open it"
+ * without the browser having to ping anything. What it marks is arrival, not
+ * presence: a screen left open all morning still reads as the single visit
+ * that loaded it.
  *
  * Callers pass the signed-in account and nothing else, so this can only ever
  * stamp whoever made the request.

@@ -29,8 +29,8 @@ export function recruitProgress(recruits: number): number {
  * How long ago the account last opened the app, in the roster's phrasing.
  *
  * Deliberately coarser than the timestamp behind it: last_seen_at is stamped
- * when a console route is called, so it marks an arrival rather than a session,
- * and a reading finer than "40m ago" would invite the card to be read as live
+ * when a screen loads, so it marks an arrival rather than a session, and a
+ * reading finer than "40m ago" would invite the card to be read as live
  * presence, which it is not.
  */
 export function lastSeenLabel(
