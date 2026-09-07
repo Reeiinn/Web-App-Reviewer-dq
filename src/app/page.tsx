@@ -17,14 +17,12 @@ import { FormEvent, useState } from "react";
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setSuccess("");
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -34,9 +32,8 @@ export default function LoginPage() {
       redirect: false,
     });
 
-    setIsSubmitting(false);
-
     if (result?.error) {
+      setIsSubmitting(false);
       setError("Invalid email or password. Please try again.");
       return;
     }
@@ -46,15 +43,11 @@ export default function LoginPage() {
     const session = await getSession();
     const target = landingFor(session?.user?.role);
 
-    setSuccess(
-      target === "/admin"
-        ? "Login successful! Redirecting to your console..."
-        : "Login successful! Redirecting to your dashboard...",
-    );
-    setTimeout(() => {
-      router.replace(target);
-      router.refresh();
-    }, 1000);
+    // Straight through to the landing page. The button keeps its spinner
+    // until the route changes, so the form cannot be submitted twice on the
+    // way out.
+    router.replace(target);
+    router.refresh();
   }
 
   return (
@@ -178,12 +171,6 @@ export default function LoginPage() {
                 {error}
               </p>
             )}
-            {success && (
-              <p className="text-sm text-green-700" role="status">
-                {success}
-              </p>
-            )}
-
             <button
               type="submit"
               disabled={isSubmitting}
