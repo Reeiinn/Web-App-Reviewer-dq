@@ -1,7 +1,7 @@
 "use client";
 
 import type { MotivationMessage } from "@/lib/helper/motivation";
-import { CheckCircle2, Flame, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle2, Sparkles, XCircle } from "lucide-react";
 import { useMemo } from "react";
 
 const confettiColors = [
@@ -69,56 +69,6 @@ export function Confetti({
           }
         />
       ))}
-    </div>
-  );
-}
-
-export function StreakBadge({
-  current,
-  best,
-  pulse,
-  compact = false,
-}: {
-  current: number;
-  best: number;
-  pulse: boolean;
-  /** One line instead of two, for a header row that cannot afford to wrap. */
-  compact?: boolean;
-}) {
-  const flame = (
-    <Flame
-      className={`${compact ? "size-4" : "size-5"} shrink-0 ${
-        current > 0 ? "text-[#C98A00]" : "text-muted-foreground"
-      } ${pulse ? "rv-streak-pulse" : ""}`}
-    />
-  );
-
-  if (compact) {
-    return (
-      <span
-        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap"
-        title={best > 0 ? `Streak ${current}, best ${best}` : undefined}
-      >
-        {flame}
-        <span className="text-sm font-extrabold tabular-nums">{current}</span>
-        {best > 0 && (
-          <span className="hidden text-xs text-muted-foreground tabular-nums sm:inline">
-            Best {best}
-          </span>
-        )}
-      </span>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      {flame}
-      <div>
-        <p className="text-2xl font-extrabold leading-none">{current}</p>
-        {best > 0 && (
-          <p className="mt-1 text-[11px] text-muted-foreground">Best {best}</p>
-        )}
-      </div>
     </div>
   );
 }

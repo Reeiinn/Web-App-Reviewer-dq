@@ -140,7 +140,9 @@ export async function GET(req: Request) {
         [userIds],
       ),
       pool.query(
-        `SELECT user_id, exam_type, current_streak, best_streak, last_answer_at
+        // study_streaks is read for its timestamp alone: it is the one table
+        // that records when a learner last answered anything on a track.
+        `SELECT user_id, exam_type, last_answer_at
            FROM study_streaks WHERE user_id = ANY($1)`,
         [userIds],
       ),
@@ -195,8 +197,6 @@ export async function GET(req: Request) {
           correct: Number(memorizationRow?.correct ?? 0),
           taken: Number(attemptRow?.taken ?? 0),
           passes: cappedPasses(Number(attemptRow?.passed ?? 0)),
-          current: Number(streakRow?.current_streak ?? 0),
-          best: Number(streakRow?.best_streak ?? 0),
           lastActivity: (streakRow?.last_answer_at as string | null) ?? null,
         };
       });
@@ -266,11 +266,7 @@ export async function GET(req: Request) {
           passedTracks: examTracks.filter((row) => row.passed).length,
           tracks: examTracks,
         },
-        streak: {
-          current: Math.max(0, ...perTrack.map((row) => row.current)),
-          best: Math.max(0, ...perTrack.map((row) => row.best)),
-          lastActivity,
-        },
+        activity: { lastActivity },
       };
     });
 

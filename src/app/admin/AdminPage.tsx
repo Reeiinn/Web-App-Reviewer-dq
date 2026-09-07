@@ -20,7 +20,6 @@ import {
 import {
   AlertTriangle,
   CheckCircle2,
-  Flame,
   Search,
   Trash2,
   Users,
@@ -66,7 +65,7 @@ type Reviewee = {
     passedTracks: number;
     tracks: ExamTrackResult[];
   };
-  streak: { current: number; best: number; lastActivity: string | null };
+  activity: { lastActivity: string | null };
 };
 
 const PAGE_SIZE = 15;
@@ -698,7 +697,7 @@ export function AdminPage() {
                       "Flashcards Mastery",
                       "Memorize Acc.",
                       "Practice Exams",
-                      "Streak & Activity",
+                      "Activity",
                       "Status",
                       "Actions",
                     ].map((heading) => (
@@ -801,20 +800,8 @@ export function AdminPage() {
                         </p>
                       </td>
 
-                      <td className="px-5 py-4">
-                        <p className="flex items-center gap-1.5 font-semibold">
-                          <Flame
-                            className={`size-3.5 ${
-                              row.streak.current > 0
-                                ? "text-[#C98A00]"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                          {row.streak.current} day streak
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {relativeTime(row.streak.lastActivity)}
-                        </p>
+                      <td className="px-5 py-4 font-semibold">
+                        {relativeTime(row.activity.lastActivity)}
                       </td>
 
                       <td className="px-5 py-4">
