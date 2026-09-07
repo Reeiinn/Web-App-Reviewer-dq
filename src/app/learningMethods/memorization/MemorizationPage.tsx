@@ -3,7 +3,6 @@
 import { AppNav } from "@/components/ui/app-nav";
 import { BackLink } from "@/components/ui/back-link";
 import {
-  AnswerFeedback,
   Confetti,
   SessionMastery,
   StreakBadge,
@@ -22,6 +21,7 @@ import type {
 import type { StreakRow } from "@/lib/types/streak";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Check, X } from "lucide-react";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -56,12 +56,45 @@ function MemorizationContent() {
 
   const [streak, setStreak] = useState<StreakState>({ current: 0, best: 0 });
   const [message, setMessage] = useState<MotivationMessage | null>(null);
+  /** The flashcard-style verdict over the card: shown on an answer given here,
+      never on a resumed one, and gone again after a beat. */
+  const [verdict, setVerdict] = useState<MotivationMessage | null>(null);
   const [celebration, setCelebration] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   /** Answers timed in this sitting: a resumed one has no clock for the rest. */
   const [timedCount, setTimedCount] = useState(0);
 
   const questionShownAt = useRef<number>(Date.now());
+  const verdictTimer = useRef<number | null>(null);
+
+  /** Drops the verdict over the card, then lifts it a beat later. */
+  const flashVerdict = (next: MotivationMessage) => {
+    if (verdictTimer.current !== null) {
+      window.clearTimeout(verdictTimer.current);
+    }
+    setVerdict(next);
+    verdictTimer.current = window.setTimeout(() => {
+      verdictTimer.current = null;
+      setVerdict(null);
+    }, 1200);
+  };
+
+  const clearVerdict = () => {
+    if (verdictTimer.current !== null) {
+      window.clearTimeout(verdictTimer.current);
+      verdictTimer.current = null;
+    }
+    setVerdict(null);
+  };
+
+  useEffect(
+    () => () => {
+      if (verdictTimer.current !== null) {
+        window.clearTimeout(verdictTimer.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -187,6 +220,7 @@ function MemorizationContent() {
     setChecked(false);
     setFinished(false);
     setMessage(null);
+    clearVerdict();
     setRatings({});
     setResumedAt(null);
     setElapsedMs(0);
@@ -209,7 +243,9 @@ function MemorizationContent() {
       current: optimistic,
       best: Math.max(current.best, optimistic),
     }));
-    setMessage(motivationFor(isCorrect, optimistic, index));
+    const verdictNow = motivationFor(isCorrect, optimistic, index);
+    setMessage(verdictNow);
+    flashVerdict(verdictNow);
     if (isCorrect) setCelebration((run) => run + 1);
 
     try {
@@ -230,7 +266,11 @@ function MemorizationContent() {
         (await response.json()) as Partial<MemorizationProgressResponse>;
       if (data.streak) {
         setStreak({ current: data.streak.current, best: data.streak.best });
-        setMessage(motivationFor(isCorrect, data.streak.current, index));
+        const settled = motivationFor(isCorrect, data.streak.current, index);
+        setMessage(settled);
+        // The server may promote the message to a milestone: keep the card
+        // face and the message saying the same thing while it is still up.
+        setVerdict((current) => (current ? settled : current));
       }
     } catch (error) {
       console.error("Failed to save memorization progress:", error);
@@ -239,6 +279,7 @@ function MemorizationContent() {
 
   const advance = () => {
     setMessage(null);
+    clearVerdict();
     questionShownAt.current = Date.now();
 
     if (index === questions.length - 1) {
@@ -356,6 +397,30 @@ function MemorizationContent() {
                 runId={celebration}
                 pieces={message?.milestone ? 34 : 20}
               />
+
+              {/* Same verdict flashcards give: the whole card face takes the
+                  colour, so the answer reads from across the room. It clears
+                  itself after a beat, uncovering the graded choices the
+                  learner still has to read before Next. */}
+              {verdict && (
+                <div
+                  role="status"
+                  className={`rv-pop-in pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 rounded-[var(--radius)] p-8 text-center text-white ${
+                    verdict.mood === "correct"
+                      ? "bg-[#0F7B52]"
+                      : "bg-[#C91D1D]"
+                  }`}
+                >
+                  <p className="text-3xl font-extrabold leading-tight sm:text-4xl">
+                    {verdict.headline}
+                  </p>
+                  {verdict.mood === "correct" ? (
+                    <Check className="size-14" strokeWidth={3} />
+                  ) : (
+                    <X className="size-14" strokeWidth={3} />
+                  )}
+                </div>
+              )}
 
               {/* The concept tag is the first thing the card drops when the
                   window is too short to hold the question at a legible size. */}
@@ -477,14 +542,6 @@ function MemorizationContent() {
               />
             </div>
 
-            {message && (
-              <AnswerFeedback
-                message={message}
-                correctAnswer={
-                  question.choices.find((choice) => choice.is_correct)?.text
-                }
-              />
-            )}
           </aside>
         </div>
       </main>
