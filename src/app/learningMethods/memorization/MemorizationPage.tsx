@@ -3,7 +3,6 @@
 import { AppNav } from "@/components/ui/app-nav";
 import { BackLink } from "@/components/ui/back-link";
 import {
-  AnswerFeedback,
   Confetti,
   SessionMastery,
   StreakBadge,
@@ -15,11 +14,14 @@ import { restoreMemorization } from "@/lib/helper/memorization-session";
 import type { SavedSession } from "@/lib/helper/study-session";
 import { useFitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
-import type { MemorizationProgressResponse } from "@/lib/types/memo";
-import type { Question } from "@/lib/types/questions";
+import type {
+  MemorizationProgressResponse,
+  MemorizationQuestion,
+} from "@/lib/types/memo";
 import type { StreakRow } from "@/lib/types/streak";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Check, X } from "lucide-react";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -40,7 +42,7 @@ function MemorizationContent() {
   const searchParams = useSearchParams();
   const type = parseExamType(searchParams.get("exam_type"));
 
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<MemorizationQuestion[]>([]);
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
@@ -54,19 +56,52 @@ function MemorizationContent() {
 
   const [streak, setStreak] = useState<StreakState>({ current: 0, best: 0 });
   const [message, setMessage] = useState<MotivationMessage | null>(null);
+  /** The flashcard-style verdict over the card: shown on an answer given here,
+      never on a resumed one, and gone again after a beat. */
+  const [verdict, setVerdict] = useState<MotivationMessage | null>(null);
   const [celebration, setCelebration] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   /** Answers timed in this sitting: a resumed one has no clock for the rest. */
   const [timedCount, setTimedCount] = useState(0);
 
   const questionShownAt = useRef<number>(Date.now());
+  const verdictTimer = useRef<number | null>(null);
+
+  /** Drops the verdict over the card, then lifts it a beat later. */
+  const flashVerdict = (next: MotivationMessage) => {
+    if (verdictTimer.current !== null) {
+      window.clearTimeout(verdictTimer.current);
+    }
+    setVerdict(next);
+    verdictTimer.current = window.setTimeout(() => {
+      verdictTimer.current = null;
+      setVerdict(null);
+    }, 1200);
+  };
+
+  const clearVerdict = () => {
+    if (verdictTimer.current !== null) {
+      window.clearTimeout(verdictTimer.current);
+      verdictTimer.current = null;
+    }
+    setVerdict(null);
+  };
+
+  useEffect(
+    () => () => {
+      if (verdictTimer.current !== null) {
+        window.clearTimeout(verdictTimer.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
 
     Promise.all([
       fetch(`/api/memorization?exam_type=${encodeURIComponent(type)}`).then(
-        (response) => response.json() as Promise<Question[]>,
+        (response) => response.json() as Promise<MemorizationQuestion[]>,
       ),
       fetch("/api/streaks")
         .then((response) => response.json() as Promise<StreakRow[]>)
@@ -85,18 +120,33 @@ function MemorizationContent() {
           asSavedSession(saved),
         );
 
+        const mine = Array.isArray(streaks)
+          ? streaks.find((row) => row.exam_type === type)
+          : null;
+
+        // A question answered before the learner left comes back answered:
+        // their choice locked in, the result shown, Next waiting. Only an
+        // unanswered one is dealt fresh. Without the saved choice there is
+        // nothing to redraw, so that question asks itself again.
+        const stoppedOn = session.questions[session.index];
+        const answer = stoppedOn ? session.ratings[stoppedOn.id] : undefined;
+        const answeredChoiceId =
+          answer === undefined ? null : (stoppedOn?.answered_choice_id ?? null);
+
         setQuestions(session.questions);
         setIndex(session.index);
         setRatings(session.ratings);
         setResumedAt(session.resumed ? session.index : null);
-        setSelected(null);
-        setChecked(false);
+        setSelected(answeredChoiceId);
+        setChecked(answeredChoiceId !== null);
+        setMessage(
+          answeredChoiceId !== null && answer !== undefined
+            ? motivationFor(answer, mine?.current_streak ?? 0, session.index)
+            : null,
+        );
         setFinished(false);
         questionShownAt.current = Date.now();
 
-        const mine = Array.isArray(streaks)
-          ? streaks.find((row) => row.exam_type === type)
-          : null;
         if (mine) {
           setStreak({ current: mine.current_streak, best: mine.best_streak });
         }
@@ -163,13 +213,14 @@ function MemorizationContent() {
     ? Math.round(elapsedMs / timedCount / 1000)
     : 0;
 
-  const resetSession = (nextQuestions: Question[]) => {
+  const resetSession = (nextQuestions: MemorizationQuestion[]) => {
     setQuestions(nextQuestions);
     setIndex(0);
     setSelected(null);
     setChecked(false);
     setFinished(false);
     setMessage(null);
+    clearVerdict();
     setRatings({});
     setResumedAt(null);
     setElapsedMs(0);
@@ -192,7 +243,9 @@ function MemorizationContent() {
       current: optimistic,
       best: Math.max(current.best, optimistic),
     }));
-    setMessage(motivationFor(isCorrect, optimistic, index));
+    const verdictNow = motivationFor(isCorrect, optimistic, index);
+    setMessage(verdictNow);
+    flashVerdict(verdictNow);
     if (isCorrect) setCelebration((run) => run + 1);
 
     try {
@@ -213,7 +266,11 @@ function MemorizationContent() {
         (await response.json()) as Partial<MemorizationProgressResponse>;
       if (data.streak) {
         setStreak({ current: data.streak.current, best: data.streak.best });
-        setMessage(motivationFor(isCorrect, data.streak.current, index));
+        const settled = motivationFor(isCorrect, data.streak.current, index);
+        setMessage(settled);
+        // The server may promote the message to a milestone: keep the card
+        // face and the message saying the same thing while it is still up.
+        setVerdict((current) => (current ? settled : current));
       }
     } catch (error) {
       console.error("Failed to save memorization progress:", error);
@@ -222,6 +279,7 @@ function MemorizationContent() {
 
   const advance = () => {
     setMessage(null);
+    clearVerdict();
     questionShownAt.current = Date.now();
 
     if (index === questions.length - 1) {
@@ -330,10 +388,39 @@ function MemorizationContent() {
           <div className="flex min-h-0 flex-col">
             <section className="rv-card relative flex min-h-0 flex-1 flex-col overflow-hidden p-4 sm:p-6 [@media(max-height:700px)]:p-3">
               <Confetti
-                active={checked && message?.mood === "correct"}
+                // celebration only moves on an answer given here, so a resumed
+                // correct answer redraws its feedback without firing the burst
+                // a second time.
+                active={
+                  checked && message?.mood === "correct" && celebration > 0
+                }
                 runId={celebration}
                 pieces={message?.milestone ? 34 : 20}
               />
+
+              {/* Same verdict flashcards give: the whole card face takes the
+                  colour, so the answer reads from across the room. It clears
+                  itself after a beat, uncovering the graded choices the
+                  learner still has to read before Next. */}
+              {verdict && (
+                <div
+                  role="status"
+                  className={`rv-pop-in pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 rounded-[var(--radius)] p-8 text-center text-white ${
+                    verdict.mood === "correct"
+                      ? "bg-[#0F7B52]"
+                      : "bg-[#C91D1D]"
+                  }`}
+                >
+                  <p className="text-3xl font-extrabold leading-tight sm:text-4xl">
+                    {verdict.headline}
+                  </p>
+                  {verdict.mood === "correct" ? (
+                    <Check className="size-14" strokeWidth={3} />
+                  ) : (
+                    <X className="size-14" strokeWidth={3} />
+                  )}
+                </div>
+              )}
 
               {/* The concept tag is the first thing the card drops when the
                   window is too short to hold the question at a legible size. */}
@@ -455,14 +542,6 @@ function MemorizationContent() {
               />
             </div>
 
-            {message && (
-              <AnswerFeedback
-                message={message}
-                correctAnswer={
-                  question.choices.find((choice) => choice.is_correct)?.text
-                }
-              />
-            )}
           </aside>
         </div>
       </main>

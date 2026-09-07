@@ -6,7 +6,11 @@ import { cn } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-type ButtonHoldAndReleaseProps = React.ComponentProps<typeof Button> & {
+// The ref is the hold handle, not the button node, so the DOM ref is dropped.
+type ButtonHoldAndReleaseProps = Omit<
+  React.ComponentProps<typeof Button>,
+  "ref"
+> & {
   /** Milliseconds the press has to survive before the action fires. */
   holdDuration?: number;
   /** Fired once the bar fills, never on a press that lets go early. */
@@ -14,6 +18,16 @@ type ButtonHoldAndReleaseProps = React.ComponentProps<typeof Button> & {
   /** Copy for the resting and held states. */
   idleLabel?: string;
   holdingLabel?: string;
+  ref?: React.Ref<HoldHandle>;
+};
+
+/**
+ * Lets another control drive the same hold — the confirm field hands a held
+ * Enter straight to the button instead of deleting on the keystroke.
+ */
+export type HoldHandle = {
+  startHold: () => void;
+  endHold: () => void;
 };
 
 /**
@@ -34,6 +48,7 @@ function ButtonHoldAndRelease({
   idleLabel = "Hold to delete",
   holdingLabel = "Keep holding…",
   disabled,
+  ref,
   ...props
 }: ButtonHoldAndReleaseProps) {
   const [isHolding, setIsHolding] = useState(false);
@@ -89,6 +104,31 @@ function ButtonHoldAndRelease({
     rewind(100);
   }
 
+  // Enter and Space are the keyboard's press: held they fill the bar, released
+  // early they rewind it, exactly like the mouse. A key that fires the action
+  // on one tap would put the delete back one keystroke away.
+  function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    // Auto-repeat while the key stays down must not restart the countdown.
+    event.preventDefault();
+    if (event.repeat) return;
+
+    handleHoldStart();
+  }
+
+  function handleKeyUp(event: React.KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    event.preventDefault();
+    handleHoldEnd();
+  }
+
+  React.useImperativeHandle(ref, () => ({
+    startHold: handleHoldStart,
+    endHold: handleHoldEnd,
+  }));
+
   return (
     <Button
       variant="destructive"
@@ -103,6 +143,9 @@ function ButtonHoldAndRelease({
       onTouchStart={handleHoldStart}
       onTouchEnd={handleHoldEnd}
       onTouchCancel={handleHoldEnd}
+      onKeyDown={handleKeyDown}
+      onKeyUp={handleKeyUp}
+      onBlur={handleHoldEnd}
       {...props}
     >
       <span
