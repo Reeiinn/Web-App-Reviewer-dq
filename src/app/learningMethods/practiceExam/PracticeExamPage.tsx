@@ -5,6 +5,7 @@ import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
 import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
+import { splitStatements } from "@/lib/helper/question-text";
 import {
   PASSING_PERCENTAGE,
   hasPassedTrack,
@@ -44,6 +45,36 @@ function dealt(
 
   const seen = new Set(inOrder.map((item) => item.id));
   return [...inOrder, ...items.filter((item) => !seen.has(item.id))];
+}
+
+/**
+ * A question, with any roman-numeral statements set out as their own lines.
+ *
+ * These questions enumerate "I. … II. … III." inside the sentence, and run
+ * together they read as one wall of text the learner has to parse before they
+ * can even look at the choices. Flashcards and memorization already break them
+ * out; this is the same split, so a question reads the same way in all three.
+ */
+function QuestionText({ text }: { text: string }) {
+  const { prompt, statements } = splitStatements(text);
+
+  return (
+    <>
+      <h2 className="mt-2 font-bold leading-7">{prompt}</h2>
+      {statements.length > 0 && (
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          {statements.map((statement) => (
+            <p
+              key={statement}
+              className="rounded-lg bg-muted px-3 py-2 text-sm leading-6"
+            >
+              {statement}
+            </p>
+          ))}
+        </div>
+      )}
+    </>
+  );
 }
 
 /**
@@ -459,7 +490,7 @@ function PracticeExamContent() {
                   <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                     Question {index + 1} · {wasRight ? "Correct" : "Incorrect"}
                   </p>
-                  <h2 className="mt-2 font-bold leading-7">{question.text}</h2>
+                  <QuestionText text={question.text} />
                   <p className="mt-3 text-sm text-emerald-700">
                     <strong>Correct answer:</strong>{" "}
                     {question.choices.find((choice) => choice.is_correct)?.text}
@@ -498,7 +529,7 @@ function PracticeExamContent() {
                 Question {index + 1}
                 {missing.has(question.id) && " · Not answered"}
               </p>
-              <h2 className="mt-2 font-bold leading-7">{question.text}</h2>
+              <QuestionText text={question.text} />
 
               <div className="mt-4 flex flex-col gap-2.5">
                 {question.choices.map((choice, choiceIndex) => {
