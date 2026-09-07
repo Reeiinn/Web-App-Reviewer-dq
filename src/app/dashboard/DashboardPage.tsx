@@ -257,33 +257,29 @@ function RecentCard({ exam_type, mode }: RecentItem) {
   return (
     <Link
       href={href(exam_type)}
-      className="rv-card block p-3 transition hover:border-[#C9A227] sm:p-5"
+      className="block rounded-xl bg-[#0B2340] p-3 text-white transition hover:bg-[#0F2E4D] sm:p-5"
     >
       {/* One condensed row below sm, the original stacked card at sm and up. */}
       <div className="flex items-center justify-between gap-2.5 sm:hidden">
         <div className="flex min-w-0 items-center gap-2">
-          <Icon className="size-4 shrink-0 text-[#527087]" />
+          <Icon className="size-4 shrink-0 text-[#FFD400]" />
           <span className="truncate font-extrabold">{title}</span>
-          <span className="shrink-0 text-xs text-muted-foreground">
+          <span className="shrink-0 text-xs text-white/75">
             {examLabels[exam_type]}
           </span>
         </div>
-        <ArrowRight className="size-4 shrink-0 text-[#0B2340]" />
+        <ArrowRight className="size-4 shrink-0 text-[#FFD400]" />
       </div>
 
       <div className="hidden sm:block">
         <div className="flex items-center gap-2.5">
-          <Icon className="size-5 text-[#527087]" />
+          <Icon className="size-5 text-[#FFD400]" />
           <h3 className="text-lg font-extrabold">{title}</h3>
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {examLabels[exam_type]}
-        </p>
+        <p className="mt-2 text-sm text-white/75">{examLabels[exam_type]}</p>
         <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-[#0B2340]">
-            Continue
-          </span>
-          <ArrowRight className="size-4 text-[#0B2340]" />
+          <span className="text-sm font-bold text-[#FFD400]">Continue</span>
+          <ArrowRight className="size-4 text-[#FFD400]" />
         </div>
       </div>
     </Link>
@@ -367,7 +363,13 @@ export function DashboardPage() {
 
   const firstName = session?.user?.name?.split(" ")[0] ?? "Scholar";
 
-  const activeTrack = pickActiveTrack(examTypes, activity);
+  // A visit is the truer "current": opening a track counts straight away,
+  // where last_activity_at only moves once an answer is saved, so a track
+  // opened but not answered yet still left the badge on the previous one.
+  // Progress timestamps stay the fallback for accounts recorded before the
+  // visit feed existed.
+  const activeTrack =
+    recent[0]?.exam_type ?? pickActiveTrack(examTypes, activity);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
