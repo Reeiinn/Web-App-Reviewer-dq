@@ -3,8 +3,8 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /** Base font size in px; every size inside the card is an em multiple of it. */
-const MAX_SIZE = 16;
-const MIN_SIZE = 10;
+const MAX_SIZE = 34;
+const MIN_SIZE = 9;
 const STEP = 0.5;
 
 export type FitText<Box extends HTMLElement, Content extends HTMLElement> = {

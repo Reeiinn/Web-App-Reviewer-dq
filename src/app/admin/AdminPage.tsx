@@ -2,6 +2,7 @@
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { AppNav } from "@/components/ui/app-nav";
+import { ButtonHoldAndRelease } from "@/components/ui/hold-and-release-button";
 import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
@@ -15,7 +16,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Flame,
-  LoaderCircle,
   Search,
   Trash2,
   Users,
@@ -162,8 +162,9 @@ const samePhrase = (a: string, b: string) => tidy(a) === tidy(b);
 /**
  * Removing a reviewee destroys their history, and the delete cascades from
  * users.id through progress, attempts, streaks and sessions. A trash icon is
- * too cheap for that, so the action opens a dialog that names the person and
- * only unlocks once the admin types the confirmation phrase.
+ * too cheap for that, so the action opens a dialog that names the person, only
+ * unlocks once the admin types the confirmation phrase, and then sends the
+ * request on a press held long enough that no slip can reach it.
  */
 function RemoveReviewee({
   reviewee,
@@ -283,14 +284,16 @@ function RemoveReviewee({
             >
               Cancel
             </AlertDialog.Close>
-            <button
-              onClick={remove}
+            {/* The phrase says who is being removed; the hold says the admin
+                meant it. A stray click cannot reach the request. */}
+            <ButtonHoldAndRelease
+              holdDuration={2000}
+              onHoldComplete={remove}
               disabled={!confirmed || removing}
-              className="flex items-center gap-1.5 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {removing && <LoaderCircle className="size-4 animate-spin" />}
-              {removing ? "Removing…" : "Remove reviewee"}
-            </button>
+              idleLabel={removing ? "Removing…" : "Hold to remove"}
+              holdingLabel="Keep holding…"
+              className="h-9 px-3 text-sm"
+            />
           </div>
         </AlertDialog.Popup>
       </AlertDialog.Portal>

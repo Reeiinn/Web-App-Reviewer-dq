@@ -3,6 +3,7 @@
 import { AppNav } from "@/components/ui/app-nav";
 import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
+import { pickActiveTrack, type TrackActivity } from "@/lib/helper/active-track";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import type { StudyMode } from "@/lib/types/study";
 import {
@@ -21,6 +22,7 @@ import { useEffect, useState } from "react";
 
 type ProgressSummaryRow = {
   exam_type: ExamType;
+  last_activity_at: string | null;
   flashcard_pct: number;
   memorize_pct: number;
   practice_exam_pct: number;
@@ -314,6 +316,7 @@ function QuickAccess({ recent }: { recent: RecentItem[] }) {
 export function DashboardPage() {
   const { data: session } = useSession();
   const [progress, setProgress] = useState(emptyProgress);
+  const [activity, setActivity] = useState<TrackActivity>({});
   const [eligibility, setEligibility] = useState<
     Partial<Record<ExamType, Eligibility>>
   >({});
@@ -335,8 +338,13 @@ export function DashboardPage() {
       .then((rows: ProgressSummaryRow[]) => {
         if (!active || !Array.isArray(rows)) return;
         const next = { ...emptyProgress };
-        for (const row of rows) next[row.exam_type] = row.overall_pct;
+        const stamps: TrackActivity = {};
+        for (const row of rows) {
+          next[row.exam_type] = row.overall_pct;
+          stamps[row.exam_type] = row.last_activity_at;
+        }
         setProgress(next);
+        setActivity(stamps);
       })
       .catch((error) => console.error("Failed to load progress:", error));
 
@@ -359,9 +367,7 @@ export function DashboardPage() {
 
   const firstName = session?.user?.name?.split(" ")[0] ?? "Scholar";
 
-  const activeTrack = examTypes.reduce((best, type) =>
-    progress[type] > progress[best] ? type : best,
-  );
+  const activeTrack = pickActiveTrack(examTypes, activity);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -385,7 +391,7 @@ export function DashboardPage() {
                   type={type}
                   overall={progress[type]}
                   eligibility={eligibility[type] ?? null}
-                  active={type === activeTrack && progress[type] > 0}
+                  active={type === activeTrack}
                   expanded={expanded === type}
                   onToggle={() =>
                     setExpanded((current) => (current === type ? null : type))

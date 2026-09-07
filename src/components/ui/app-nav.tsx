@@ -98,7 +98,16 @@ function UserMenu() {
   );
 }
 
-export function AppNav() {
+export function AppNav({
+  compact = false,
+}: {
+  /**
+   * Drops the mobile link row and shortens the bar. Study screens own the
+   * viewport and lead back through their own Back link, so on a phone those
+   * two rows of chrome are worth more to the question than to navigation.
+   */
+  compact?: boolean;
+} = {}) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const staff = isStaff(session?.user?.role);
@@ -107,7 +116,11 @@ export function AppNav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-      <div className="rv-shell flex h-16 items-center justify-between gap-6">
+      <div
+        className={`rv-shell flex items-center justify-between gap-6 ${
+          compact ? "h-12" : "h-16"
+        }`}
+      >
         <Link
           href={home}
           className="text-lg font-extrabold tracking-tight text-foreground"
@@ -144,28 +157,30 @@ export function AppNav() {
       </div>
 
       {/* The link row wraps below the bar on narrow screens. */}
-      <nav aria-label="Main" className="rv-shell pb-3 md:hidden">
-        <ul className="flex items-center gap-5 overflow-x-auto">
-          {links.map((link) => {
-            const active = pathname.startsWith(link.href);
-            return (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  aria-current={active ? "page" : undefined}
-                  className={
-                    active
-                      ? "whitespace-nowrap border-b-2 border-[#C9A227] pb-1 text-sm font-bold text-[#8A6D0B]"
-                      : "whitespace-nowrap pb-1 text-sm font-semibold text-muted-foreground"
-                  }
-                >
-                  {link.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      {!compact && (
+        <nav aria-label="Main" className="rv-shell pb-3 md:hidden">
+          <ul className="flex items-center gap-5 overflow-x-auto">
+            {links.map((link) => {
+              const active = pathname.startsWith(link.href);
+              return (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      active
+                        ? "whitespace-nowrap border-b-2 border-[#C9A227] pb-1 text-sm font-bold text-[#8A6D0B]"
+                        : "whitespace-nowrap pb-1 text-sm font-semibold text-muted-foreground"
+                    }
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
     </header>
   );
 }
