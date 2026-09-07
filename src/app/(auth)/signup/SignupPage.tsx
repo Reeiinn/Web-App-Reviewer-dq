@@ -17,13 +17,11 @@ import { FormEvent, useState } from "react";
 export function SignupPage({ initialCode }: { initialCode: string }) {
   const router = useRouter();
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setSuccess("");
     setIsSubmitting(true);
     const formData = new FormData(event.currentTarget);
     const payload = {
@@ -50,18 +48,16 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
       password: payload.password,
       redirect: false,
     });
-    setIsSubmitting(false);
-
     if (signInResult?.error) {
+      setIsSubmitting(false);
       setError("Signup succeeded, but automatic login failed. Please log in manually.");
       return;
     }
 
-    setSuccess("Account created successfully! Redirecting to your dashboard...");
-    setTimeout(() => {
-      router.replace("/dashboard");
-      router.refresh();
-    }, 1000);
+    // Straight to the dashboard. The button keeps its spinner until the
+    // route changes, so the form cannot be submitted twice on the way out.
+    router.replace("/dashboard");
+    router.refresh();
   }
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#FBF8F1] p-3 sm:p-6">
@@ -166,11 +162,6 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
           {error && (
             <p className="text-sm text-red-600" role="alert">
               {error}
-            </p>
-          )}
-          {success && (
-            <p className="text-sm text-green-700" role="status">
-              {success}
             </p>
           )}
           <button
