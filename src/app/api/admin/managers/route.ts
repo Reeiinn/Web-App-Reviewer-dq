@@ -11,8 +11,8 @@ import { NextResponse } from "next/server";
  * different feature with a different conversation behind it, so MANAGER is
  * refused here even though it is allowed on the roster.
  *
- * last_seen_at is written by the routes the console calls, so it says the
- * account loaded a screen — not that anyone is looking at one now. The
+ * last_seen_at is written by the routes every screen calls, so it says the
+ * account loaded one — not that anyone is looking at one now. The
  * recruit counts ride along because the join is already there, and "opened
  * the app yesterday, recruited nobody" answers rather more than a date does.
  */

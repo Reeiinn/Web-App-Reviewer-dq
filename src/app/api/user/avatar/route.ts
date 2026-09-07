@@ -1,3 +1,4 @@
+import { touchLastSeen } from "@/app/api/_lib/presence-store";
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
@@ -19,6 +20,14 @@ const unauthorized = () =>
 export async function GET() {
   const session = await auth();
   if (!session?.user) return unauthorized();
+
+  // Every screen renders AppNav, and AppNav asks for this photo once per
+  // visit, so this is the one request every signed-in account makes whatever
+  // they came to do. Stamping here is what lets last_seen_at mean "opened the
+  // app" rather than "opened the console": a field manager who spends their
+  // session in the glossary now reads as present, where before only loading
+  // the roster counted.
+  await touchLastSeen(session.user.id);
 
   try {
     const result = await pool.query(
