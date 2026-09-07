@@ -5,6 +5,7 @@ import { AppNav } from "@/components/ui/app-nav";
 import { ButtonHoldAndRelease } from "@/components/ui/hold-and-release-button";
 import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
+import { staffTitleFor } from "@/lib/helper/roles";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import {
   readinessStatus,
@@ -29,12 +30,15 @@ type Recruiter = {
   name: string;
   email: string;
   role: "ADMIN" | "MANAGER";
+  /** Profile photo as a data URL, null until the account uploads one. */
+  image: string | null;
 };
 
 type Reviewee = {
   id: string;
   name: string;
   email: string;
+  image: string | null;
   /** Whoever's invite link this reviewee signed up with. */
   manager: Recruiter | null;
   readiness: number;
@@ -42,7 +46,7 @@ type Reviewee = {
   flashcards: { mastered: number; total: number };
   memorize: { mastered: number; total: number; accuracy: number };
   practice: { mastered: number; total: number };
-  mockExam: { taken: number; passed: number; average: number | null };
+  practiceExam: { taken: number; passed: number; average: number | null };
   streak: { current: number; best: number; lastActivity: string | null };
 };
 
@@ -124,6 +128,49 @@ function SummaryTile({
         <Icon className="size-5" />
       </span>
     </div>
+  );
+}
+
+/**
+ * The account's photo, or its initials while there is none.
+ *
+ * A roster is a list of people, so the row leads with a face: the photo comes
+ * down with the roster itself, already cropped to the square it is drawn at.
+ */
+function Avatar({
+  name,
+  image,
+  size = "size-9",
+}: {
+  name: string;
+  image: string | null;
+  /** Tailwind size class: reviewees lead the row, recruiters sit beside it. */
+  size?: string;
+}) {
+  const initials = name
+    .split(" ")
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+
+  return (
+    <span
+      className={`flex ${size} shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-[#0B2340] text-[11px] font-bold text-white`}
+    >
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a data URL has
+        // nothing for the image loader to optimise.
+        <img
+          src={image}
+          alt=""
+          className="size-full object-cover"
+          draggable={false}
+        />
+      ) : (
+        initials || <Users className="size-4" />
+      )}
+    </span>
   );
 }
 
@@ -508,7 +555,7 @@ export function AdminPage() {
           </div>
 
           <label className="ml-auto text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            {isAdmin ? "Search Reviewee or Manager" : "Search Reviewee"}
+            {isAdmin ? "Search Reviewee or Field Manager" : "Search Reviewee"}
             <div className="relative mt-1.5">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -518,7 +565,9 @@ export function AdminPage() {
                   setSearch(event.target.value);
                   setPage(1);
                 }}
-                placeholder={isAdmin ? "Name, email or manager" : "Name or email"}
+                placeholder={
+                  isAdmin ? "Name, email or field manager" : "Name or email"
+                }
                 className="w-72 rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm font-semibold text-foreground outline-none focus:border-[#0B2340]"
               />
             </div>
@@ -552,7 +601,7 @@ export function AdminPage() {
                       "Overall Readiness",
                       "Flashcards Mastery",
                       "Memorize Acc.",
-                      "Mock Exam Avg",
+                      "Prac Exam Avg",
                       "Streak & Activity",
                       "Status",
                       "Actions",
@@ -575,26 +624,36 @@ export function AdminPage() {
                       className="border-t border-border align-top"
                     >
                       <td className="px-5 py-4">
-                        <p className="font-bold">{row.name}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {row.email}
-                        </p>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={row.name} image={row.image} />
+                          <div className="min-w-0">
+                            <p className="font-bold">{row.name}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {row.email}
+                            </p>
+                          </div>
+                        </div>
                       </td>
 
                       {isAdmin && (
                         <td className="px-5 py-4">
                           {row.manager ? (
-                            <>
-                              <p className="font-semibold">
-                                {row.manager.name}
-                              </p>
-                              <p className="mt-0.5 text-xs text-muted-foreground">
-                                {row.manager.role === "ADMIN"
-                                  ? "Admin"
-                                  : "Manager"}{" "}
-                                · {row.manager.email}
-                              </p>
-                            </>
+                            <div className="flex items-center gap-2.5">
+                              <Avatar
+                                name={row.manager.name}
+                                image={row.manager.image}
+                                size="size-8"
+                              />
+                              <div className="min-w-0">
+                                <p className="font-semibold">
+                                  {row.manager.name}
+                                </p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {staffTitleFor(row.manager.role)} ·{" "}
+                                  {row.manager.email}
+                                </p>
+                              </div>
+                            </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">
                               No recruiter on record
@@ -640,14 +699,14 @@ export function AdminPage() {
 
                       <td className="px-5 py-4">
                         <p className="font-semibold">
-                          {row.mockExam.average === null
+                          {row.practiceExam.average === null
                             ? "—"
-                            : `${row.mockExam.average}% Avg`}
+                            : `${row.practiceExam.average}% Avg`}
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {row.mockExam.taken === 0
-                            ? "No mocks taken"
-                            : `Passed ${row.mockExam.passed}/${row.mockExam.taken}`}
+                          {row.practiceExam.taken === 0
+                            ? "No practice exams taken"
+                            : `Passed ${row.practiceExam.passed}/${row.practiceExam.taken}`}
                         </p>
                       </td>
 

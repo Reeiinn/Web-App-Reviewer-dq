@@ -63,6 +63,11 @@ const statements = [
 
   `CREATE INDEX IF NOT EXISTS recent_activity_user_id_idx
      ON recent_activity (user_id)`,
+
+  // The profile photo lives with the account as a data URL. It is capped at a
+  // few tens of kilobytes by the upload route, so a column beats standing up
+  // object storage for one small square per user.
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS image text`,
 ];
 
 // One example term so the Glossary renders against real data.

@@ -52,11 +52,12 @@ export async function GET(req: Request) {
     // the recruiter. An admin sees every reviewee and who recruited them; a
     // manager sees only the reviewees they recruited themselves.
     const selectReviewees = `
-      SELECT u.id, u.email, u.name, u.role,
+      SELECT u.id, u.email, u.name, u.role, u.image,
              m.id    AS manager_id,
              m.name  AS manager_name,
              m.email AS manager_email,
-             m.role  AS manager_role
+             m.role  AS manager_role,
+             m.image AS manager_image
         FROM users u
         LEFT JOIN users m ON m.id = u.manager_id
        WHERE u.role = 'USER'
@@ -228,6 +229,7 @@ export async function GET(req: Request) {
         id: user.id,
         name: user.name,
         email: user.email,
+        image: user.image ?? null,
         // Null when the account predates invite-only signup.
         manager: user.manager_id
           ? {
@@ -235,6 +237,7 @@ export async function GET(req: Request) {
               name: user.manager_name,
               email: user.manager_email,
               role: user.manager_role as "ADMIN" | "MANAGER",
+              image: user.manager_image ?? null,
             }
           : null,
         readiness,
@@ -255,7 +258,7 @@ export async function GET(req: Request) {
           total: sum((row) => row.practice.total),
           mastered: sum((row) => row.practice.mastered),
         },
-        mockExam: {
+        practiceExam: {
           taken: sum((row) => row.taken),
           passed: sum((row) => row.passed),
           average,
