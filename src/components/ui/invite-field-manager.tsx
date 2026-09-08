@@ -22,6 +22,8 @@ export function InviteFieldManager({ onInvited }: { onInvited?: () => void }) {
   const [error, setError] = useState("");
   const [link, setLink] = useState("");
   const [sent, setSent] = useState(false);
+  /** Why the mail didn't go out, when it didn't. Undefined once it did. */
+  const [failReason, setFailReason] = useState<string | undefined>();
   const [copied, setCopied] = useState(false);
 
   const trimmed = email.trim();
@@ -34,6 +36,7 @@ export function InviteFieldManager({ onInvited }: { onInvited?: () => void }) {
       setError("");
       setLink("");
       setSent(false);
+      setFailReason(undefined);
       setCopied(false);
     }
   }
@@ -59,6 +62,7 @@ export function InviteFieldManager({ onInvited }: { onInvited?: () => void }) {
       }
 
       setSent(Boolean(data.sent));
+      setFailReason(data.sent ? undefined : data.reason);
       setLink(data.link ?? "");
       setSending(false);
       onInvited?.();
@@ -124,7 +128,9 @@ export function InviteFieldManager({ onInvited }: { onInvited?: () => void }) {
               <p className="mt-1 text-xs text-muted-foreground">
                 {sent
                   ? "The link below is the same one they received."
-                  : "No mailer is configured. Send them this link yourself."}
+                  : failReason === "not-configured"
+                    ? "No mailer is configured. Send them this link yourself."
+                    : "The email could not be sent — the sending domain may still be verifying, or Resend rejected it. Send them this link yourself."}
               </p>
 
               <div className="mt-2 flex items-center gap-2">
