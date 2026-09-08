@@ -142,3 +142,28 @@ export function nudgeAge(sentAt: string, now: number = Date.now()) {
   if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h ago`;
   return `${Math.floor(elapsed / DAY)}d ago`;
 }
+
+export type SentNudge = { sender_id: string | null };
+
+/**
+ * Whether this account may take back a reminder it can see.
+ *
+ * A field manager unsends their own only: two managers can share a reviewee
+ * through a recruit and a reassignment, and one deleting the other's reminder
+ * would be editing a conversation that is not theirs. The Sales Manager owns
+ * the console outright and can clear any of them.
+ */
+export function canDeleteNudge(
+  sender: NudgeSender,
+  nudge: SentNudge,
+): NudgeResolution {
+  if (sender.role === "ADMIN") return { ok: true, message: "" };
+
+  if (sender.role !== "MANAGER") {
+    return { ok: false, error: "Only managers can delete reminders." };
+  }
+
+  return nudge.sender_id === sender.id
+    ? { ok: true, message: "" }
+    : { ok: false, error: "You can only delete reminders you sent." };
+}

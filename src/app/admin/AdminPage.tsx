@@ -11,7 +11,7 @@ import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
 import { SummaryTile } from "@/components/ui/summary-tile";
 import { staffTitleFor } from "@/lib/helper/roles";
-import { NUDGE_MAX_LENGTH, nudgePresets } from "@/lib/helper/nudges";
+import { NUDGE_MAX_LENGTH, nudgeAge, nudgePresets } from "@/lib/helper/nudges";
 import { PASSES_REQUIRED, passesLabel } from "@/lib/helper/practice-exam";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import {
@@ -71,6 +71,16 @@ type Reviewee = {
     tracks: ExamTrackResult[];
   };
   activity: { lastActivity: string | null };
+};
+
+/** One reminder already sitting in a reviewee's bell. */
+type SentNudge = {
+  id: string;
+  senderId: string | null;
+  sender: string;
+  message: string;
+  createdAt: string;
+  read: boolean;
 };
 
 const PAGE_SIZE = 15;
@@ -237,6 +247,11 @@ function NudgeReviewee({
   const [sending, setSending] = useState(false);
   const [custom, setCustom] = useState("");
   const [error, setError] = useState("");
+  const [sent, setSent] = useState<SentNudge[]>([]);
+  const [viewer, setViewer] = useState<{ id: string; role: string } | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const trimmed = custom.trim();
   const tooLong = trimmed.length > NUDGE_MAX_LENGTH;
@@ -244,9 +259,50 @@ function NudgeReviewee({
   function close(next: boolean) {
     if (sending) return; // never yank the dialog out from under a request
     setOpen(next);
-    if (!next) {
+    if (next) {
+      loadSent();
+    } else {
       setCustom("");
       setError("");
+    }
+  }
+
+  async function loadSent() {
+    try {
+      const response = await fetch(`/api/admin/reviewees/${reviewee.id}/nudge`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setSent(data.nudges ?? []);
+      setViewer(data.viewer ?? null);
+    } catch {
+      // The dialog still sends; only the history is missing.
+    }
+  }
+
+  async function remove(id: string) {
+    if (deleting) return;
+
+    setDeleting(id);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/admin/reviewees/${reviewee.id}/nudge?nudge=${id}`,
+        { method: "DELETE" },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(data.error ?? "Could not delete this reminder.");
+        setDeleting(null);
+        return;
+      }
+
+      setSent((current) => current.filter((item) => item.id !== id));
+      setDeleting(null);
+    } catch {
+      setError("Could not reach the server.");
+      setDeleting(null);
     }
   }
 
@@ -341,6 +397,49 @@ function NudgeReviewee({
               {trimmed.length} / {NUDGE_MAX_LENGTH}
             </p>
           </div>
+
+          {sent.length > 0 && (
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                Already sent
+              </p>
+              <ul className="mt-2 flex flex-col gap-2">
+                {sent.map((nudge) => {
+                  // A field manager unsends their own only; the Sales Manager
+                  // owns the console and can clear any of them.
+                  const mine =
+                    viewer?.role === "ADMIN" || nudge.senderId === viewer?.id;
+
+                  return (
+                    <li
+                      key={nudge.id}
+                      className="flex items-start justify-between gap-3 rounded-xl border border-border px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm">{nudge.message}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {nudge.sender} · {nudgeAge(nudge.createdAt)} ·{" "}
+                          {nudge.read ? "Read" : "Unread"}
+                        </p>
+                      </div>
+
+                      {mine && (
+                        <button
+                          type="button"
+                          aria-label="Delete this reminder"
+                          disabled={deleting === nudge.id}
+                          onClick={() => remove(nudge.id)}
+                          className="shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
           {error && (
             <p

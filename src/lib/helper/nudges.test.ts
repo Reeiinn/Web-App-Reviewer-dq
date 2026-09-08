@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   NUDGE_MAX_LENGTH,
+  canDeleteNudge,
   canNudge,
   nudgeAge,
   nudgePresets,
@@ -114,5 +115,30 @@ describe("nudgeAge", () => {
 
   it("counts days past that", () => {
     expect(nudgeAge(ago(3 * 24 * 60 * 60_000), NOW)).toBe("3d ago");
+  });
+});
+
+describe("canDeleteNudge", () => {
+  const admin = { role: "ADMIN", id: "admin-1" };
+  const manager = { role: "MANAGER", id: "manager-1" };
+
+  it("lets a manager take back their own reminder", () => {
+    expect(canDeleteNudge(manager, { sender_id: "manager-1" }).ok).toBe(true);
+  });
+
+  // Two managers can share a reviewee; one does not edit the other's message.
+  it("refuses a manager somebody else's reminder", () => {
+    expect(canDeleteNudge(manager, { sender_id: "manager-2" }).ok).toBe(false);
+  });
+
+  it("lets an admin clear any reminder", () => {
+    expect(canDeleteNudge(admin, { sender_id: "manager-2" }).ok).toBe(true);
+  });
+
+  it("refuses an account that is not staff", () => {
+    expect(
+      canDeleteNudge({ role: "USER", id: "user-1" }, { sender_id: "user-1" })
+        .ok,
+    ).toBe(false);
   });
 });
