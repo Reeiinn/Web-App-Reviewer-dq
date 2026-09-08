@@ -54,6 +54,12 @@ export function InfoShell({
           <Link href="/help" className="font-semibold hover:text-foreground">
             Help
           </Link>
+          <Link href="/privacy" className="font-semibold hover:text-foreground">
+            Privacy
+          </Link>
+          <Link href="/terms" className="font-semibold hover:text-foreground">
+            Terms
+          </Link>
           {!signedIn && (
             <Link href="/" className="font-semibold hover:text-foreground">
               Sign in
