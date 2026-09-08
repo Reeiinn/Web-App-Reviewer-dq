@@ -46,8 +46,7 @@ export const NUDGE_MAX_LENGTH = 200;
 export type NudgeInput = { preset?: unknown; message?: unknown };
 
 export type NudgeResolution =
-  | { ok: true; message: string }
-  | { ok: false; error: string };
+  { ok: true; message: string } | { ok: false; error: string };
 
 /**
  * The text a nudge will carry, from what the client asked for.
@@ -122,4 +121,24 @@ export function canNudge(
   }
 
   return { ok: true, message: "" };
+}
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/**
+ * How long ago a reminder arrived, for the line under it in the bell.
+ *
+ * Coarse on purpose: what a reviewee takes from the stamp is "this is new" or
+ * "this has been sitting there", and a minute-level reading would invite the
+ * list to be read as a conversation it cannot be.
+ */
+export function nudgeAge(sentAt: string, now: number = Date.now()) {
+  const elapsed = now - new Date(sentAt).getTime();
+
+  if (elapsed < MINUTE) return "Just now";
+  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m ago`;
+  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h ago`;
+  return `${Math.floor(elapsed / DAY)}d ago`;
 }

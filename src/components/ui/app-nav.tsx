@@ -1,6 +1,7 @@
 "use client";
 
 import { PhotoCropper } from "@/components/ui/photo-cropper";
+import { NotificationBell } from "@/components/ui/notification-bell";
 import { isStaff, landingFor, staffTitleFor } from "@/lib/helper/roles";
 import { LogOut, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
@@ -319,6 +320,9 @@ export function AppNav({
         </nav>
 
         <div className="flex items-center gap-3">
+          {/* Staff send reminders and receive none, so the bell would only ever
+              be empty for them. */}
+          {session?.user && !isStaff(session.user.role) && <NotificationBell />}
           <UserMenu />
         </div>
       </div>
