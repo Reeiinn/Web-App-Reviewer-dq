@@ -82,5 +82,21 @@ export default auth(async (req: NextRequest) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/dashboard/:path*",
+    "/learningMethods/:path*",
+    "/glossary/:path*",
+    "/analytics/:path*",
+    "/certificates/:path*",
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/api/invites/:path*",
+    "/api/attempts/:path*",
+    "/api/flashcards/:path*",
+    "/api/glossary/:path*",
+    "/api/memorization/:path*",
+    "/api/progress/:path*",
+    "/api/questions/:path*",
+    "/api/streaks/:path*",
+  ],
 };

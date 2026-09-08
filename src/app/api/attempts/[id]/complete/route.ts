@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { issueCertificate } from "@/app/api/_lib/certificates";
 import pool from "@/lib/db";
 import {
   PASSES_REQUIRED,
@@ -75,11 +76,20 @@ export async function POST(
 
     const passes = cappedPasses(passesResult.rows[0]?.passes ?? 0);
 
+    // The fifth pass is what earns the certificate, and every sitting after
+    // it asks again — so this returns the certificate already held rather
+    // than minting a second one.
+    const certificate =
+      passes >= PASSES_REQUIRED
+        ? await issueCertificate(attempt.user_id, attempt.exam_type)
+        : null;
+
     return NextResponse.json({
       ...attempt,
       passes,
       passes_required: PASSES_REQUIRED,
       track_passed: passes >= PASSES_REQUIRED,
+      certificate,
     });
   } catch (error) {
     console.error("Error completing attempt:", error);
