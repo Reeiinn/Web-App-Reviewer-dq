@@ -191,6 +191,13 @@ export default function LoginPage() {
               Create account
             </Link>
           </div>
+          {/* Reachable without an account on purpose: someone who cannot get
+              past this screen is exactly who needs Help. */}
+          <div className="mt-4 flex items-center justify-center gap-3 text-sm text-[#5B6472]">
+            <Link href="/about" className="font-semibold hover:text-[#0B2340] hover:underline">
+              About
+            </Link>
+          </div>
         </div>
       </div>
     </div>
