@@ -2,21 +2,40 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-// General write limiter — 30 writes/min per IP
-export const writeLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(30, "60 s"),
-  prefix: "ratelimit:write",
-});
+if (!redisUrl || !redisToken) {
+  console.error(
+    "Upstash Redis env vars are missing — rate limiting is disabled.",
+  );
+}
 
-// Strict auth limiter — 5 attempts/15min per IP (brute-force protection)
-export const authLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, "15 m"),
-  prefix: "ratelimit:auth",
-});
+const redis =
+  redisUrl && redisToken
+    ? new Redis({ url: redisUrl, token: redisToken })
+    : null;
+
+function buildLimiter(
+  limiter: ReturnType<typeof Ratelimit.slidingWindow>,
+  prefix: string,
+) {
+  if (!redis) {
+    // No Redis configured — return a stub that always allows requests
+    // through rather than crashing every page load.
+    return {
+      limit: async () => ({ success: true }),
+    };
+  }
+  return new Ratelimit({ redis, limiter, prefix });
+}
+
+export const writeLimiter = buildLimiter(
+  Ratelimit.slidingWindow(30, "60 s"),
+  "ratelimit:write",
+);
+
+export const authLimiter = buildLimiter(
+  Ratelimit.slidingWindow(5, "15 m"),
+  "ratelimit:auth",
+);
