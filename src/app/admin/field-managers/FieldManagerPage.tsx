@@ -4,6 +4,7 @@ import { AppNav } from "@/components/ui/app-nav";
 import { Avatar } from "@/components/ui/avatar";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
 import { SummaryTile } from "@/components/ui/summary-tile";
+import { InviteFieldManager } from "@/components/ui/invite-field-manager";
 import {
   RECRUIT_TARGET,
   lastSeenLabel,
@@ -361,7 +362,10 @@ export function FieldManagerPage() {
   const ranked = useMemo(
     () =>
       rankFieldManagers(
-        managers.map((manager) => ({ ...manager, recruits: manager.reviewees })),
+        managers.map((manager) => ({
+          ...manager,
+          recruits: manager.reviewees,
+        })),
       ),
     [managers],
   );
@@ -405,11 +409,17 @@ export function FieldManagerPage() {
       <AppNav />
 
       <main className="mx-auto w-full max-w-[1500px] px-6 py-8">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-extrabold">Field Manager Console</h1>
-          <span className="rounded-full bg-[#0B2340] px-3 py-1 text-xs font-bold text-[#FFD400]">
-            {counts.total} Field Managers
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-extrabold">Field Manager Console</h1>
+            <span className="rounded-full bg-[#0B2340] px-3 py-1 text-xs font-bold text-[#FFD400]">
+              {counts.total} Field Managers
+            </span>
+          </div>
+
+          {/* Only the Sales Manager reaches this page, and the API refuses the
+              role to anyone else regardless. */}
+          <InviteFieldManager />
         </div>
         <p className="mt-1.5 max-w-[72ch] text-sm text-muted-foreground">
           Every field manager ranked by how many reviewees they have recruited,
