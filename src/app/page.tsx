@@ -197,6 +197,10 @@ export default function LoginPage() {
             <Link href="/about" className="font-semibold hover:text-[#0B2340] hover:underline">
               About
             </Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/help" className="font-semibold hover:text-[#0B2340] hover:underline">
+              Help
+            </Link>
           </div>
         </div>
       </div>
