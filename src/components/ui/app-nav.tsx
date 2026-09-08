@@ -3,7 +3,15 @@
 import { PhotoCropper } from "@/components/ui/photo-cropper";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { isStaff, landingFor, staffTitleFor } from "@/lib/helper/roles";
-import { Award, Info, LifeBuoy, LogOut, User } from "lucide-react";
+import {
+  Award,
+  FileText,
+  Info,
+  LifeBuoy,
+  LogOut,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -235,10 +243,10 @@ function UserMenu() {
             </Link>
           )}
 
-          {/* About and Help sit here rather than in the main nav: that row is
-              for the work — dashboards, decks, the console — and it is built
-              per role, so these two would have had to be repeated in every
-              list. This menu is already the same for everyone. */}
+          {/* About, Help, Privacy and Terms sit here rather than in the main
+              nav: that row is for the work — dashboards, decks, the console —
+              and it is built per role, so these would have had to be repeated
+              in every list. This menu is already the same for everyone. */}
           <Link
             href="/about"
             role="menuitem"
@@ -256,6 +264,24 @@ function UserMenu() {
           >
             <LifeBuoy className="size-4" />
             Help
+          </Link>
+          <Link
+            href="/privacy"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ShieldCheck className="size-4" />
+            Privacy
+          </Link>
+          <Link
+            href="/terms"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <FileText className="size-4" />
+            Terms
           </Link>
 
           <button

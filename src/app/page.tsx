@@ -192,14 +192,24 @@ export default function LoginPage() {
             </Link>
           </div>
           {/* Reachable without an account on purpose: someone who cannot get
-              past this screen is exactly who needs Help. */}
-          <div className="mt-4 flex items-center justify-center gap-3 text-sm text-[#5B6472]">
+              past this screen is exactly who needs Help, and someone deciding
+              whether to register has to be able to read what they would be
+              agreeing to before they do. */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-[#5B6472]">
             <Link href="/about" className="font-semibold hover:text-[#0B2340] hover:underline">
               About
             </Link>
             <span aria-hidden="true">·</span>
             <Link href="/help" className="font-semibold hover:text-[#0B2340] hover:underline">
               Help
+            </Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/privacy" className="font-semibold hover:text-[#0B2340] hover:underline">
+              Privacy
+            </Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/terms" className="font-semibold hover:text-[#0B2340] hover:underline">
+              Terms
             </Link>
           </div>
         </div>
