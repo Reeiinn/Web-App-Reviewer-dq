@@ -11,6 +11,7 @@ import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
 import { SummaryTile } from "@/components/ui/summary-tile";
 import { staffTitleFor } from "@/lib/helper/roles";
+import { NUDGE_MAX_LENGTH, nudgePresets } from "@/lib/helper/nudges";
 import { PASSES_REQUIRED, passesLabel } from "@/lib/helper/practice-exam";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@/lib/helper/readiness";
 import {
   AlertTriangle,
+  Bell,
   CheckCircle2,
   Search,
   Trash2,
@@ -213,6 +215,163 @@ const tidy = (value: string) =>
     .toLowerCase();
 
 const samePhrase = (a: string, b: string) => tidy(a) === tidy(b);
+
+/**
+ * Sends a reviewee a reminder without leaving the roster.
+ *
+ * The presets are the point: a manager reading a row that says "Inactive 6d"
+ * wants one press, not a blank box and a wording decision. The custom field is
+ * folded away behind them for the case a preset does not fit.
+ *
+ * Both staff roles get this control on the same terms — the API decides who a
+ * given manager may reach, since the roster being filtered is not a guarantee.
+ */
+function NudgeReviewee({
+  reviewee,
+  onSent,
+}: {
+  reviewee: Reviewee;
+  onSent: (message: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [custom, setCustom] = useState("");
+  const [error, setError] = useState("");
+
+  const trimmed = custom.trim();
+  const tooLong = trimmed.length > NUDGE_MAX_LENGTH;
+
+  function close(next: boolean) {
+    if (sending) return; // never yank the dialog out from under a request
+    setOpen(next);
+    if (!next) {
+      setCustom("");
+      setError("");
+    }
+  }
+
+  async function send(body: { preset?: string; message?: string }) {
+    if (sending) return;
+
+    setSending(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/admin/reviewees/${reviewee.id}/nudge`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(data.error ?? "Could not send this reminder.");
+        setSending(false);
+        return;
+      }
+
+      setSending(false);
+      setOpen(false);
+      setCustom("");
+      onSent(data.message ?? `Reminder sent to ${reviewee.name}.`);
+    } catch {
+      setError("Could not reach the server.");
+      setSending(false);
+    }
+  }
+
+  return (
+    <AlertDialog.Root open={open} onOpenChange={close}>
+      <AlertDialog.Trigger
+        aria-label={`Send ${reviewee.name} a reminder`}
+        className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-[#C9A227] hover:bg-[#FFF8D6] hover:text-[#0B2340]"
+      >
+        <Bell className="size-3.5" />
+        Nudge
+      </AlertDialog.Trigger>
+
+      <AlertDialog.Portal>
+        <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-[#0B2340]/50 backdrop-blur-[2px]" />
+        <AlertDialog.Popup className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-left shadow-xl">
+          <AlertDialog.Title className="text-lg font-extrabold">
+            Remind {reviewee.name}
+          </AlertDialog.Title>
+          <AlertDialog.Description className="mt-1 text-sm text-muted-foreground">
+            They see it in their notifications the next time they open the app.
+          </AlertDialog.Description>
+
+          <div className="mt-4 flex flex-col gap-2">
+            {nudgePresets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                disabled={sending}
+                onClick={() => send({ preset: preset.id })}
+                className="rounded-xl border border-border px-4 py-3 text-left transition hover:border-[#C9A227] hover:bg-[#FFF8D6] disabled:opacity-60"
+              >
+                <span className="block text-sm font-bold">{preset.label}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {preset.message}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 border-t border-border pt-4">
+            <label
+              htmlFor={`nudge-custom-${reviewee.id}`}
+              className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground"
+            >
+              Write your own
+            </label>
+            <textarea
+              id={`nudge-custom-${reviewee.id}`}
+              value={custom}
+              rows={3}
+              disabled={sending}
+              onChange={(event) => setCustom(event.target.value)}
+              className="mt-1.5 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[#C9A227]"
+            />
+            <p
+              className={`mt-1 text-xs ${tooLong ? "font-bold text-rose-700" : "text-muted-foreground"}`}
+            >
+              {trimmed.length} / {NUDGE_MAX_LENGTH}
+            </p>
+          </div>
+
+          {error && (
+            <p
+              role="alert"
+              className="mt-3 text-sm font-semibold text-rose-700"
+            >
+              {error}
+            </p>
+          )}
+
+          <div className="mt-5 flex justify-end gap-2">
+            <AlertDialog.Close
+              disabled={sending}
+              className="rounded-lg border border-border px-3 py-2 text-sm font-bold transition hover:border-[#C9A227] disabled:opacity-60"
+            >
+              Cancel
+            </AlertDialog.Close>
+            <button
+              type="button"
+              disabled={sending || !trimmed || tooLong}
+              onClick={() => send({ message: trimmed })}
+              className="rounded-lg bg-[#0B2340] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#0F2E4D] disabled:opacity-40"
+            >
+              {sending ? "Sending…" : "Send"}
+            </button>
+          </div>
+        </AlertDialog.Popup>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
+  );
+}
 
 /**
  * Removing a reviewee destroys their history, and the delete cascades from
@@ -748,15 +907,21 @@ export function AdminPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <RemoveReviewee
-                          reviewee={row}
-                          onRemoved={(id) => {
-                            setRoster((current) =>
-                              current.filter((item) => item.id !== id),
-                            );
-                            setNotice(`${row.name} has been removed.`);
-                          }}
-                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <NudgeReviewee
+                            reviewee={row}
+                            onSent={(message) => setNotice(message)}
+                          />
+                          <RemoveReviewee
+                            reviewee={row}
+                            onRemoved={(id) => {
+                              setRoster((current) =>
+                                current.filter((item) => item.id !== id),
+                              );
+                              setNotice(`${row.name} has been removed.`);
+                            }}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))}
