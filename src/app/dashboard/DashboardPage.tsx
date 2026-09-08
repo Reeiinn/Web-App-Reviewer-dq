@@ -336,10 +336,10 @@ function TrackCard({
           // to something they have already cleared.
           <Link
             href={`/learningMethods/practiceExam?exam_type=${type}`}
-            className={`w-full whitespace-nowrap rounded-lg border-2 px-3 py-2 text-center text-sm font-bold transition sm:w-auto ${
+            className={`w-full whitespace-nowrap rounded-lg px-3 py-2 text-center text-sm font-bold transition sm:w-auto ${
               trackPassed
-                ? "border-[#0F7B52] text-[#0F7B52] hover:bg-[#E7F4EE]"
-                : "border-[var(--exam)] text-[var(--exam)] hover:bg-[var(--exam-soft)]"
+                ? "border-2 border-[#0F7B52] text-[#0F7B52] hover:bg-[#E7F4EE]"
+                : "bg-[var(--exam)] text-white hover:bg-[var(--exam-strong)]"
             }`}
           >
             {trackPassed ? "Review Practice Exam" : "Practice Exam"}
