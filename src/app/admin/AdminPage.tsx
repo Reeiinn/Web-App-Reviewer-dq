@@ -522,7 +522,7 @@ export function AdminPage() {
             tone="bg-amber-50 text-amber-700"
           />
           <SummaryTile
-            label="At Risk / Nudge"
+            label="At Risk"
             value={counts.atRisk}
             hint={`(${share(counts.atRisk)})`}
             icon={AlertTriangle}
