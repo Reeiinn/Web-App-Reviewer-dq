@@ -107,6 +107,17 @@ const statements = [
 
   `CREATE INDEX IF NOT EXISTS nudges_user_id_idx
      ON nudges (user_id, created_at DESC)`,
+
+  // An invite now says what it creates. Existing rows are reviewee links, so
+  // the default keeps them working untouched.
+  `ALTER TABLE registration_invites
+     ADD COLUMN IF NOT EXISTS role user_role NOT NULL DEFAULT 'USER'`,
+
+  // Set when the invite was addressed to somebody: signup then refuses any
+  // other address, so a forwarded link cannot be spent by the wrong person.
+  // Null keeps the open link the reviewee invite has always been.
+  `ALTER TABLE registration_invites
+     ADD COLUMN IF NOT EXISTS email text`,
 ];
 
 // One example term so the Glossary renders against real data.

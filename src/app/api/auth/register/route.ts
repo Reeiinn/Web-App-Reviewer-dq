@@ -1,4 +1,10 @@
 import pool from "@/lib/db";
+import {
+  claimantMatches,
+  isInviteRole,
+  managerForInvite,
+  type InviteRole,
+} from "@/lib/helper/invites";
 import { registerBodySchema } from "@/lib/validation/auth.validation";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
@@ -42,7 +48,7 @@ export async function POST(req: Request) {
       const claim = await client.query(
         `UPDATE registration_invites SET used_at = now()
          WHERE code = $1 AND used_at IS NULL AND expires_at > now()
-         RETURNING created_by`,
+         RETURNING created_by, role, email`,
         [code],
       );
 
@@ -54,15 +60,28 @@ export async function POST(req: Request) {
         );
       }
 
+      const invite = claim.rows[0];
+
+      // An addressed invite belongs to one person. Rolling back rather than
+      // burning the link leaves it there for whoever it was sent to.
+      const claimant = claimantMatches(invite.email, email);
+      if (!claimant.ok) {
+        await client.query("ROLLBACK");
+        return NextResponse.json({ error: claimant.error }, { status: 403 });
+      }
+
+      const role: InviteRole = isInviteRole(invite.role) ? invite.role : "USER";
+
       const result = await client.query(
         `INSERT INTO users (email, password, name, role, manager_id)
-         VALUES ($1, $2, $3, 'USER', $4)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING id, email, name, role, manager_id, created_at`,
         [
           email.trim().toLowerCase(),
           hashedPassword,
           name.trim(),
-          claim.rows[0].created_by,
+          role,
+          managerForInvite(role, invite.created_by),
         ],
       );
 
