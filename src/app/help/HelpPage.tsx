@@ -6,11 +6,11 @@ import { LifeBuoy, Lock, Mail } from "lucide-react";
  */
 
 /**
- * TODO: put the real support address here once it exists. Empty is deliberate
- * rather than a placeholder string: an address nobody reads is worse than
- * pointing the reviewee at the manager who can actually act.
+ * Where suggestions and concerns go. Emptying this is a supported state, not
+ * a broken one: the section falls back to pointing the reviewee at their Field
+ * Manager, so the page never advertises a mailbox that is not being read.
  */
-const SUPPORT_EMAIL = "";
+const SUPPORT_EMAIL = "insureph26@gmail.com";
 
 const faqs = [
   {
@@ -61,7 +61,7 @@ export function HelpPage({ signedIn }: { signedIn: boolean }) {
       signedIn={signedIn}
       eyebrow="Help"
       title="Help & Support"
-      intro="How the study modes work, why something might be locked, and what to do when the app is not behaving. If your answer is not here, the last section says who to ask."
+      intro="How the study modes work, why something might be locked, and what to do when the app is not behaving. If your answer is not here, there is an address to write to further down."
     >
       <InfoSection title="Common questions">
         <dl className="mt-4 divide-y divide-border rounded-xl border border-border bg-card">
@@ -95,14 +95,14 @@ export function HelpPage({ signedIn }: { signedIn: boolean }) {
         </p>
       </InfoSection>
 
-      <InfoSection title="Still stuck?">
+      <InfoSection title="Suggestions and concerns">
         <div className="rv-card mt-4 p-6">
           <div className="flex items-center gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#0B2340] text-[#FFD400]">
               <LifeBuoy className="size-4" aria-hidden="true" />
             </span>
             <h3 className="text-lg font-extrabold text-foreground">
-              Get in touch
+              Email us
             </h3>
           </div>
 
@@ -119,8 +119,9 @@ export function HelpPage({ signedIn }: { signedIn: boolean }) {
                 />
                 {SUPPORT_EMAIL}
               </a>{" "}
-              with what you were doing and what happened. Include the track and
-              study mode if it is about a specific screen.
+              with a suggestion, a concern, or anything the app is getting wrong.
+              If it is about a particular screen, say which track and study mode
+              you were in, and what happened.
             </p>
           ) : (
             <p className="mt-3 text-sm leading-6">
