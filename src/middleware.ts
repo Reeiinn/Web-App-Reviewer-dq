@@ -13,6 +13,7 @@ export const config = {
     "/learningMethods/:path*",
     "/glossary/:path*",
     "/analytics/:path*",
+    "/certificates/:path*",
     "/admin/:path*",
     "/api/admin/:path*",
     "/api/invites/:path*",

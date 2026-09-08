@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Great+Vibes&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Playfair+Display:wght@400;700;900&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -306,5 +306,45 @@
 
   html::-webkit-scrollbar-thumb:hover {
     background: var(--primary);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Certificates
+
+   The sheet is drawn in its own two faces — a display serif for the headings
+   and a script for the recipient's name — because the artwork it stands in for
+   is set that way. Neither belongs to the rest of the app's type.
+   --------------------------------------------------------------------------- */
+.cert-serif {
+  font-family: "Playfair Display", Georgia, serif;
+}
+
+.cert-script {
+  font-family: "Great Vibes", "Playfair Display", Georgia, cursive;
+}
+
+@media print {
+  /* A certificate prints as the sheet and nothing else: no nav, no buttons,
+     no page margins eating into the border. */
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
+
+  .rv-print-hide {
+    display: none !important;
+  }
+
+  .rv-print-sheet {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+
+  body {
+    background: #fff;
   }
 }

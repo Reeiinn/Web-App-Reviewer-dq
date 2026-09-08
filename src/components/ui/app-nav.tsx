@@ -19,6 +19,7 @@ const learnerLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/glossary", label: "Glossary" },
   { href: "/analytics", label: "Analytics" },
+  { href: "/certificates", label: "Certificates" },
 ];
 
 // No Analytics here: it charts the signed-in account's own per-track mastery,

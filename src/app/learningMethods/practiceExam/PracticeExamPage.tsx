@@ -13,7 +13,7 @@ import {
 } from "@/lib/helper/practice-exam";
 import { examLabels, parseExamType } from "@/lib/types/common";
 import type { Question } from "@/lib/types/questions";
-import { Lock } from "lucide-react";
+import { Award, Lock } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -110,6 +110,8 @@ function PracticeExamContent() {
   const [outcome, setOutcome] = useState<{
     passed: boolean;
     passes: number;
+    /** Set on the sitting that clears the track, and on every one after. */
+    certificateId: string | null;
   } | null>(null);
 
   /** Questions a submit found blank, marked until they are answered. */
@@ -316,11 +318,13 @@ function PracticeExamContent() {
       }).then((response) => response.json())) as {
         passed?: boolean;
         passes?: number;
+        certificate?: { id?: string } | null;
       };
 
       setOutcome({
         passed: Boolean(completed?.passed),
         passes: Number(completed?.passes ?? 0),
+        certificateId: completed?.certificate?.id ?? null,
       });
       setFinished(true);
     } catch (submitError) {
@@ -469,6 +473,34 @@ function PracticeExamContent() {
             </div>
           </section>
 
+          {/* The certificate is the point of the fifth pass, so the result
+              screen says so rather than leaving it to be discovered on a
+              page the learner has no reason to open yet. */}
+          {trackPassed && outcome?.certificateId && (
+            <section className="rv-card mb-4 flex flex-col items-start justify-between gap-3 border-2 border-[#C9A227] p-[clamp(1rem,4vw,1.25rem)] xs:flex-row xs:items-center">
+              <div className="flex items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#0B2340] text-[#FFD400]">
+                  <Award className="size-5" />
+                </span>
+                <div>
+                  <p className="text-lg font-extrabold">
+                    Your certificate is ready
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {examLabels[type]} is complete — the certificate has been
+                    issued to your account.
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                href={`/certificates/${outcome.certificateId}`}
+                className="w-full rounded-lg bg-[#0B2340] px-4 py-2.5 text-center text-sm font-bold text-white transition hover:bg-[#0F2E4D] xs:w-auto"
+              >
+                View certificate
+              </Link>
+            </section>
+          )}
           <Result
             correct={score}
             wrong={wrongQuestions.length}
