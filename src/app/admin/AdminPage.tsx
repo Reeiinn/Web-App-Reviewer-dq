@@ -617,7 +617,12 @@ export function AdminPage() {
         ) : (
           <div className="rv-card mt-6 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-left text-sm">
+              {/* The Sales Manager's table carries an extra Recruited By
+                  column, so it needs the wider floor before the cells start
+                  wrapping mid-phrase. */}
+              <table
+                className={`w-full text-left text-sm ${isAdmin ? "min-w-[1320px]" : "min-w-[1100px]"}`}
+              >
                 <thead className="bg-[#0B2340] text-white">
                   <tr>
                     {[
@@ -634,7 +639,7 @@ export function AdminPage() {
                       <th
                         key={heading}
                         scope="col"
-                        className="px-5 py-4 text-[11px] font-bold uppercase tracking-wide"
+                        className="whitespace-nowrap px-5 py-4 text-[11px] font-bold uppercase tracking-wide"
                       >
                         {heading}
                       </th>
@@ -730,13 +735,13 @@ export function AdminPage() {
                         </p>
                       </td>
 
-                      <td className="px-5 py-4 font-semibold">
+                      <td className="whitespace-nowrap px-5 py-4 font-semibold">
                         {relativeTime(row.activity.lastActivity)}
                       </td>
 
                       <td className="px-5 py-4">
                         <span
-                          className={`inline-block rounded-full border px-3 py-1 text-xs font-bold ${statusStyles[row.status]}`}
+                          className={`inline-block whitespace-nowrap rounded-full border px-3 py-1 text-xs font-bold ${statusStyles[row.status]}`}
                         >
                           {statusLabels[row.status]}
                         </span>
