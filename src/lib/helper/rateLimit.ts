@@ -13,7 +13,10 @@ if (!redisUrl || !redisToken) {
 
 const redis =
   redisUrl && redisToken
-    ? new Redis({ url: redisUrl, token: redisToken })
+    ? new Redis({
+        url: redisUrl,
+        token: redisToken,
+      })
     : null;
 
 function buildLimiter(
@@ -21,21 +24,52 @@ function buildLimiter(
   prefix: string,
 ) {
   if (!redis) {
-    // No Redis configured — return a stub that always allows requests
-    // through rather than crashing every page load.
     return {
-      limit: async () => ({ success: true }),
+      limit: async (_key: string) => ({
+        success: true,
+      }),
     };
   }
-  return new Ratelimit({ redis, limiter, prefix });
+
+  return new Ratelimit({
+    redis,
+    limiter,
+    prefix,
+  });
 }
 
+/**
+ * General write protection.
+ *
+ * 30 write requests per minute per IP.
+ */
 export const writeLimiter = buildLimiter(
   Ratelimit.slidingWindow(30, "60 s"),
   "ratelimit:write",
 );
 
-export const authLimiter = buildLimiter(
-  Ratelimit.slidingWindow(7, "5 m"),
-  "ratelimit:auth",
+/**
+ * Login protection per IP.
+ *
+ * Prevents one client from repeatedly attacking
+ * multiple accounts.
+ *
+ * 20 attempts per 15 minutes per IP.
+ */
+export const authIpLimiter = buildLimiter(
+  Ratelimit.slidingWindow(20, "15 m"),
+  "ratelimit:auth:ip",
+);
+
+/**
+ * Login protection per account.
+ *
+ * Prevents repeated attempts against one account,
+ * even if the attacker changes IP addresses.
+ *
+ * 7 attempts per 15 minutes per email.
+ */
+export const authEmailLimiter = buildLimiter(
+  Ratelimit.slidingWindow(7, "15 m"),
+  "ratelimit:auth:email",
 );
