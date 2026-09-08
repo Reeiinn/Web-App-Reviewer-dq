@@ -13,22 +13,31 @@ import { getSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import Turnstile from "react-turnstile";
 
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+
+    if (!turnstileToken) {
+      setError("Please complete the verification challenge.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
     const result = await signIn("credentials", {
       email: formData.get("email"),
       password: formData.get("password"),
+      turnstileToken,
       redirect: false,
     });
 
@@ -38,14 +47,13 @@ export default function LoginPage() {
       return;
     }
 
-    // signIn with redirect:false resolves before the session is readable, so
-    // the role that decides where to land is fetched rather than assumed.
+    if (result?.code === "rate_limit") {
+      setError("Too many login attempts. Please try again later.");
+    }
+
     const session = await getSession();
     const target = landingFor(session?.user?.role);
 
-    // Straight through to the landing page. The button keeps its spinner
-    // until the route changes, so the form cannot be submitted twice on the
-    // way out.
     router.replace(target);
     router.refresh();
   }
@@ -59,20 +67,22 @@ export default function LoginPage() {
             INSURE
           </div>
 
-        
           <div className="absolute inset-0 pointer-events-none">
-            <div
-              className="absolute -right-[70px] -bottom-[70px] size-[260px] rounded-full bg-[radial-gradient(circle_at_35%_30%,#FDB913_0%,#C98A00_55%,transparent_72%)] opacity-90"
-            />
+            <div className="absolute -right-[70px] -bottom-[70px] size-[260px] rounded-full bg-[radial-gradient(circle_at_35%_30%,#FDB913_0%,#C98A00_55%,transparent_72%)] opacity-90" />
           </div>
 
           <div className="relative z-10 max-w-[340px] -translate-y-6">
             <h1 className="mb-4 text-3xl leading-snug xl:text-4xl">
-              <span className="block text-white font-extrabold ">OUR TARGET.</span>
-              <span className="block text-[#FDB913] font-extrabold">OUR WIN.</span>
+              <span className="block text-white font-extrabold ">
+                OUR TARGET.
+              </span>
+              <span className="block text-[#FDB913] font-extrabold">
+                OUR WIN.
+              </span>
             </h1>
             <p className="text-base font-semibold leading-relaxed text-white">
-              &quot;Every action counts. Every conversation matters. Every submission brings us closer to our dreams.&quot;
+              &quot;Every action counts. Every conversation matters. Every
+              submission brings us closer to our dreams.&quot;
             </p>
             <p className="mt-4 text-2xl font-semibold italic text-[#FDB913] xl:text-3xl">
               Let&apos;s do this, Team!
@@ -83,14 +93,11 @@ export default function LoginPage() {
             <div>
               <div className="text-lg text-[#FDB913]">DAILY ACTIONS.</div>
               <div className="text-lg text-[#FDB913]">BIG RESULTS.</div>
-
             </div>
-          </div> 
+          </div>
         </div>
 
-   
         <div className="flex flex-col justify-start p-6 sm:p-8 lg:min-h-[560px] lg:p-12">
-       
           <div className="mb-6 flex items-center gap-2 text-lg text-[#0B2340] lg:hidden">
             <span className="inline-block w-[8px] h-[8px] rounded-full bg-[#FDB913]" />
             INSURE
@@ -161,10 +168,20 @@ export default function LoginPage() {
                   onClick={() => setShowPassword((prev) => !prev)}
                   className="absolute inset-y-0 right-1 flex w-11 items-center justify-center text-[#A9A092] transition hover:text-[#0B2340]"
                 >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {showPassword ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
                 </button>
               </div>
             </div>
+
+            <Turnstile
+              sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+              onVerify={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken("")}
+            />
 
             {error && (
               <p className="text-sm text-red-600" role="alert">
@@ -187,7 +204,10 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center text-base text-[#5B6472] sm:mt-8">
             Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-[#0B2340] font-bold hover:underline">
+            <Link
+              href="/signup"
+              className="text-[#0B2340] font-bold hover:underline"
+            >
               Create account
             </Link>
           </div>
