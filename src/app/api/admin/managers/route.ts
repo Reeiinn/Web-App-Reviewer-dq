@@ -11,9 +11,9 @@ import { NextResponse } from "next/server";
  * different feature with a different conversation behind it, so MANAGER is
  * refused here even though it is allowed on the roster.
  *
- * last_seen_at is written by the routes every screen calls, so it says the
- * account loaded one — not that anyone is looking at one now. The
- * recruit counts ride along because the join is already there, and "opened
+ * last_seen_at is written by the routes the console calls, so it says the
+ * account loaded a screen — not that anyone is looking at one now. The
+ * reviewee count rides along because the join is already there, and "opened
  * the app yesterday, recruited nobody" answers rather more than a date does.
  */
 export async function GET() {
@@ -31,23 +31,18 @@ export async function GET() {
 
   try {
     const result = await pool.query(
-      // The console ranks on the recruit count, so the rows arrive in that
-      // order already: a client that renders them as they came still shows the
-      // ranking, and the sort it applies only reorders what it was given.
       `SELECT u.id, u.name, u.email, u.image, u.last_seen_at,
-              COUNT(r.id) AS reviewees,
-              COUNT(r.id) FILTER (
-                WHERE r.created_at >= date_trunc('month', now())
-              ) AS new_this_month
+              COUNT(r.id) AS reviewees
          FROM users u
          LEFT JOIN users r ON r.manager_id = u.id AND r.role = 'USER'
         WHERE u.role = 'MANAGER'
         GROUP BY u.id
-        ORDER BY COUNT(r.id) DESC,
-                 u.last_seen_at DESC NULLS LAST,
-                 u.name ASC`,
+        ORDER BY u.last_seen_at DESC NULLS LAST, u.name ASC`,
     );
 
+
+
+    
     const managers = result.rows.map((row) => {
       // pg hands back a Date for timestamptz. Settling on an ISO string here
       // keeps the shape the same whether a caller reads it or JSON does.
@@ -65,10 +60,6 @@ export async function GET() {
         lastSeenAt,
         status: presenceStatus(lastSeenAt),
         reviewees: Number(row.reviewees),
-        // Recruits who signed up since the first of the current month, which
-        // separates a manager still recruiting from one coasting on a total
-        // banked months ago.
-        newThisMonth: Number(row.new_this_month),
       };
     });
 
