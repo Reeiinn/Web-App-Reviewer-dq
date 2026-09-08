@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
 import { authConfig } from "./auth.config";
+import { verifyTurnstile } from "./helper/turnstile";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -11,14 +12,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        turnstileToken: { label: "Turnstile Token", type: "text" },
       },
       async authorize(credentials) {
-        const { email, password } = credentials as {
+        const { email, password, turnstileToken } = credentials as {
           email: string;
           password: string;
+          turnstileToken: string;
         };
 
-        if (!email || !password) return null;
+        if (!email || !password || !turnstileToken) return null;
+
+        const isHuman = await verifyTurnstile(turnstileToken);
+        if (!isHuman) return null;
 
         const result = await pool.query(
           `SELECT id, email, password, name, role, manager_id FROM users WHERE email = $1`,

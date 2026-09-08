@@ -1,0 +1,3 @@
+ALTER TABLE exam_attempt_answers
+ADD CONSTRAINT exam_attempt_answers_attempt_question_unique UNIQUE (attempt_id, question_id);
+ALTER TABLE exam_attempt_answers DROP CONSTRAINT exam_attempt_answers_attempt_question_key;
