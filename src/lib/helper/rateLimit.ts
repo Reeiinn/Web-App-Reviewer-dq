@@ -36,6 +36,6 @@ export const writeLimiter = buildLimiter(
 );
 
 export const authLimiter = buildLimiter(
-  Ratelimit.slidingWindow(5, "15 m"),
+  Ratelimit.slidingWindow(7, "5 m"),
   "ratelimit:auth",
 );
