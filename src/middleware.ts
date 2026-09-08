@@ -27,6 +27,22 @@ function isProtected(pathname: string) {
   return PROTECTED_ROUTES.some((route) => pathname.startsWith(route));
 }
 
+async function safeLimitCheck(
+  limiter: typeof writeLimiter,
+  ip: string,
+): Promise<boolean> {
+  try {
+    const { success } = await limiter.limit(ip);
+    return success;
+  } catch (err) {
+    // If Upstash is unreachable/misconfigured, don't take the whole site
+    // down — log it and let the request through. A rate limiter failing
+    // open is far safer than the entire app failing closed.
+    console.error("Rate limiter check failed, failing open:", err);
+    return true;
+  }
+}
+
 async function applySecurityHeaders(req: NextRequest, res: NextResponse) {
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -37,15 +53,15 @@ async function applySecurityHeaders(req: NextRequest, res: NextResponse) {
   const isWrite = req.method !== "GET";
 
   if (isAuthRoute) {
-    const { success } = await authLimiter.limit(ip);
-    if (!success) {
+    const allowed = await safeLimitCheck(authLimiter, ip);
+    if (!allowed) {
       return new NextResponse("Too many login attempts, try again later", {
         status: 429,
       });
     }
   } else if (isWrite) {
-    const { success } = await writeLimiter.limit(ip);
-    if (!success) {
+    const allowed = await safeLimitCheck(writeLimiter, ip);
+    if (!allowed) {
       return new NextResponse("Too many requests", { status: 429 });
     }
   }
@@ -60,14 +76,6 @@ async function applySecurityHeaders(req: NextRequest, res: NextResponse) {
 
 export default auth(async (req: NextRequest) => {
   const { pathname } = req.nextUrl;
-
-  // Public pages: apply CSP/rate-limit only, skip auth check
-  if (!isProtected(pathname)) {
-    return applySecurityHeaders(req, NextResponse.next());
-  }
-
-  // Protected pages: NextAuth's auth() wrapper already redirects
-  // unauthenticated users before this runs
   return applySecurityHeaders(req, NextResponse.next());
 });
 
