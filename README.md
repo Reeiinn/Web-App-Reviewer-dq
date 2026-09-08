@@ -37,6 +37,12 @@ Create `.env.local`:
     DATABASE_URL="postgresql://postgres:<password>@<host>:<port>/railway"
     AUTH_SECRET="your-generated-secret"
 
+    # Optional. Outbound mail, used to send Field Manager invitations.
+    # Without both, an invitation is still created and the link is handed
+    # back in the dialog to send by hand.
+    RESEND_API_KEY="re_..."
+    MAIL_FROM="INSURE <invites@yourdomain.com>"
+
 Generate an `AUTH_SECRET`:
 
     npx auth secret

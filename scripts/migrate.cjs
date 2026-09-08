@@ -90,6 +90,34 @@ const statements = [
   // refresh returns to the same questions in the same order rather than
   // reshuffling under answers the learner has already given.
   `ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS question_order jsonb`,
+
+  // Reminders a manager sends a reviewee. The text is stored resolved rather
+  // than as a preset key, so editing the phrase list cannot rewrite what was
+  // already sent; sender_name is snapshotted beside sender_id so a nudge from
+  // a manager who has since left still says who sent it.
+  `CREATE TABLE IF NOT EXISTS nudges (
+     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     sender_id   uuid REFERENCES users(id) ON DELETE SET NULL,
+     sender_name text NOT NULL,
+     message     text NOT NULL,
+     created_at  timestamptz NOT NULL DEFAULT now(),
+     read_at     timestamptz
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS nudges_user_id_idx
+     ON nudges (user_id, created_at DESC)`,
+
+  // An invite now says what it creates. Existing rows are reviewee links, so
+  // the default keeps them working untouched.
+  `ALTER TABLE registration_invites
+     ADD COLUMN IF NOT EXISTS role user_role NOT NULL DEFAULT 'USER'`,
+
+  // Set when the invite was addressed to somebody: signup then refuses any
+  // other address, so a forwarded link cannot be spent by the wrong person.
+  // Null keeps the open link the reviewee invite has always been.
+  `ALTER TABLE registration_invites
+     ADD COLUMN IF NOT EXISTS email text`,
 ];
 
 // One example term so the Glossary renders against real data.
