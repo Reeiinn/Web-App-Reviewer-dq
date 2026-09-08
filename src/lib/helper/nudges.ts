@@ -28,7 +28,7 @@ export const nudgePresets: readonly NudgePreset[] = [
   {
     id: "exam",
     label: "Practice exam",
-    message: "Your practice exam is open. Take a sitting this week.",
+    message: "Answer your practice exam. Take a sitting this week.",
   },
   {
     id: "behind",
