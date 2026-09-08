@@ -18,9 +18,9 @@ type Nudge = {
  *
  * It refetches on mount and whenever the path changes rather than polling: a
  * reminder is not urgent enough to keep a timer alive for, and a reviewee
- * moving between screens picks it up within a click. Opening the list is what
- * marks it read — there is nothing to reply to, so arriving is the whole
- * interaction.
+ * moving between screens picks it up within a click. Unread reminders stay
+ * tinted until the reviewee marks them read: opening the bell to look is not
+ * the same as dealing with what is in it.
  */
 export function NotificationBell() {
   const pathname = usePathname();
@@ -72,29 +72,37 @@ export function NotificationBell() {
     };
   }, [open]);
 
-  async function toggle() {
-    const next = !open;
-    setOpen(next);
-
-    if (!next || unread === 0) return;
-
-    // The dot clears on the press rather than on the response: the reviewee
-    // is looking at the list either way, and a dot that lingers reads as a
-    // reminder they have not seen.
-    setUnread(0);
-    setNudges((current) => current.map((item) => ({ ...item, read: true })));
+  /**
+   * Marking read is the reviewee's own press, not a side effect of opening the
+   * bell: a reminder they have glanced at and left is one they mean to come
+   * back to, and clearing it for them loses that.
+   */
+  async function markRead(id?: string) {
+    setNudges((current) =>
+      current.map((item) =>
+        !id || item.id === id ? { ...item, read: true } : item,
+      ),
+    );
+    setUnread((current) => (id ? Math.max(0, current - 1) : 0));
 
     try {
-      await fetch("/api/nudges", { method: "PATCH" });
+      const response = await fetch("/api/nudges", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(id ? { id } : {}),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && typeof data?.unread === "number")
+        setUnread(data.unread);
     } catch {
-      // Left unread server-side; the next load restores the dot.
+      // The optimistic state stands; the next load corrects it either way.
     }
   }
 
   return (
     <div className="relative" ref={container}>
       <button
-        onClick={toggle}
+        onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={
@@ -115,9 +123,20 @@ export function NotificationBell() {
           role="menu"
           className="rv-pop-in absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
         >
-          <p className="border-b border-border px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-            Reminders
-          </p>
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Reminders
+            </p>
+            {unread > 0 && (
+              <button
+                type="button"
+                onClick={() => markRead()}
+                className="text-[11px] font-bold uppercase tracking-wide text-[#0B2340] transition hover:underline"
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
 
           {nudges.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
@@ -128,12 +147,25 @@ export function NotificationBell() {
               {nudges.map((nudge) => (
                 <li
                   key={nudge.id}
-                  className="border-b border-border px-4 py-3 last:border-b-0"
+                  className={`border-b border-border px-4 py-3 last:border-b-0 ${
+                    nudge.read ? "" : "bg-[#FFF8D6]"
+                  }`}
                 >
                   <p className="text-sm">{nudge.message}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {nudge.sender} · {nudgeAge(nudge.createdAt)}
-                  </p>
+                  <div className="mt-1 flex items-baseline justify-between gap-3">
+                    <p className="text-xs text-muted-foreground">
+                      {nudge.sender} · {nudgeAge(nudge.createdAt)}
+                    </p>
+                    {!nudge.read && (
+                      <button
+                        type="button"
+                        onClick={() => markRead(nudge.id)}
+                        className="shrink-0 text-xs font-bold text-[#0B2340] transition hover:underline"
+                      >
+                        Mark as read
+                      </button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

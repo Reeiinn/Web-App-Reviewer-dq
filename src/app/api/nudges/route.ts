@@ -55,21 +55,51 @@ export async function GET() {
   }
 }
 
-/** Marks the caller's unread reminders read. Opening the bell is the receipt. */
-export async function PATCH() {
+/**
+ * Marks reminders read — one when the body names an id, otherwise all of them.
+ *
+ * Reading is the reviewee's own act, so the id is only ever matched inside
+ * their own rows: naming somebody else's leaves it untouched and reports the
+ * caller's own count back.
+ */
+export async function PATCH(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  let body: { id?: unknown } = {};
   try {
-    await pool.query(
-      `UPDATE nudges SET read_at = now()
+    body = (await req.json()) ?? {};
+  } catch {
+    body = {};
+  }
+
+  const one = typeof body.id === "string" ? body.id : null;
+
+  try {
+    if (one) {
+      await pool.query(
+        `UPDATE nudges SET read_at = now()
+          WHERE id = $1 AND user_id = $2 AND read_at IS NULL`,
+        [one, session.user.id],
+      );
+    } else {
+      await pool.query(
+        `UPDATE nudges SET read_at = now()
+          WHERE user_id = $1 AND read_at IS NULL`,
+        [session.user.id],
+      );
+    }
+
+    const unread = await pool.query(
+      `SELECT COUNT(*)::int AS count
+         FROM nudges
         WHERE user_id = $1 AND read_at IS NULL`,
       [session.user.id],
     );
 
-    return NextResponse.json({ unread: 0 });
+    return NextResponse.json({ unread: unread.rows[0]?.count ?? 0 });
   } catch (error) {
     console.error("Error marking nudges read:", error);
     return NextResponse.json(
