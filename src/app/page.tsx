@@ -47,6 +47,10 @@ export default function LoginPage() {
       return;
     }
 
+    if (result?.code === "rate_limit") {
+      setError("Too many login attempts. Please try again later.");
+    }
+
     const session = await getSession();
     const target = landingFor(session?.user?.role);
 
