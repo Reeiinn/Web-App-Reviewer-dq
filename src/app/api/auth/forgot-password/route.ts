@@ -25,9 +25,10 @@ export async function POST(req: Request) {
     }
 
     const email = parsed.data.email.trim().toLowerCase();
-    const user = await pool.query(`SELECT id FROM users WHERE email = $1`, [
-      email,
-    ]);
+    const user = await pool.query(
+      `SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL`,
+      [email],
+    );
 
     if (user.rowCount === 0) {
       return NextResponse.json({ message: GENERIC_MESSAGE });

@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { recordAdminAction } from "@/app/api/_lib/audit-store";
 import { touchLastSeen } from "@/app/api/_lib/presence-store";
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
@@ -37,7 +38,8 @@ export async function DELETE(
 
   try {
     const target = await pool.query(
-      `SELECT id, name, role, manager_id FROM users WHERE id = $1`,
+      `SELECT id, name, email, role, manager_id FROM users
+        WHERE id = $1 AND deleted_at IS NULL`,
       [id],
     );
 
@@ -63,7 +65,21 @@ export async function DELETE(
       );
     }
 
-    await pool.query(`DELETE FROM users WHERE id = $1`, [id]);
+    await pool.query(
+      `UPDATE users SET deleted_at = now()
+        WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+
+    await recordAdminAction({
+      actor: {
+        id: currentUserId,
+        email: session.user.email ?? "unknown",
+        role,
+      },
+      action: "reviewee.removed",
+      target: { id: user.id, email: user.email, name: user.name },
+    });
 
     return NextResponse.json({
       message: `${user.name} has been removed.`,

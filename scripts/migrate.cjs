@@ -118,6 +118,35 @@ const statements = [
   // Null keeps the open link the reviewee invite has always been.
   `ALTER TABLE registration_invites
      ADD COLUMN IF NOT EXISTS email text`,
+
+  // Removal from the console is a stamp rather than a DELETE, so a reviewee's
+  // work survives the removal and can be restored. Every read filters on it.
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`,
+
+  `CREATE INDEX IF NOT EXISTS users_active_idx
+     ON users (id) WHERE deleted_at IS NULL`,
+
+  // What a staff account did, kept whether or not the target still exists.
+  // The actor's and target's details are copied in at the time so the record
+  // stays legible after either account is gone.
+  `CREATE TABLE IF NOT EXISTS admin_actions (
+     id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     actor_id     uuid REFERENCES users(id) ON DELETE SET NULL,
+     actor_email  text NOT NULL,
+     actor_role   text NOT NULL,
+     action       text NOT NULL,
+     target_id    uuid REFERENCES users(id) ON DELETE SET NULL,
+     target_email text,
+     target_name  text,
+     detail       jsonb NOT NULL DEFAULT '{}'::jsonb,
+     created_at   timestamptz NOT NULL DEFAULT now()
+   )`,
+
+  `CREATE INDEX IF NOT EXISTS admin_actions_created_at_idx
+     ON admin_actions (created_at DESC)`,
+
+  `CREATE INDEX IF NOT EXISTS admin_actions_target_idx
+     ON admin_actions (target_id)`,
 ];
 
 // One example term so the Glossary renders against real data.

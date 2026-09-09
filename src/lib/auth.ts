@@ -64,7 +64,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
              role,
              manager_id
            FROM users
-           WHERE email = $1`,
+           WHERE email = $1 AND deleted_at IS NULL`,
           [normalizedEmail],
         );
 
@@ -120,7 +120,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       try {
         const current = await pool.query(
-          `SELECT role, manager_id FROM users WHERE id = $1`,
+          `SELECT role, manager_id FROM users
+            WHERE id = $1 AND deleted_at IS NULL`,
           [base.id],
         );
 

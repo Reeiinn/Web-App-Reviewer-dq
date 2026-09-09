@@ -27,7 +27,8 @@ async function reachReviewee(revieweeId: string) {
   await touchLastSeen(currentUserId);
 
   const target = await pool.query(
-    `SELECT id, name, role, manager_id FROM users WHERE id = $1`,
+    `SELECT id, name, role, manager_id FROM users
+      WHERE id = $1 AND deleted_at IS NULL`,
     [revieweeId],
   );
 

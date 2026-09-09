@@ -35,14 +35,12 @@ export async function GET() {
               COUNT(r.id) AS reviewees
          FROM users u
          LEFT JOIN users r ON r.manager_id = u.id AND r.role = 'USER'
-        WHERE u.role = 'MANAGER'
+                          AND r.deleted_at IS NULL
+        WHERE u.role = 'MANAGER' AND u.deleted_at IS NULL
         GROUP BY u.id
         ORDER BY u.last_seen_at DESC NULLS LAST, u.name ASC`,
     );
 
-
-
-    
     const managers = result.rows.map((row) => {
       // pg hands back a Date for timestamptz. Settling on an ISO string here
       // keeps the shape the same whether a caller reads it or JSON does.

@@ -31,7 +31,7 @@ export async function GET() {
 
   try {
     const result = await pool.query(
-      `SELECT image FROM users WHERE id = $1`,
+      `SELECT image FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [session.user.id],
     );
     return NextResponse.json({ image: result.rows[0]?.image ?? null });

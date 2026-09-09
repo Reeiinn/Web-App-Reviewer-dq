@@ -19,10 +19,13 @@ export async function GET() {
     const usersResult =
       role === "ADMIN"
         ? await pool.query(
-            `SELECT id, email, name, role, manager_id FROM users ORDER BY created_at DESC`,
+            `SELECT id, email, name, role, manager_id FROM users
+              WHERE deleted_at IS NULL ORDER BY created_at DESC`,
           )
         : await pool.query(
-            `SELECT id, email, name, role, manager_id FROM users WHERE manager_id = $1 ORDER BY created_at DESC`,
+            `SELECT id, email, name, role, manager_id FROM users
+              WHERE manager_id = $1 AND deleted_at IS NULL
+              ORDER BY created_at DESC`,
             [currentUserId],
           );
 
