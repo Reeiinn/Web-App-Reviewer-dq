@@ -333,9 +333,13 @@ function TrackCard({
         ) : (
           // Once the five passes are in, the exam stays open — it is revision
           // from then on, and the label says so rather than sending them back
-          // to something they have already cleared.
+          // to something they have already cleared. mode=review makes the page
+          // match the label: the paper with its answers marked, and a Retake
+          // button there for anyone who does want to sit it again.
           <Link
-            href={`/learningMethods/practiceExam?exam_type=${type}`}
+            href={`/learningMethods/practiceExam?exam_type=${type}${
+              trackPassed ? "&mode=review" : ""
+            }`}
             className={`w-full whitespace-nowrap rounded-lg px-3 py-2 text-center text-sm font-bold transition sm:w-auto ${
               trackPassed
                 ? "border-2 border-[#0F7B52] text-[#0F7B52] hover:bg-[#E7F4EE]"
