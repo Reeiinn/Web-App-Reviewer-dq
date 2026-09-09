@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { fetchEligibility } from "@/app/api/_lib/mastery";
+import { fetchAllEligibility, fetchEligibility } from "@/app/api/_lib/mastery";
 import { NextResponse } from "next/server";
 
 /**
@@ -16,14 +16,14 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const examType = searchParams.get("exam_type");
 
-  if (!examType) {
-    return NextResponse.json(
-      { error: "exam_type is required" },
-      { status: 400 },
-    );
-  }
-
   try {
+    // No track named means every track, keyed by exam_type. The dashboard shows
+    // all four at once and was asking four times over, eight counting queries
+    // deep, for one screen.
+    if (!examType) {
+      return NextResponse.json(await fetchAllEligibility(session.user.id));
+    }
+
     return NextResponse.json(await fetchEligibility(session.user.id, examType));
   } catch (error) {
     console.error("Error checking practice exam eligibility:", error);

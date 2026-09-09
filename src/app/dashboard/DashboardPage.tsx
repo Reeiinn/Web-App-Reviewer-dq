@@ -545,15 +545,13 @@ export function DashboardPage() {
       })
       .catch((error) => console.error("Failed to load progress:", error));
 
-    Promise.all(
-      examTypes.map((type) =>
-        fetch(`/api/attempts/eligibility?exam_type=${type}`)
-          .then((response) => response.json())
-          .then((data: Eligibility) => [type, data] as const),
-      ),
-    )
-      .then((entries) => {
-        if (current()) setEligibility(Object.fromEntries(entries));
+    // One request for every track. Asking per track meant four round trips and
+    // eight counting queries before this screen could say which exams are
+    // unlocked.
+    fetch("/api/attempts/eligibility")
+      .then((response) => response.json())
+      .then((data: Partial<Record<ExamType, Eligibility>>) => {
+        if (current()) setEligibility(data);
       })
       .catch((error) => console.error("Failed to load eligibility:", error));
   }, []);
