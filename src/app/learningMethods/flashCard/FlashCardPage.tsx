@@ -6,14 +6,25 @@ import { Result } from "@/components/ui/result";
 import { motivationFor, MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
 import { createWriteQueue } from "@/lib/helper/session-writes";
-import { restoreSession, type SavedSession } from "@/lib/helper/study-session";
+import {
+  restoreSession,
+  shuffleUnstudied,
+  type SavedSession,
+} from "@/lib/helper/study-session";
 import { useFitText, type FitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
 import type {
   Flashcard,
   FlashcardProgressResponse,
 } from "@/lib/types/flashcard";
-import { Check, ChevronLeft, ChevronRight, Shuffle, X } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  Shuffle,
+  X,
+} from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { fresh } from "@/lib/helper/fetch-fresh";
@@ -252,16 +263,30 @@ function FlashCardContent() {
 
       <main className="rv-shell flex min-h-0 max-w-3xl flex-1 flex-col py-4 text-center md:py-6">
         <BackLink />
+        {/* Two separate jobs, kept at opposite ends of the row so the one that
+            throws away the sitting is never a thumb-slip from the one that
+            keeps it. */}
         <div className="flex shrink-0 items-center justify-between">
-          <div />
+          <button
+            onClick={() => resetSession(shuffled(cards))}
+            disabled={Boolean(message)}
+            className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-border px-3 py-2 text-xs font-bold transition hover:border-[#C9A227] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <RotateCcw className="size-3.5" /> Reset
+          </button>
+
           <button
             onClick={() => {
-              setCards((current) => shuffled(current));
-              setIndex(0);
+              // Only the cards still to be rated are re-dealt, and the position
+              // holds. Shuffling used to deal the whole deck from the top,
+              // which walked the learner back over cards they had already
+              // cleared — the reason to shuffle mid-deck is the material that
+              // is left, not the material that is done.
+              setCards((current) => shuffleUnstudied(current, ratings));
               setRevealed(false);
-              setResumedAt(null);
             }}
-            className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-border px-3 py-2 text-xs font-bold transition hover:border-[#C9A227]"
+            disabled={Boolean(message)}
+            className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-border px-3 py-2 text-xs font-bold transition hover:border-[#C9A227] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Shuffle className="size-3.5" /> Shuffle
           </button>
@@ -269,10 +294,14 @@ function FlashCardContent() {
 
         {/* The heading block is the first thing to give up room on a short
             window, so it steps down instead of pushing the card off-screen. */}
-        <h1 className="mt-4 text-2xl font-extrabold sm:text-3xl md:text-4xl [@media(max-height:700px)]:mt-2 [@media(max-height:700px)]:text-lg [@media(min-height:900px)]:text-5xl">
+        {/* The chrome starts giving up room at 850px, not 700px. A 800px-tall
+            laptop — the common case — used to pay for a full heading, subtitle
+            and margin while leaving the card less room than a 700px window got,
+            because every saving fired a breakpoint too late. */}
+        <h1 className="mt-4 text-2xl font-extrabold sm:text-3xl md:text-4xl [@media(max-height:850px)]:mt-2 [@media(max-height:700px)]:text-lg [@media(min-height:900px)]:text-5xl">
           {trackTitles[type]}
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground [@media(max-height:700px)]:hidden">
+        <p className="mt-1 text-sm text-muted-foreground [@media(max-height:850px)]:hidden">
           Master core concepts with active recall.
         </p>
 
@@ -306,10 +335,16 @@ function FlashCardContent() {
             </div>
           )}
 
+          {/* The verdict above is pointer-events-none so it never swallows a
+              click meant for the card. That let a click land on the card while
+              the verdict was still up, flipping it behind the overlay — so the
+              card itself stands down until the verdict clears, the same guard
+              the rating and step controls already use. */}
           <button
             type="button"
             aria-label={revealed ? "Show question" : "Reveal answer"}
             onClick={() => setRevealed((current) => !current)}
+            disabled={Boolean(message)}
             className="flex min-h-0 w-full flex-1 [perspective:1200px]"
           >
             {/* The frame fills the room the viewport leaves after the chrome;
@@ -332,7 +367,7 @@ function FlashCardContent() {
                     mark it has, and the bare mark matches the bare check. */}
                 <span
                   aria-hidden="true"
-                  className="block shrink-0 text-3xl font-extrabold leading-none text-[#C9A227] [@media(max-height:700px)]:hidden"
+                  className="block shrink-0 text-lg font-extrabold leading-none text-[#C9A227] [@media(max-height:700px)]:hidden"
                 >
                   ?
                 </span>
@@ -347,11 +382,11 @@ function FlashCardContent() {
                   {/* Enumerated statements read as a list, not as one paragraph
                       run together with the question. */}
                   {front.statements.length > 0 && (
-                    <span className="flex w-full flex-col gap-[0.6em] text-left">
+                    <span className="flex w-full flex-col gap-[0.3em] text-left">
                       {front.statements.map((statement) => (
                         <span
                           key={statement}
-                          className="block rounded-lg bg-muted px-[0.9em] py-[0.65em] text-[1.125em] font-semibold leading-[1.5]"
+                          className="block rounded-lg bg-muted px-[0.7em] py-[0.35em] text-[1.125em] font-semibold leading-[1.3]"
                         >
                           {statement}
                         </span>
@@ -379,11 +414,11 @@ function FlashCardContent() {
                   )}
 
                   {back.statements.length > 0 && (
-                    <span className="flex w-full flex-col gap-[0.6em] text-left">
+                    <span className="flex w-full flex-col gap-[0.3em] text-left">
                       {back.statements.map((statement) => (
                         <span
                           key={statement}
-                          className="block rounded-lg bg-white/12 px-[0.9em] py-[0.65em] text-[1.25em] font-semibold leading-[1.5]"
+                          className="block rounded-lg bg-white/12 px-[0.7em] py-[0.35em] text-[1.25em] font-semibold leading-[1.3]"
                         >
                           {statement}
                         </span>
@@ -463,7 +498,7 @@ function FitBox({
       <span
         ref={fit.contentRef}
         style={{ fontSize: `${fit.fontSize}px` }}
-        className="flex w-full flex-col items-center gap-[0.9em]"
+        className="flex w-full flex-col items-center gap-[0.5em]"
       >
         {children}
       </span>
