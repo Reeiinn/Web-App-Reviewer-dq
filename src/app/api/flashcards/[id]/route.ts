@@ -1,3 +1,4 @@
+import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
 import { Flashcard } from "@/lib/types/flashcard";
 import { NextResponse } from "next/server";
@@ -6,6 +7,13 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // Every sibling route checks the session for itself. This one was relying on
+  // the middleware alone, which is one matcher edit away from being nothing.
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
 
   try {
