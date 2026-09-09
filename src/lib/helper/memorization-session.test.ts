@@ -85,3 +85,43 @@ describe("restoreMemorization", () => {
     expect(state.resumed).toBe(false);
   });
 });
+
+describe("restoreMemorization over a redo pass", () => {
+  it("keeps a redo deck at its own size", () => {
+    const state = restoreMemorization(deck, {
+      card_order: ["q2", "q4"],
+      card_index: 1,
+      ratings: { q2: false },
+    });
+
+    expect(state.resumed).toBe(true);
+    expect(state.questions.map((item) => item.id)).toEqual(["q2", "q4"]);
+    expect(state.index).toBe(1);
+  });
+});
+
+describe("restoreMemorization at the start of a redo pass", () => {
+  it("keeps a redo deck that has not been answered into yet", () => {
+    const state = restoreMemorization(deck, {
+      card_order: ["q2", "q4"],
+      card_index: 0,
+      ratings: {},
+    });
+
+    expect(state.questions.map((item) => item.id)).toEqual(["q2", "q4"]);
+    expect(state.index).toBe(0);
+    // Question 1 of a deck nobody has answered into is not a resume.
+    expect(state.resumed).toBe(false);
+  });
+
+  it("reshuffles a whole-track deck parked on question 1 with no answers", () => {
+    const state = restoreMemorization(deck, {
+      card_order: ["q1", "q2", "q3", "q4"],
+      card_index: 0,
+      ratings: {},
+    });
+
+    expect(state.questions).toHaveLength(4);
+    expect(state.resumed).toBe(false);
+  });
+});
