@@ -31,7 +31,8 @@ export async function GET(
       // no restriction
     } else if (role === "MANAGER") {
       const check = await pool.query(
-        `SELECT 1 FROM users WHERE id = $1 AND manager_id = $2`,
+        `SELECT 1 FROM users
+          WHERE id = $1 AND manager_id = $2 AND deleted_at IS NULL`,
         [attempt.user_id, currentUserId],
       );
       const isOwnAttempt = attempt.user_id === currentUserId;

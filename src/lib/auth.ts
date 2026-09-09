@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
 import { authConfig } from "./auth.config";
+import { isValidSignupGrant } from "./helper/signup-grant";
 import { verifyTurnstile } from "./helper/turnstile";
 import { authEmailLimiter } from "./helper/rateLimit";
 
@@ -28,22 +29,36 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           label: "Turnstile Token",
           type: "text",
         },
+        // Declared so Auth.js carries it through to authorize: the signup form
+        // sends this where the login screen sends a Turnstile token.
+        signupGrant: {
+          label: "Signup Grant",
+          type: "text",
+        },
       },
 
       async authorize(credentials) {
-        const { email, password, turnstileToken } = credentials as {
-          email: string;
-          password: string;
-          turnstileToken: string;
-        };
+        const { email, password, turnstileToken, signupGrant } =
+          credentials as {
+            email: string;
+            password: string;
+            turnstileToken?: string;
+            signupGrant?: string;
+          };
 
-        if (!email || !password || !turnstileToken) {
+        if (!email || !password) {
           return null;
         }
 
         const normalizedEmail = email.trim().toLowerCase();
 
-        const isHuman = await verifyTurnstile(turnstileToken);
+        // Two ways to prove this is not a script: the widget on the login
+        // screen, or a grant the registration handler has just issued for this
+        // address. The signup form has no widget, so without the second one
+        // its automatic sign-in was refused every single time.
+        const isHuman = isValidSignupGrant(signupGrant, normalizedEmail)
+          ? true
+          : Boolean(turnstileToken) && (await verifyTurnstile(turnstileToken!));
 
         if (!isHuman) {
           return null;
@@ -64,7 +79,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
              role,
              manager_id
            FROM users
-           WHERE email = $1`,
+           WHERE email = $1 AND deleted_at IS NULL`,
           [normalizedEmail],
         );
 
@@ -90,4 +105,53 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+
+  callbacks: {
+    ...authConfig.callbacks,
+
+    /**
+     * Refreshes what the token claims about the account.
+     *
+     * Role and manager were written once, at sign-in, and believed for the
+     * life of the token. Whatever the session's length, that is a window in
+     * which a demoted Sales Manager still reaches the console and a reassigned
+     * reviewee is still overseen by the manager they were moved away from,
+     * because nothing in the request path asks the database who they are.
+     *
+     * Auth.js refreshes the token on its own schedule (updateAge), and each
+     * time it does, this reads the account again. An account that has been
+     * deleted has no answer to give, and returning null there ends the session
+     * rather than carrying its claims forward.
+     *
+     * This lives here rather than in auth.config.ts because that file is also
+     * the middleware's config, and the middleware runs on the edge where the
+     * Postgres pool cannot.
+     */
+    async jwt({ token, user, ...rest }) {
+      const base = await authConfig.callbacks!.jwt!({ token, user, ...rest });
+      if (!base) return base;
+
+      if (user || !base.id) return base;
+
+      try {
+        const current = await pool.query(
+          `SELECT role, manager_id FROM users
+            WHERE id = $1 AND deleted_at IS NULL`,
+          [base.id],
+        );
+
+        const account = current.rows[0];
+        if (!account) return null;
+
+        base.role = account.role;
+        base.managerId = account.manager_id;
+      } catch (error) {
+        // A database that cannot answer is not grounds for signing everyone
+        // out; the claims already in the token stand until the next refresh.
+        console.error("Failed to refresh session claims:", error);
+      }
+
+      return base;
+    },
+  },
 });

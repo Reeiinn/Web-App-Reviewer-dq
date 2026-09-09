@@ -70,7 +70,7 @@ export async function GET(req: Request) {
              m.image AS manager_image
         FROM users u
         LEFT JOIN users m ON m.id = u.manager_id
-       WHERE u.role = 'USER'
+       WHERE u.role = 'USER' AND u.deleted_at IS NULL
     `;
 
     const usersResult =

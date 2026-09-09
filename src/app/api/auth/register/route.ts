@@ -7,6 +7,7 @@ import {
 } from "@/lib/helper/invites";
 import { registerBodySchema } from "@/lib/validation/auth.validation";
 import bcrypt from "bcryptjs";
+import { createSignupGrant } from "@/lib/helper/signup-grant";
 import { NextResponse } from "next/server";
 
 async function explainUnusableInvite(code: string) {
@@ -86,7 +87,17 @@ export async function POST(req: Request) {
       );
 
       await client.query("COMMIT");
-      return NextResponse.json(result.rows[0], { status: 201 });
+
+      // The signup form signs the new account in straight away, and the
+      // credentials provider wants a bot check it has no widget to satisfy.
+      // This stands in for one, for this address, for the next two minutes.
+      return NextResponse.json(
+        {
+          ...result.rows[0],
+          signupGrant: createSignupGrant(result.rows[0].email),
+        },
+        { status: 201 },
+      );
     } catch (dbError: any) {
       await client.query("ROLLBACK").catch(() => {});
 

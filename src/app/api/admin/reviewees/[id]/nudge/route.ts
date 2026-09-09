@@ -1,7 +1,13 @@
 import { auth } from "@/lib/auth";
 import { touchLastSeen } from "@/app/api/_lib/presence-store";
 import pool from "@/lib/db";
-import { canDeleteNudge, canNudge, resolveNudge } from "@/lib/helper/nudges";
+import {
+  canDeleteNudge,
+  canNudge,
+  nudgeAllowedAfter,
+  nudgeCooldownMessage,
+  resolveNudge,
+} from "@/lib/helper/nudges";
 import { NextResponse } from "next/server";
 
 /**
@@ -27,7 +33,8 @@ async function reachReviewee(revieweeId: string) {
   await touchLastSeen(currentUserId);
 
   const target = await pool.query(
-    `SELECT id, name, role, manager_id FROM users WHERE id = $1`,
+    `SELECT id, name, role, manager_id FROM users
+      WHERE id = $1 AND deleted_at IS NULL`,
     [revieweeId],
   );
 
@@ -84,6 +91,29 @@ export async function POST(
     if (reach.error) return reach.error;
 
     const { sender, reviewee } = reach;
+
+    // One sender, one reviewee, one reminder per cooldown. Enforced here rather
+    // than in the dialog: the dialog is a courtesy, this is the rule.
+    const last = await pool.query(
+      `SELECT created_at FROM nudges
+        WHERE user_id = $1 AND sender_id = $2
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [id, sender.id],
+    );
+
+    const lastSentAt = last.rows[0]?.created_at
+      ? new Date(last.rows[0].created_at).getTime()
+      : null;
+
+    const msSinceLast = lastSentAt === null ? null : Date.now() - lastSentAt;
+
+    if (!nudgeAllowedAfter(msSinceLast)) {
+      return NextResponse.json(
+        { error: nudgeCooldownMessage(reviewee.name, msSinceLast ?? 0) },
+        { status: 429 },
+      );
+    }
 
     const inserted = await pool.query(
       `INSERT INTO nudges (user_id, sender_id, sender_name, message)
