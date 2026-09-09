@@ -43,14 +43,20 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
       setIsSubmitting(false);
       return;
     }
+    // The grant the registration just issued stands in for the bot check the
+    // login screen does with Turnstile. Without it this call was refused every
+    // time, and every new account was told to go and log in by hand.
     const signInResult = await signIn("credentials", {
       email: payload.email,
       password: payload.password,
+      signupGrant: data.signupGrant ?? "",
       redirect: false,
     });
     if (signInResult?.error) {
       setIsSubmitting(false);
-      setError("Signup succeeded, but automatic login failed. Please log in manually.");
+      setError(
+        "Signup succeeded, but automatic login failed. Please log in manually.",
+      );
       return;
     }
 
@@ -69,18 +75,21 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
           </div>
 
           <div className="absolute inset-0 pointer-events-none">
-            <div
-              className="absolute -right-[70px] -bottom-[70px] size-[260px] rounded-full bg-[radial-gradient(circle_at_35%_30%,#FDB913_0%,#C98A00_55%,transparent_72%)] opacity-90"
-            />
+            <div className="absolute -right-[70px] -bottom-[70px] size-[260px] rounded-full bg-[radial-gradient(circle_at_35%_30%,#FDB913_0%,#C98A00_55%,transparent_72%)] opacity-90" />
           </div>
 
           <div className="relative z-10 max-w-[390px]">
             <h1 className="text-4xl font-extrabold leading-tight mb-5">
-              <span className="block text-white font-extrabold">OUR TARGET.</span>
-              <span className="block text-[#FDB913] font-extrabold">OUR WIN.</span>
+              <span className="block text-white font-extrabold">
+                OUR TARGET.
+              </span>
+              <span className="block text-[#FDB913] font-extrabold">
+                OUR WIN.
+              </span>
             </h1>
             <p className="text-base font-semibold leading-6 text-white">
-              &quot;Every action counts. Every conversation matters. Every submission brings us closer to our dreams.&quot;
+              &quot;Every action counts. Every conversation matters. Every
+              submission brings us closer to our dreams.&quot;
             </p>
             <p className="mt-4 text-3xl font-semibold italic text-[#FDB913]">
               Let&apos;s do this, Team!
@@ -101,7 +110,9 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
             INSURE
           </div>
 
-          <h1 className="max-w-[380px] text-5xl font-normal leading-none tracking-tight text-[#0B2340]">Create your account</h1>
+          <h1 className="max-w-[380px] text-5xl font-normal leading-none tracking-tight text-[#0B2340]">
+            Create your account
+          </h1>
           <p className="mb-8 mt-4 max-w-[340px] text-base leading-6 text-[#66717D]">
             Start your insurance licensing journey with INSURE.
           </p>
@@ -123,60 +134,69 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
           )}
 
           {initialCode && (
-          <form className="max-w-[440px] space-y-[18px]" onSubmit={handleSubmit}>
-          <Field
-            id="name"
-            label="Full Name"
-            type="text"
-            autoComplete="name"
-            placeholder="Enter your name"
-            icon={<UserRound className="size-4" />}
-          />
-          <Field
-            id="email"
-            label="Email Address"
-            type="email"
-            autoComplete="email"
-            placeholder="Enter your email"
-            icon={<Mail className="size-4" />}
-          />
-          <Field
-            id="password"
-            label="Password"
-            type={showPassword ? "text" : "password"}
-            autoComplete="new-password"
-            placeholder="At least 8 characters"
-            minLength={8}
-            icon={<LockKeyhole className="size-4" />}
-            trailingAction={
+            <form
+              className="max-w-[440px] space-y-[18px]"
+              onSubmit={handleSubmit}
+            >
+              <Field
+                id="name"
+                label="Full Name"
+                type="text"
+                autoComplete="name"
+                placeholder="Enter your name"
+                icon={<UserRound className="size-4" />}
+              />
+              <Field
+                id="email"
+                label="Email Address"
+                type="email"
+                autoComplete="email"
+                placeholder="Enter your email"
+                icon={<Mail className="size-4" />}
+              />
+              <Field
+                id="password"
+                label="Password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                placeholder="At least 8 characters"
+                minLength={8}
+                icon={<LockKeyhole className="size-4" />}
+                trailingAction={
+                  <button
+                    type="button"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="flex items-center justify-center text-[#A9A092] transition hover:text-[#0B2340]"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="size-4" />
+                    ) : (
+                      <Eye className="size-4" />
+                    )}
+                  </button>
+                }
+              />
+              {error && (
+                <p className="text-sm text-red-600" role="alert">
+                  {error}
+                </p>
+              )}
               <button
-                type="button"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="flex items-center justify-center text-[#A9A092] transition hover:text-[#0B2340]"
+                type="submit"
+                disabled={isSubmitting}
+                className="mt-1.5 flex w-full items-center justify-center gap-2 bg-[#FDB913] px-4 py-3.5 text-base text-[#0B2340] shadow-sm transition-colors hover:bg-[#D99D00] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0B2340] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                {isSubmitting ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <ArrowRight className="size-4" />
+                )}
+                {isSubmitting ? "Creating account..." : "Create Account"}
               </button>
-            }
-          />
-          {error && (
-            <p className="text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="mt-1.5 flex w-full items-center justify-center gap-2 bg-[#FDB913] px-4 py-3.5 text-base text-[#0B2340] shadow-sm transition-colors hover:bg-[#D99D00] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0B2340] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isSubmitting ? (
-                <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-                <ArrowRight className="size-4" />
-            )}
-            {isSubmitting ? "Creating account..." : "Create Account"}
-          </button>
-          </form>
+            </form>
           )}
           <p className="mt-8 max-w-[440px] text-center text-base text-[#66717D]">
             Already have an account?{" "}
