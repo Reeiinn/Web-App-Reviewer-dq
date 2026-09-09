@@ -15,6 +15,7 @@ import type {
 import { Check, ChevronLeft, ChevronRight, Shuffle, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { fresh } from "@/lib/helper/fetch-fresh";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -59,10 +60,11 @@ function FlashCardContent() {
     let active = true;
 
     Promise.all([
-      fetch(`/api/flashcards?exam_type=${encodeURIComponent(type)}`).then(
-        (response) => response.json() as Promise<Flashcard[]>,
-      ),
-      fetch(sessionUrl(type))
+      fetch(
+        `/api/flashcards?exam_type=${encodeURIComponent(type)}`,
+        fresh,
+      ).then((response) => response.json() as Promise<Flashcard[]>),
+      fetch(sessionUrl(type), fresh)
         .then((response) => response.json() as Promise<unknown>)
         .catch((): unknown => null),
     ])

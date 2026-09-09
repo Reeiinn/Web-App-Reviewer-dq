@@ -4,6 +4,7 @@ import { AppNav } from "@/components/ui/app-nav";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { fresh } from "@/lib/helper/fetch-fresh";
 
 type Term = {
   id: string;
@@ -23,7 +24,7 @@ export function GlossaryPage() {
   useEffect(() => {
     let active = true;
 
-    fetch("/api/glossary")
+    fetch("/api/glossary", fresh)
       .then((response) => response.json())
       .then((data: Term[]) => {
         if (active) setTerms(Array.isArray(data) ? data : []);

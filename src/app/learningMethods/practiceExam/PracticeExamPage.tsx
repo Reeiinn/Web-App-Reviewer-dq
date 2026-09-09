@@ -17,6 +17,7 @@ import { Award, Lock } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { fresh } from "@/lib/helper/fetch-fresh";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -221,6 +222,7 @@ function PracticeExamContent() {
         if (openedForReview) {
           const items = await fetch(
             `/api/questions?exam_type=${encodeURIComponent(type)}`,
+            fresh,
           ).then((response) => response.json() as Promise<Question[]>);
 
           if (!active) return;
@@ -230,9 +232,10 @@ function PracticeExamContent() {
         }
 
         const [items, attempt] = await Promise.all([
-          fetch(`/api/questions?exam_type=${encodeURIComponent(type)}`).then(
-            (response) => response.json() as Promise<Question[]>,
-          ),
+          fetch(
+            `/api/questions?exam_type=${encodeURIComponent(type)}`,
+            fresh,
+          ).then((response) => response.json() as Promise<Question[]>),
           fetch(`/api/attempts`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },

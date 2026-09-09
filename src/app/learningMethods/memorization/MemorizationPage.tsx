@@ -17,6 +17,7 @@ import type {
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X } from "lucide-react";
+import { fresh } from "@/lib/helper/fetch-fresh";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -100,10 +101,11 @@ function MemorizationContent() {
     let active = true;
 
     Promise.all([
-      fetch(`/api/memorization?exam_type=${encodeURIComponent(type)}`).then(
-        (response) => response.json() as Promise<MemorizationQuestion[]>,
-      ),
-      fetch(sessionUrl(type))
+      fetch(
+        `/api/memorization?exam_type=${encodeURIComponent(type)}`,
+        fresh,
+      ).then((response) => response.json() as Promise<MemorizationQuestion[]>),
+      fetch(sessionUrl(type), fresh)
         .then((response) => response.json() as Promise<unknown>)
         .catch((): unknown => null),
     ])
@@ -209,7 +211,10 @@ function MemorizationContent() {
    * dashboard the learner just came from rather than with the sitting.
    */
   const refreshTrackMastery = useCallback(() => {
-    fetch(`/api/memorization/eligibility?exam_type=${encodeURIComponent(type)}`)
+    fetch(
+      `/api/memorization/eligibility?exam_type=${encodeURIComponent(type)}`,
+      fresh,
+    )
       .then((response) => response.json())
       .then((data: { mastered?: number; total?: number }) => {
         if (
