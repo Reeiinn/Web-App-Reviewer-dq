@@ -7,6 +7,7 @@ import { Result } from "@/components/ui/result";
 import { motivationFor, type MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
 import { restoreMemorization } from "@/lib/helper/memorization-session";
+import { createWriteQueue } from "@/lib/helper/session-writes";
 import type { SavedSession } from "@/lib/helper/study-session";
 import { useFitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
@@ -14,9 +15,10 @@ import type {
   MemorizationProgressResponse,
   MemorizationQuestion,
 } from "@/lib/types/memo";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X } from "lucide-react";
+import { fresh } from "@/lib/helper/fetch-fresh";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -44,6 +46,11 @@ function MemorizationContent() {
 
   /** Every answer so far, and the one thing this sitting saves and resumes. */
   const [ratings, setRatings] = useState<Record<string, boolean>>({});
+  /** Mastery for the whole track: what the practice exam is gated on. */
+  const [trackMastery, setTrackMastery] = useState<{
+    mastered: number;
+    total: number;
+  } | null>(null);
   /** Question the sitting picked up on, so a resume never looks like a restart. */
   const [resumedAt, setResumedAt] = useState<number | null>(null);
 
@@ -61,6 +68,17 @@ function MemorizationContent() {
 
   const questionShownAt = useRef<number>(Date.now());
   const verdictTimer = useRef<number | null>(null);
+
+  /** Saves and clearings of the sitting, in the order this page issued them. */
+  const writeQueue = useRef(
+    createWriteQueue((error) =>
+      console.error("Failed to write memorization session:", error),
+    ),
+  );
+  const write = useCallback(
+    (request: () => Promise<unknown>) => writeQueue.current(request),
+    [],
+  );
 
   /** Drops the verdict over the card, then lifts it a beat later. */
   const flashVerdict = (next: MotivationMessage) => {
@@ -95,10 +113,11 @@ function MemorizationContent() {
     let active = true;
 
     Promise.all([
-      fetch(`/api/memorization?exam_type=${encodeURIComponent(type)}`).then(
-        (response) => response.json() as Promise<MemorizationQuestion[]>,
-      ),
-      fetch(sessionUrl(type))
+      fetch(
+        `/api/memorization?exam_type=${encodeURIComponent(type)}`,
+        fresh,
+      ).then((response) => response.json() as Promise<MemorizationQuestion[]>),
+      fetch(sessionUrl(type), fresh)
         .then((response) => response.json() as Promise<unknown>)
         .catch((): unknown => null),
     ])
@@ -149,27 +168,27 @@ function MemorizationContent() {
   useEffect(() => {
     if (loading || finished || questions.length === 0) return;
 
-    fetch(sessionUrl(type), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        card_order: questions.map((item) => item.id),
-        card_index: index,
-        ratings,
+    write(() =>
+      fetch(sessionUrl(type), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card_order: questions.map((item) => item.id),
+          card_index: index,
+          ratings,
+        }),
       }),
-    }).catch((error) => {
-      console.error("Failed to save memorization session:", error);
-    });
-  }, [questions, index, ratings, loading, finished, type]);
+    );
+  }, [questions, index, ratings, loading, finished, type, write]);
 
   // A finished set has nothing to resume into: the next visit starts over.
+  // Queued behind the saves rather than raced against them, so the redo deck
+  // this clearing is followed by outlives it.
   useEffect(() => {
     if (!finished) return;
 
-    fetch(sessionUrl(type), { method: "DELETE" }).catch((error) => {
-      console.error("Failed to clear memorization session:", error);
-    });
-  }, [finished, type]);
+    write(() => fetch(sessionUrl(type), { method: "DELETE" }));
+  }, [finished, type, write]);
 
   const question = questions[index];
   const correctChoiceId = question?.choices.find(
@@ -196,6 +215,35 @@ function MemorizationContent() {
   const averageSeconds = timedCount
     ? Math.round(elapsedMs / timedCount / 1000)
     : 0;
+
+  /**
+   * Re-reads the track's mastery count.
+   *
+   * Called on load and after every answer, so the panel agrees with the
+   * dashboard the learner just came from rather than with the sitting.
+   */
+  const refreshTrackMastery = useCallback(() => {
+    fetch(
+      `/api/memorization/eligibility?exam_type=${encodeURIComponent(type)}`,
+      fresh,
+    )
+      .then((response) => response.json())
+      .then((data: { mastered?: number; total?: number }) => {
+        if (
+          typeof data?.mastered === "number" &&
+          typeof data?.total === "number"
+        ) {
+          setTrackMastery({ mastered: data.mastered, total: data.total });
+        }
+      })
+      .catch((error) =>
+        console.error("Failed to load memorization mastery:", error),
+      );
+  }, [type]);
+
+  useEffect(() => {
+    refreshTrackMastery();
+  }, [refreshTrackMastery]);
 
   const resetSession = (nextQuestions: MemorizationQuestion[]) => {
     setQuestions(nextQuestions);
@@ -243,6 +291,9 @@ function MemorizationContent() {
       );
 
       await response.json();
+      // The answer may have just taken the track's count up, and this panel is
+      // the only place the learner can see that while they are still in here.
+      refreshTrackMastery();
     } catch (error) {
       console.error("Failed to save memorization progress:", error);
     }
@@ -328,7 +379,11 @@ function MemorizationContent() {
           <h1 className="hidden truncate text-xl font-extrabold md:block [@media(max-height:850px)]:sr-only [@media(min-height:900px)]:text-2xl">
             Memorization Mode
           </h1>
+          {/* Named, because a bare "27 / 49" beside a dashboard reading
+              "memorize (20/49)" looks like the same count disagreeing with
+              itself. This one is a place in the deck; mastery is in the panel. */}
           <span className="ml-auto shrink-0 whitespace-nowrap text-sm font-extrabold tabular-nums">
+            <span className="font-bold text-muted-foreground">Question </span>
             {index + 1}
             <span className="text-muted-foreground"> / {questions.length}</span>
           </span>
@@ -338,7 +393,7 @@ function MemorizationContent() {
             a restarted one. */}
         {resumedAt === index && (
           <p className="rv-pop-in mt-2 w-fit shrink-0 rounded-lg border border-[#C9A227] bg-[#FFF8D6] px-3 py-1 text-xs font-bold text-[#0B2340]">
-            Resumed at {index + 1} of {questions.length}
+            Resumed at question {index + 1} of {questions.length}
           </p>
         )}
 
@@ -502,6 +557,7 @@ function MemorizationContent() {
               <SessionMastery
                 accuracy={accuracy}
                 averageSeconds={averageSeconds}
+                trackMastery={trackMastery}
               />
             </div>
           </aside>

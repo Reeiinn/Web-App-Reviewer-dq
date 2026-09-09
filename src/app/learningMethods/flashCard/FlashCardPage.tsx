@@ -5,6 +5,7 @@ import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
 import { motivationFor, MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
+import { createWriteQueue } from "@/lib/helper/session-writes";
 import { restoreSession, type SavedSession } from "@/lib/helper/study-session";
 import { useFitText, type FitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
@@ -14,7 +15,8 @@ import type {
 } from "@/lib/types/flashcard";
 import { Check, ChevronLeft, ChevronRight, Shuffle, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { fresh } from "@/lib/helper/fetch-fresh";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -55,14 +57,26 @@ function FlashCardContent() {
   /** Card the deck resumed on, so the learner sees where they left off. */
   const [resumedAt, setResumedAt] = useState<number | null>(null);
 
+  /** Saves and clearings of the deck, in the order this page issued them. */
+  const writeQueue = useRef(
+    createWriteQueue((error) =>
+      console.error("Failed to write flashcard session:", error),
+    ),
+  );
+  const write = useCallback(
+    (request: () => Promise<unknown>) => writeQueue.current(request),
+    [],
+  );
+
   useEffect(() => {
     let active = true;
 
     Promise.all([
-      fetch(`/api/flashcards?exam_type=${encodeURIComponent(type)}`).then(
-        (response) => response.json() as Promise<Flashcard[]>,
-      ),
-      fetch(sessionUrl(type))
+      fetch(
+        `/api/flashcards?exam_type=${encodeURIComponent(type)}`,
+        fresh,
+      ).then((response) => response.json() as Promise<Flashcard[]>),
+      fetch(sessionUrl(type), fresh)
         .then((response) => response.json() as Promise<unknown>)
         .catch((): unknown => null),
     ])
@@ -103,27 +117,27 @@ function FlashCardContent() {
   useEffect(() => {
     if (loading || finished || cards.length === 0) return;
 
-    fetch(sessionUrl(type), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        card_order: cards.map((item) => item.id),
-        card_index: index,
-        ratings,
+    write(() =>
+      fetch(sessionUrl(type), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card_order: cards.map((item) => item.id),
+          card_index: index,
+          ratings,
+        }),
       }),
-    }).catch((error) => {
-      console.error("Failed to save flashcard session:", error);
-    });
-  }, [cards, index, ratings, loading, finished, type]);
+    );
+  }, [cards, index, ratings, loading, finished, type, write]);
 
   // A finished deck has nothing to resume into: the next visit starts over.
+  // Queued behind the saves rather than raced against them, so a redo deck
+  // dealt straight after this clearing outlives it.
   useEffect(() => {
     if (!finished) return;
 
-    fetch(sessionUrl(type), { method: "DELETE" }).catch((error) => {
-      console.error("Failed to clear flashcard session:", error);
-    });
-  }, [finished, type]);
+    write(() => fetch(sessionUrl(type), { method: "DELETE" }));
+  }, [finished, type, write]);
 
   useEffect(
     () => () => {
@@ -139,11 +153,14 @@ function FlashCardContent() {
   const front = splitStatements(card?.front ?? "");
   const back = splitStatements(card?.back ?? "");
 
+  // Keyed on the card rather than on its text: the frame is remounted per card,
+  // so two cards that happen to read the same still need a fresh measurement of
+  // the nodes now on screen.
   const frontFit = useFitText<HTMLSpanElement, HTMLSpanElement>(
-    card?.front ?? "",
+    `${card?.id ?? ""}:front`,
   );
   const backFit = useFitText<HTMLSpanElement, HTMLSpanElement>(
-    card?.back ?? "",
+    `${card?.id ?? ""}:back`,
   );
 
   /** Step between cards without rating the current one. */
@@ -298,7 +315,14 @@ function FlashCardContent() {
             {/* The frame fills the room the viewport leaves after the chrome;
                 the text inside scales itself down to fit, and scrolls only if
                 it hits the floor. */}
+            {/* Keyed on the card, so moving to the next one mounts a fresh
+                frame that is already face up. Turning the same element back
+                instead animated it through 90 degrees, and the back face —
+                carrying the next card's answer by then — showed for that half
+                of the turn. A flip is only ever the learner revealing the card
+                in front of them. */}
             <span
+              key={card.id}
               className={`relative grid h-full w-full transition-transform duration-500 [transform-style:preserve-3d] ${
                 revealed ? "[transform:rotateY(180deg)]" : ""
               }`}

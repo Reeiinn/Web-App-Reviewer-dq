@@ -17,6 +17,7 @@ import { Award, Lock } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { fresh } from "@/lib/helper/fetch-fresh";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -25,9 +26,12 @@ const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
  *
  * The order belongs to the attempt rather than to the page, so a refresh
  * returns to the same questions in the same places instead of reshuffling
- * under answers already given. Questions added to the track since the sitting
- * began go on the end; ones withdrawn since simply drop out. An attempt with
- * no stored order — one dealt before this was kept — falls back to a shuffle.
+ * under answers already given. The paper is fixed at that: questions added to
+ * the track mid-sitting used to go on the end, which grew the paper under a
+ * learner who had already seen its length and scored them against a total the
+ * attempt never recorded. They wait for the next sitting now. Questions
+ * withdrawn since simply drop out. An attempt with no stored order — one dealt
+ * before this was kept — falls back to a shuffle.
  */
 function dealt(
   items: Question[],
@@ -39,12 +43,9 @@ function dealt(
   if (!order) return shuffled(items);
 
   const byId = new Map(items.map((item) => [item.id, item]));
-  const inOrder = order
+  return order
     .map((id) => byId.get(id))
     .filter((item): item is Question => Boolean(item));
-
-  const seen = new Set(inOrder.map((item) => item.id));
-  return [...inOrder, ...items.filter((item) => !seen.has(item.id))];
 }
 
 /**
@@ -78,6 +79,69 @@ function QuestionText({ text }: { text: string }) {
 }
 
 /**
+ * A question's choices, read rather than answered.
+ *
+ * Used by the screen after a sitting and by the review a passed track opens
+ * into, so the two mark a paper the same way: the right answer always carries
+ * its own colour, and a wrong pick is marked beside it when there is one.
+ * `chosen` is undefined in a review that belongs to no sitting.
+ */
+function ReviewChoices({
+  question,
+  chosen,
+}: {
+  question: Question;
+  chosen: string | undefined;
+}) {
+  return (
+    <div className="mt-4 flex flex-col gap-2.5">
+      {question.choices.map((choice, choiceIndex) => {
+        const picked = chosen === choice.id;
+        const pickedWrong = picked && !choice.is_correct;
+
+        return (
+          <div
+            key={choice.id}
+            className={`flex items-center gap-4 rounded-lg border-2 px-4 py-3 text-left text-sm ${
+              choice.is_correct
+                ? "border-[#0F7B52] bg-[#0F7B52]/10"
+                : pickedWrong
+                  ? "border-[#C91D1D] bg-[#C91D1D]/10"
+                  : "border-border"
+            }`}
+          >
+            <span
+              className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                choice.is_correct
+                  ? "border-[#0F7B52] bg-[#0F7B52] text-white"
+                  : pickedWrong
+                    ? "border-[#C91D1D] bg-[#C91D1D] text-white"
+                    : "border-border text-muted-foreground"
+              }`}
+            >
+              {String.fromCharCode(65 + choiceIndex)}
+            </span>
+
+            <span className="flex-1">{choice.text}</span>
+
+            {choice.is_correct && (
+              <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-[#0F7B52]">
+                {picked ? "Your answer · Correct" : "Correct answer"}
+              </span>
+            )}
+            {pickedWrong && (
+              <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-[#C91D1D]">
+                Your answer
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * Jumps to the top of the page.
  *
  * Instant rather than smooth: a smooth scroll across a paper this long is slow,
@@ -93,6 +157,18 @@ const toTop = () => {
 function PracticeExamContent() {
   const searchParams = useSearchParams();
   const type = parseExamType(searchParams.get("exam_type"));
+
+  /**
+   * Revision rather than a sitting.
+   *
+   * A track that has been passed opens here from the dashboard: the paper is
+   * shown with its answers marked, and nothing is recorded. It used to link
+   * straight at the exam, so "Review Practice Exam" dealt a blank paper and
+   * quietly started an attempt — the opposite of a review. Held in state as
+   * well as read from the URL so Retake can leave it without a navigation.
+   */
+  const openedForReview = searchParams.get("mode") === "review";
+  const [reviewing, setReviewing] = useState(openedForReview);
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<Question["id"], string>>({});
@@ -142,10 +218,24 @@ function PracticeExamContent() {
           return;
         }
 
+        // A review reads the paper and records nothing, so it deals no attempt.
+        if (openedForReview) {
+          const items = await fetch(
+            `/api/questions?exam_type=${encodeURIComponent(type)}`,
+            fresh,
+          ).then((response) => response.json() as Promise<Question[]>);
+
+          if (!active) return;
+          setQuestions(Array.isArray(items) ? items : []);
+          setLoading(false);
+          return;
+        }
+
         const [items, attempt] = await Promise.all([
-          fetch(`/api/questions?exam_type=${encodeURIComponent(type)}`).then(
-            (response) => response.json() as Promise<Question[]>,
-          ),
+          fetch(
+            `/api/questions?exam_type=${encodeURIComponent(type)}`,
+            fresh,
+          ).then((response) => response.json() as Promise<Question[]>),
           fetch(`/api/attempts`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -197,7 +287,7 @@ function PracticeExamContent() {
     return () => {
       active = false;
     };
-  }, [type]);
+  }, [type, openedForReview]);
 
   // Scrolling inside submit ran while the page was still the exam, so the
   // browser landed part-way down a page that was about to be replaced. Waiting
@@ -364,6 +454,9 @@ function PracticeExamContent() {
       unsaved.current.clear();
       setOutcome(null);
       setFinished(false);
+      // Retake is also how a passed track leaves its review: same request, same
+      // fresh paper, so revision and another sitting need no separate route.
+      setReviewing(false);
       toTop();
     } catch (retakeError) {
       console.error("Failed to start another practice exam:", retakeError);
@@ -423,6 +516,53 @@ function PracticeExamContent() {
             </Link>
           </div>
         </section>
+      </Frame>
+    );
+  }
+
+  if (reviewing) {
+    return (
+      <Frame title={`${examLabels[type]} Practice Exam · Review`}>
+        <div className="w-full">
+          <section className="rv-card mb-4 flex flex-col items-start justify-between gap-3 p-[clamp(1rem,4vw,1.25rem)] xs:flex-row xs:items-center">
+            <div>
+              <p className="text-lg font-extrabold">Reviewing the paper</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Every question with its answer marked. Nothing here is scored,
+                and nothing is recorded against your track.
+              </p>
+            </div>
+
+            <button
+              onClick={retake}
+              disabled={submitting}
+              className="w-full whitespace-nowrap rounded-lg bg-[var(--exam)] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[var(--exam-strong)] disabled:opacity-60 xs:w-auto"
+            >
+              {submitting ? "Starting…" : "Retake exam"}
+            </button>
+          </section>
+
+          {error && (
+            <p
+              role="alert"
+              className="mb-4 text-sm font-semibold text-destructive"
+            >
+              {error}
+            </p>
+          )}
+
+          <div className="flex flex-col gap-4">
+            {questions.map((question, index) => (
+              <section key={question.id} className="rv-card border-2 p-5">
+                <p className="text-xs font-bold uppercase tracking-wide text-[#8A6D0B]">
+                  Question {index + 1}
+                </p>
+                <QuestionText text={question.text} />
+                <ReviewChoices question={question} chosen={undefined} />
+              </section>
+            ))}
+          </div>
+        </div>
       </Frame>
     );
   }
@@ -532,10 +672,8 @@ function PracticeExamContent() {
                     Question {index + 1} · {wasRight ? "Correct" : "Incorrect"}
                   </p>
                   <QuestionText text={question.text} />
-                  <p className="mt-3 text-sm text-[#0F7B52]">
-                    <strong>Correct answer:</strong>{" "}
-                    {question.choices.find((choice) => choice.is_correct)?.text}
-                  </p>
+
+                  <ReviewChoices question={question} chosen={chosen} />
                 </section>
               );
             })}

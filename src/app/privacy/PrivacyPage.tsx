@@ -4,7 +4,7 @@ import {
   LEGAL_LAST_UPDATED,
   LEGAL_SERVICE_NAME,
 } from "@/lib/legal";
-import { Mail, ShieldCheck } from "lucide-react";
+import { Mail } from "lucide-react";
 
 /**
  * Static prose, so this stays a server component — same reasoning as About
@@ -119,14 +119,9 @@ export function PrivacyPage({ signedIn }: { signedIn: boolean }) {
 
       <InfoSection title="Who can see your study record">
         <div className="rv-card mt-4 p-6">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#0B2340] text-[#FFD400]">
-              <ShieldCheck className="size-4" aria-hidden="true" />
-            </span>
-            <h3 className="text-lg font-extrabold text-foreground">
-              Your manager sees your progress
-            </h3>
-          </div>
+          <h3 className="text-lg font-extrabold text-foreground">
+            Your manager sees your progress
+          </h3>
           <p className="mt-3 text-sm leading-6">
             This is worth stating plainly rather than burying. If you are a
             reviewee, the Field Manager you are assigned to can see your name,
