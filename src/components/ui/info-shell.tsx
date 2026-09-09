@@ -72,7 +72,7 @@ export function InfoShell({
 }
 
 /** The bar a signed-out reader gets: the wordmark home, and a way to sign in. */
-function SignedOutHeader() {
+export function SignedOutHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="rv-shell flex h-16 items-center justify-between gap-6">
