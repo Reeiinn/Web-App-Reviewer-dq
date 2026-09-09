@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  NUDGE_COOLDOWN_MS,
   NUDGE_MAX_LENGTH,
+  nudgeAllowedAfter,
+  nudgeCooldownMessage,
   canDeleteNudge,
   canNudge,
   nudgeAge,
@@ -140,5 +143,27 @@ describe("canDeleteNudge", () => {
       canDeleteNudge({ role: "USER", id: "user-1" }, { sender_id: "user-1" })
         .ok,
     ).toBe(false);
+  });
+});
+
+describe("the wait between reminders", () => {
+  it("lets a first reminder through", () => {
+    expect(nudgeAllowedAfter(null)).toBe(true);
+  });
+
+  it("holds a second one until the cooldown has passed", () => {
+    expect(nudgeAllowedAfter(NUDGE_COOLDOWN_MS - 1)).toBe(false);
+    expect(nudgeAllowedAfter(NUDGE_COOLDOWN_MS)).toBe(true);
+  });
+
+  it("says how long is left in hours, then in minutes", () => {
+    expect(nudgeCooldownMessage("Ada", 0)).toContain("4 hours");
+    expect(
+      nudgeCooldownMessage("Ada", NUDGE_COOLDOWN_MS - 30 * 60_000),
+    ).toContain("30 minutes");
+    // Never "0 minutes": a wait that is nearly over is still a wait.
+    expect(nudgeCooldownMessage("Ada", NUDGE_COOLDOWN_MS - 1)).toContain(
+      "1 minute",
+    );
   });
 });

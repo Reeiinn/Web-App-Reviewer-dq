@@ -128,6 +128,43 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 /**
+ * How long one sender waits before reminding the same reviewee again.
+ *
+ * A reminder is worth reading because it is rare. Nothing stopped a manager
+ * sending twenty in a minute, which turns the bell into something to be
+ * dismissed unread — and, from the reviewee's side, into harassment they
+ * cannot switch off. Four hours is long enough that a second reminder means a
+ * second occasion, and short enough to chase somebody twice in a working day.
+ */
+export const NUDGE_COOLDOWN_MS = 4 * HOUR;
+
+/** What to say when the wait is not over: hours where there are any, else minutes. */
+export function nudgeCooldownMessage(
+  name: string,
+  msSinceLast: number,
+  cooldownMs = NUDGE_COOLDOWN_MS,
+): string {
+  const remaining = Math.max(0, cooldownMs - msSinceLast);
+  const hours = Math.floor(remaining / HOUR);
+  const minutes = Math.max(1, Math.ceil((remaining % HOUR) / MINUTE));
+
+  const wait =
+    hours > 0
+      ? `${hours} hour${hours === 1 ? "" : "s"}`
+      : `${minutes} minute${minutes === 1 ? "" : "s"}`;
+
+  return `You have already reminded ${name}. You can send another in about ${wait}.`;
+}
+
+/** Whether this sender has waited long enough to remind this reviewee again. */
+export function nudgeAllowedAfter(
+  msSinceLast: number | null,
+  cooldownMs = NUDGE_COOLDOWN_MS,
+): boolean {
+  return msSinceLast === null || msSinceLast >= cooldownMs;
+}
+
+/**
  * How long ago a reminder arrived, for the line under it in the bell.
  *
  * Coarse on purpose: what a reviewee takes from the stamp is "this is new" or
