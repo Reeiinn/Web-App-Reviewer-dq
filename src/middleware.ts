@@ -69,14 +69,33 @@ async function applySecurityHeaders(req: NextRequest, res: NextResponse) {
     }
   }
 
+  /*
+   * `unsafe-eval` and the websocket origins are development-only.
+   *
+   * React's development build calls eval() to rebuild callstacks that cross
+   * the server/client boundary, and the dev server pushes updates over a
+   * websocket. Without them the app refuses to render locally with "eval() is
+   * not supported in this environment". Neither is needed by the production
+   * build, and neither is granted to it.
+   */
+  const isDev = process.env.NODE_ENV === "development";
+
+  const scriptSrc = isDev
+    ? "'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com"
+    : "'self' 'unsafe-inline' https://challenges.cloudflare.com";
+
+  const connectSrc = isDev
+    ? "'self' ws: wss: https://challenges.cloudflare.com"
+    : "'self' https://challenges.cloudflare.com";
+
   res.headers.set(
     "Content-Security-Policy",
     "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; " +
+      `script-src ${scriptSrc}; ` +
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
       "font-src 'self' https://fonts.gstatic.com; " +
       "img-src 'self' data: blob:; " +
-      "connect-src 'self' https://challenges.cloudflare.com; " +
+      `connect-src ${connectSrc}; ` +
       "frame-src https://challenges.cloudflare.com;",
   );
 
