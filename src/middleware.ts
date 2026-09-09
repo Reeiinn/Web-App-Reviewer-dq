@@ -19,6 +19,17 @@ async function safeLimitCheck(
   }
 }
 
+/**
+ * Every route behind the matcher is called with `fetch(...).then(r => r.json())`,
+ * and the API routes it fronts all answer with `{ error }`. A plain-text body
+ * here broke that contract: the caller got `Unexpected token 'T', "Too many
+ * requests" is not valid JSON` instead of the message, so the person being
+ * limited was shown a parser error rather than being told to wait.
+ */
+function tooManyRequests(error: string) {
+  return NextResponse.json({ error }, { status: 429 });
+}
+
 async function applySecurityHeaders(req: NextRequest, res: NextResponse) {
   const forwardedFor = req.headers.get("x-forwarded-for");
 
@@ -46,20 +57,15 @@ async function applySecurityHeaders(req: NextRequest, res: NextResponse) {
     const allowed = await safeLimitCheck(authIpLimiter, ip);
 
     if (!allowed) {
-      return new NextResponse(
+      return tooManyRequests(
         "Too many login attempts. Please try again later.",
-        {
-          status: 429,
-        },
       );
     }
   } else if (!isAuthRoute && isWrite) {
     const allowed = await safeLimitCheck(writeLimiter, ip);
 
     if (!allowed) {
-      return new NextResponse("Too many requests", {
-        status: 429,
-      });
+      return tooManyRequests("Too many requests. Please slow down.");
     }
   }
 
