@@ -42,6 +42,7 @@ const learnerLinks = [
 // what the console is for.
 const staffLinks = [
   { href: "/admin", label: "Admin Console" },
+  { href: "/admin/analytics", label: "Cohort" },
   { href: "/glossary", label: "Glossary" },
 ];
 
@@ -53,6 +54,7 @@ const staffLinks = [
 const adminLinks = [
   { href: "/admin", label: "Admin Console" },
   { href: "/admin/field-managers", label: "Field Managers" },
+  { href: "/admin/analytics", label: "Cohort" },
   { href: "/glossary", label: "Glossary" },
 ];
 
