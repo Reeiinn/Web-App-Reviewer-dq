@@ -1,13 +1,4 @@
 import { InfoSection, InfoShell } from "@/components/ui/info-shell";
-import {
-  Award,
-  BookOpen,
-  ClipboardList,
-  Layers,
-  ListChecks,
-  TrendingUp,
-  Users,
-} from "lucide-react";
 
 /**
  * Static prose, so this stays a server component: nothing here needs a hook,
@@ -16,25 +7,21 @@ import {
 
 const studyModes = [
   {
-    icon: Layers,
     name: "Flash Cards",
     description:
       "Front-and-back recall cards. You judge whether you knew the answer, and a card counts as mastered once you have.",
   },
   {
-    icon: ListChecks,
     name: "Memorization",
     description:
       "Multiple-choice drills with instant feedback, for the definitions and figures that have to be automatic.",
   },
   {
-    icon: BookOpen,
     name: "Vocabulary",
     description:
       "A searchable glossary of the terms each track expects you to know, filterable by exam type.",
   },
   {
-    icon: ClipboardList,
     name: "Practice Exams",
     description:
       "Timed, scored attempts under exam conditions, with a per-question review afterwards.",
@@ -80,11 +67,11 @@ export function AboutPage({ signedIn }: { signedIn: boolean }) {
         </p>
       </InfoSection>
 
-      <InfoSection title="Two exam tracks">
+      <InfoSection title="Four exam tracks">
         <p>
-          Material is organised into two independent tracks, each with its own
+          Material is organised into four independent tracks, each with its own
           cards, drills, glossary and exams — and its own progress. Studying one
-          does not move the other.
+          does not move the others.
         </p>
         <div className="mt-4 grid gap-5 sm:grid-cols-2">
           <article className="rv-card p-6">
@@ -104,6 +91,24 @@ export function AboutPage({ signedIn }: { signedIn: boolean }) {
               products, policy provisions, and underwriting fundamentals.
             </p>
           </article>
+          <article className="rv-card p-6">
+            <h3 className="text-lg font-extrabold text-foreground">
+              IIAP (Set A)
+            </h3>
+            <p className="mt-2 text-sm leading-6">
+              The first IIAP question set — its own deck, glossary and exam, and
+              its own certificate once the exam is passed.
+            </p>
+          </article>
+          <article className="rv-card p-6">
+            <h3 className="text-lg font-extrabold text-foreground">
+              IIAP (Set B)
+            </h3>
+            <p className="mt-2 text-sm leading-6">
+              The second IIAP question set. The same qualification as Set A, but
+              tracked separately, so clearing one leaves the other untouched.
+            </p>
+          </article>
         </div>
       </InfoSection>
 
@@ -111,15 +116,10 @@ export function AboutPage({ signedIn }: { signedIn: boolean }) {
         <div className="mt-4 grid gap-5 sm:grid-cols-2">
           {studyModes.map((mode) => (
             <article key={mode.name} className="rv-card p-6">
-              <div className="flex items-center gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#0B2340] text-[#FFD400]">
-                  <mode.icon className="size-4" aria-hidden="true" />
-                </span>
-                <h3 className="text-lg font-extrabold text-foreground">
-                  {mode.name}
-                </h3>
-              </div>
-              <p className="mt-3 text-sm leading-6">{mode.description}</p>
+              <h3 className="text-lg font-extrabold text-foreground">
+                {mode.name}
+              </h3>
+              <p className="mt-2 text-sm leading-6">{mode.description}</p>
             </article>
           ))}
         </div>
@@ -127,20 +127,12 @@ export function AboutPage({ signedIn }: { signedIn: boolean }) {
 
       <InfoSection title="How progress works">
         <p>
-          <TrendingUp
-            className="mr-2 inline size-4 align-[-2px] text-[#8A6D0B]"
-            aria-hidden="true"
-          />
           Each track carries a mastery percentage built from your flashcards,
           memorization items and practice questions. Analytics charts that over
           time, alongside the study streak you build by showing up on
           consecutive days.
         </p>
         <p>
-          <Award
-            className="mr-2 inline size-4 align-[-2px] text-[#8A6D0B]"
-            aria-hidden="true"
-          />
           The practice exam for a track stays locked until every flashcard and
           every memorization item on that track is mastered — the exam is meant
           to tell you something, which it cannot do if you sit it early. Pass it,
@@ -150,10 +142,6 @@ export function AboutPage({ signedIn }: { signedIn: boolean }) {
 
       <InfoSection title="Who uses it">
         <p>
-          <Users
-            className="mr-2 inline size-4 align-[-2px] text-[#8A6D0B]"
-            aria-hidden="true"
-          />
           Three kinds of account share the app, and each sees a different home
           screen after signing in.
         </p>

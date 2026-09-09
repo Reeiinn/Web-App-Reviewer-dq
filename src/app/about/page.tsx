@@ -5,7 +5,7 @@ import { AboutPage } from "./AboutPage";
 export const metadata: Metadata = {
   title: "About — INSURE",
   description:
-    "What INSURE covers, the two exam tracks, and how mastery and certificates work.",
+    "What INSURE covers, the four exam tracks, and how mastery and certificates work.",
 };
 
 // Public on purpose: no redirect here, and the route is left out of the
