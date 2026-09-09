@@ -43,6 +43,26 @@ Create `.env.local`:
     RESEND_API_KEY="re_..."
     MAIL_FROM="INSURE <invites@yourdomain.com>"
 
+Leave `APP_URL` unset here. Locally the links a signup invite or a password
+reset carries are built from the request, which is what makes them open on the
+dev server you are running.
+
+### Deployment
+
+Set `APP_URL` in the production environment to the address the app is served at:
+
+    APP_URL="https://insureph.app"
+
+Invitations and password resets are opened from a chat or an inbox, somewhere
+other than the machine that made them, so they are built on this address rather
+than on the host a request arrived at. On Vercel it may be left out — the
+platform's own production domain is used — but setting it pins every link to
+the custom domain rather than to the `*.vercel.app` one.
+
+NextAuth is a separate matter: behind a proxy, set `AUTH_URL` to the same
+address (or `AUTH_TRUST_HOST=true`) so sign-in callbacks land on the right
+host. `AUTH_URL` also serves as the link address when `APP_URL` is absent.
+
 Generate an `AUTH_SECRET`:
 
     npx auth secret

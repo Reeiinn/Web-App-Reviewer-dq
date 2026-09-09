@@ -13,6 +13,14 @@ describe("appOrigin", () => {
     ).toBe("https://insure.example.com");
   });
 
+  it("accepts an address given as a bare domain", () => {
+    expect(
+      appOrigin(request("http://localhost:3000/api/invites"), {
+        APP_URL: "insureph.app",
+      }),
+    ).toBe("https://insureph.app");
+  });
+
   it("takes NextAuth's address when nothing app-specific is set", () => {
     expect(
       appOrigin(request("http://localhost:3000/api/invites"), {
