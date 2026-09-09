@@ -96,6 +96,26 @@ async function applySecurityHeaders(
     }
   }
 
+  return res;
+}
+
+/**
+ * The policy the browser is given.
+ *
+ * The policy closes what it never named: where the page may be framed, what a
+ * <base> may rewrite, where a form may post, and plugins.
+ *
+ * script-src still carries 'unsafe-inline', and that is a measured decision
+ * rather than an oversight. The alternative is a per-request nonce, which was
+ * tried: Next serves this app's shells from its prerender cache, those shells
+ * carry inline bootstrap scripts with no nonce on them, and a nonce policy
+ * stops them — the sign-in page rendered as static HTML that never hydrated and
+ * never drew its Turnstile widget. What keeps injected script out meanwhile is
+ * that nothing here writes markup into the page: there is no
+ * dangerouslySetInnerHTML in the codebase, so every value is escaped by React.
+ * Revisit if the shells ever ship nonces of their own.
+ */
+function contentSecurityPolicy(isDev: boolean) {
   /*
    * `unsafe-eval` and the websocket origins are development-only.
    *
@@ -104,9 +124,8 @@ async function applySecurityHeaders(
    * websocket. Without them the app refuses to render locally with "eval() is
    * not supported in this environment". Neither is needed by the production
    * build, and neither is granted to it.
+   *
    */
-  const isDev = process.env.NODE_ENV === "development";
-
   const scriptSrc = isDev
     ? "'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com"
     : "'self' 'unsafe-inline' https://challenges.cloudflare.com";
@@ -115,26 +134,56 @@ async function applySecurityHeaders(
     ? "'self' ws: wss: https://challenges.cloudflare.com"
     : "'self' https://challenges.cloudflare.com";
 
-  res.headers.set(
-    "Content-Security-Policy",
+  return (
     "default-src 'self'; " +
-      `script-src ${scriptSrc}; ` +
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-      "font-src 'self' https://fonts.gstatic.com; " +
-      "img-src 'self' data: blob:; " +
-      `connect-src ${connectSrc}; ` +
-      "frame-src https://challenges.cloudflare.com;",
+    `script-src ${scriptSrc}; ` +
+    // Inline styles stay: Tailwind's own utilities are in a stylesheet, but
+    // style attributes on elements are not, and nothing nonces those.
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "img-src 'self' data: blob:; " +
+    `connect-src ${connectSrc}; ` +
+    "frame-src https://challenges.cloudflare.com; " +
+    "worker-src 'self' blob:; " +
+    "object-src 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'; " +
+    "frame-ancestors 'none'; " +
+    "upgrade-insecure-requests"
   );
+}
+
+/** Headers that say nothing about this request and everything about the app. */
+function applyStaticHeaders(res: NextResponse, isDev: boolean) {
+  res.headers.set("X-Content-Type-Options", "nosniff");
+  res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // Nothing here asks for a camera, a microphone or a location, so nothing may.
+  res.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+  );
+  // frame-ancestors covers modern browsers; this covers the rest.
+  res.headers.set("X-Frame-Options", "DENY");
+
+  // Only over TLS, and never announced from a dev server on http.
+  if (!isDev) {
+    res.headers.set(
+      "Strict-Transport-Security",
+      "max-age=63072000; includeSubDomains; preload",
+    );
+  }
 
   return res;
 }
 
 export default auth(async (req) => {
-  return applySecurityHeaders(
-    req as NextRequest,
-    NextResponse.next(),
-    req.auth?.user?.id,
-  );
+  const isDev = process.env.NODE_ENV === "development";
+
+  const res = NextResponse.next();
+  res.headers.set("Content-Security-Policy", contentSecurityPolicy(isDev));
+  applyStaticHeaders(res, isDev);
+
+  return applySecurityHeaders(req as NextRequest, res, req.auth?.user?.id);
 });
 
 export const config = {
