@@ -1,5 +1,6 @@
 "use client";
 
+import { cachedFetch, invalidateCached } from "@/lib/helper/client-cache";
 import { nudgeAge } from "@/lib/helper/nudges";
 import { Bell } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -13,12 +14,19 @@ type Nudge = {
   read: boolean;
 };
 
+type NudgeFeed = { nudges?: Nudge[]; unread?: number };
+
+/** The reminders, held for the tab so moving between screens is not a refetch. */
+const NUDGES_CACHE_KEY = "user:nudges";
+const NUDGES_TTL_MS = 60_000;
+
 /**
  * Where a reviewee reads the reminders their manager sent.
  *
- * It refetches on mount and whenever the path changes rather than polling: a
- * reminder is not urgent enough to keep a timer alive for, and a reviewee
- * moving between screens picks it up within a click. Unread reminders stay
+ * It reads on mount and on a path change rather than polling: a reminder is not
+ * urgent enough to keep a timer alive for, and a reviewee moving between
+ * screens picks it up within a click. The answer is held for a minute, so a run
+ * through four screens is one request rather than four. Unread reminders stay
  * tinted until the reviewee marks them read: opening the bell to look is not
  * the same as dealing with what is in it.
  */
@@ -35,9 +43,16 @@ export function NotificationBell() {
 
     async function load() {
       try {
-        const response = await fetch("/api/nudges");
-        if (!response.ok) return;
-        const data = await response.json();
+        const data = await cachedFetch<NudgeFeed>(
+          NUDGES_CACHE_KEY,
+          async () => {
+            const response = await fetch("/api/nudges");
+            if (!response.ok) throw new Error("nudges unavailable");
+            return (await response.json()) as NudgeFeed;
+          },
+          NUDGES_TTL_MS,
+        );
+
         if (!live) return;
         setNudges(data.nudges ?? []);
         setUnread(data.unread ?? 0);
@@ -94,6 +109,10 @@ export function NotificationBell() {
       const data = await response.json().catch(() => null);
       if (response.ok && typeof data?.unread === "number")
         setUnread(data.unread);
+
+      // What the cache holds is now behind what the reviewee has just done, so
+      // the next screen reads it again rather than redrawing an old dot.
+      invalidateCached(NUDGES_CACHE_KEY);
     } catch {
       // The optimistic state stands; the next load corrects it either way.
     }

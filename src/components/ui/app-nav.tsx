@@ -2,6 +2,7 @@
 
 import { PhotoCropper } from "@/components/ui/photo-cropper";
 import { NotificationBell } from "@/components/ui/notification-bell";
+import { cachedFetch, putCached } from "@/lib/helper/client-cache";
 import { isStaff, landingFor, staffTitleFor } from "@/lib/helper/roles";
 import {
   Award,
@@ -16,6 +17,10 @@ import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+
+/** The signed-in account's photo, held for the tab rather than re-read per screen. */
+const AVATAR_CACHE_KEY = "user:avatar";
+const AVATAR_TTL_MS = 5 * 60_000;
 
 // Flashcards and Memorize are reached through a track on the dashboard, so
 // they are deliberately not top-level links — a nav entry here would have had
@@ -76,15 +81,25 @@ function UserMenu() {
     .join("")
     .toUpperCase();
 
-  // The photo is not in the session token, so it is read once per signed-in
-  // visit and then kept in step by the upload itself.
+  // The photo is not in the session token, and this header mounts fresh on
+  // every screen, so the read went to the network on every click. It is held
+  // for the tab instead: nothing changes the photo except the upload below,
+  // which hands the new one straight to the cache.
   useEffect(() => {
     if (!session?.user) return;
 
     let active = true;
-    fetch("/api/user/avatar")
-      .then((response) => response.json() as Promise<{ image?: string | null }>)
-      .then((data) => active && setImage(data.image ?? null))
+    cachedFetch(
+      AVATAR_CACHE_KEY,
+      () =>
+        fetch("/api/user/avatar")
+          .then(
+            (response) => response.json() as Promise<{ image?: string | null }>,
+          )
+          .then((data) => data.image ?? null),
+      AVATAR_TTL_MS,
+    )
+      .then((image) => active && setImage(image))
       .catch(() => active && setImage(null));
 
     return () => {
@@ -112,6 +127,7 @@ function UserMenu() {
         return;
       }
       setImage(data.image);
+      putCached(AVATAR_CACHE_KEY, data.image);
       setPending(null);
     } catch {
       setUploadError("Could not reach the server.");
