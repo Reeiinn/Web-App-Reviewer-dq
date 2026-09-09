@@ -24,7 +24,7 @@ export type RestoredSession = {
   resumed: boolean;
 };
 
-const shuffle = (ids: string[]) => [...ids].sort(() => Math.random() - 0.5);
+const shuffle = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
 const fresh = (deck: string[]): RestoredSession => ({
   order: shuffle(deck),
@@ -83,4 +83,28 @@ export function restoreSession(
   }
 
   return { order, index, ratings, resumed: !untouched };
+}
+
+/**
+ * Re-deals only the cards the learner has yet to rate.
+ *
+ * Shuffling used to re-deal the whole deck and send the learner back to card 1,
+ * so cleared cards came round again and the sitting restarted from the top. A
+ * rated card now holds the slot it already occupied; the un-rated ones are
+ * shuffled and dealt back into the slots that are left. The caller keeps its
+ * position, because the deck length and every studied slot are unchanged.
+ *
+ * Rated means answered either way: a card marked wrong has been studied just as
+ * much as one marked right.
+ */
+export function shuffleUnstudied<T extends { id: string }>(
+  items: T[],
+  ratings: Record<string, boolean>,
+): T[] {
+  const studied = (item: T) => item.id in ratings;
+
+  const pool = shuffle(items.filter((item) => !studied(item)));
+  let next = 0;
+
+  return items.map((item) => (studied(item) ? item : pool[next++]));
 }
