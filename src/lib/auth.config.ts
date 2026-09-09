@@ -35,8 +35,66 @@ const isPublic = (pathname: string) =>
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export const authConfig: NextAuthConfig = {
+  /**
+   * The app runs behind a proxy in production, so the host on the request is
+   * the internal one. Without this Auth.js refuses it as UntrustedHost and
+   * sign-in fails outright. AUTH_URL names the address it should believe
+   * instead; see the deployment section of the README.
+   */
+  trustHost: true,
+
   session: { strategy: "jwt" },
+
+  /**
+   * Spelled out rather than inherited.
+   *
+   * The defaults are already httpOnly and SameSite=Lax, and `secure` follows
+   * whatever address Auth.js has worked out for itself — which is exactly the
+   * kind of thing that changes underneath a deployment without anyone noticing.
+   * Stating it makes the posture reviewable, and makes a regression a diff.
+   *
+   * SameSite=Lax rather than Strict: Strict withholds the cookie on a
+   * navigation into the app from anywhere else, so following an invitation
+   * link out of an email would land the recipient on a signed-out page.
+   */
+  cookies: {
+    sessionToken: {
+      name: isProduction
+        ? "__Secure-authjs.session-token"
+        : "authjs.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: isProduction,
+      },
+    },
+    callbackUrl: {
+      name: isProduction
+        ? "__Secure-authjs.callback-url"
+        : "authjs.callback-url",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: isProduction,
+      },
+    },
+    csrfToken: {
+      // The double-submit cookie carries a __Host- prefix: it is scoped to this
+      // exact origin, and no subdomain may write over it.
+      name: isProduction ? "__Host-authjs.csrf-token" : "authjs.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: isProduction,
+      },
+    },
+  },
   providers: [], // filled in by the full config in auth.ts
   callbacks: {
     authorized({ auth, request }) {
