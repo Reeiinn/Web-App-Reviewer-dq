@@ -7,6 +7,7 @@ import { Result } from "@/components/ui/result";
 import { motivationFor, type MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
 import { restoreMemorization } from "@/lib/helper/memorization-session";
+import { createWriteQueue } from "@/lib/helper/session-writes";
 import type { SavedSession } from "@/lib/helper/study-session";
 import { useFitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
@@ -67,6 +68,17 @@ function MemorizationContent() {
 
   const questionShownAt = useRef<number>(Date.now());
   const verdictTimer = useRef<number | null>(null);
+
+  /** Saves and clearings of the sitting, in the order this page issued them. */
+  const writeQueue = useRef(
+    createWriteQueue((error) =>
+      console.error("Failed to write memorization session:", error),
+    ),
+  );
+  const write = useCallback(
+    (request: () => Promise<unknown>) => writeQueue.current(request),
+    [],
+  );
 
   /** Drops the verdict over the card, then lifts it a beat later. */
   const flashVerdict = (next: MotivationMessage) => {
@@ -156,27 +168,27 @@ function MemorizationContent() {
   useEffect(() => {
     if (loading || finished || questions.length === 0) return;
 
-    fetch(sessionUrl(type), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        card_order: questions.map((item) => item.id),
-        card_index: index,
-        ratings,
+    write(() =>
+      fetch(sessionUrl(type), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card_order: questions.map((item) => item.id),
+          card_index: index,
+          ratings,
+        }),
       }),
-    }).catch((error) => {
-      console.error("Failed to save memorization session:", error);
-    });
-  }, [questions, index, ratings, loading, finished, type]);
+    );
+  }, [questions, index, ratings, loading, finished, type, write]);
 
   // A finished set has nothing to resume into: the next visit starts over.
+  // Queued behind the saves rather than raced against them, so the redo deck
+  // this clearing is followed by outlives it.
   useEffect(() => {
     if (!finished) return;
 
-    fetch(sessionUrl(type), { method: "DELETE" }).catch((error) => {
-      console.error("Failed to clear memorization session:", error);
-    });
-  }, [finished, type]);
+    write(() => fetch(sessionUrl(type), { method: "DELETE" }));
+  }, [finished, type, write]);
 
   const question = questions[index];
   const correctChoiceId = question?.choices.find(

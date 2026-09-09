@@ -5,6 +5,7 @@ import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
 import { motivationFor, MotivationMessage } from "@/lib/helper/motivation";
 import { splitStatements } from "@/lib/helper/question-text";
+import { createWriteQueue } from "@/lib/helper/session-writes";
 import { restoreSession, type SavedSession } from "@/lib/helper/study-session";
 import { useFitText, type FitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
@@ -14,7 +15,7 @@ import type {
 } from "@/lib/types/flashcard";
 import { Check, ChevronLeft, ChevronRight, Shuffle, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { fresh } from "@/lib/helper/fetch-fresh";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
@@ -55,6 +56,17 @@ function FlashCardContent() {
   const advanceTimer = useRef<number | null>(null);
   /** Card the deck resumed on, so the learner sees where they left off. */
   const [resumedAt, setResumedAt] = useState<number | null>(null);
+
+  /** Saves and clearings of the deck, in the order this page issued them. */
+  const writeQueue = useRef(
+    createWriteQueue((error) =>
+      console.error("Failed to write flashcard session:", error),
+    ),
+  );
+  const write = useCallback(
+    (request: () => Promise<unknown>) => writeQueue.current(request),
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -105,27 +117,27 @@ function FlashCardContent() {
   useEffect(() => {
     if (loading || finished || cards.length === 0) return;
 
-    fetch(sessionUrl(type), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        card_order: cards.map((item) => item.id),
-        card_index: index,
-        ratings,
+    write(() =>
+      fetch(sessionUrl(type), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card_order: cards.map((item) => item.id),
+          card_index: index,
+          ratings,
+        }),
       }),
-    }).catch((error) => {
-      console.error("Failed to save flashcard session:", error);
-    });
-  }, [cards, index, ratings, loading, finished, type]);
+    );
+  }, [cards, index, ratings, loading, finished, type, write]);
 
   // A finished deck has nothing to resume into: the next visit starts over.
+  // Queued behind the saves rather than raced against them, so a redo deck
+  // dealt straight after this clearing outlives it.
   useEffect(() => {
     if (!finished) return;
 
-    fetch(sessionUrl(type), { method: "DELETE" }).catch((error) => {
-      console.error("Failed to clear flashcard session:", error);
-    });
-  }, [finished, type]);
+    write(() => fetch(sessionUrl(type), { method: "DELETE" }));
+  }, [finished, type, write]);
 
   useEffect(
     () => () => {
