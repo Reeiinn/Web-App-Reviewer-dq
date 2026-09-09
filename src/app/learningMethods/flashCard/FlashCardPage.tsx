@@ -153,11 +153,14 @@ function FlashCardContent() {
   const front = splitStatements(card?.front ?? "");
   const back = splitStatements(card?.back ?? "");
 
+  // Keyed on the card rather than on its text: the frame is remounted per card,
+  // so two cards that happen to read the same still need a fresh measurement of
+  // the nodes now on screen.
   const frontFit = useFitText<HTMLSpanElement, HTMLSpanElement>(
-    card?.front ?? "",
+    `${card?.id ?? ""}:front`,
   );
   const backFit = useFitText<HTMLSpanElement, HTMLSpanElement>(
-    card?.back ?? "",
+    `${card?.id ?? ""}:back`,
   );
 
   /** Step between cards without rating the current one. */
@@ -312,7 +315,14 @@ function FlashCardContent() {
             {/* The frame fills the room the viewport leaves after the chrome;
                 the text inside scales itself down to fit, and scrolls only if
                 it hits the floor. */}
+            {/* Keyed on the card, so moving to the next one mounts a fresh
+                frame that is already face up. Turning the same element back
+                instead animated it through 90 degrees, and the back face —
+                carrying the next card's answer by then — showed for that half
+                of the turn. A flip is only ever the learner revealing the card
+                in front of them. */}
             <span
+              key={card.id}
               className={`relative grid h-full w-full transition-transform duration-500 [transform-style:preserve-3d] ${
                 revealed ? "[transform:rotateY(180deg)]" : ""
               }`}
