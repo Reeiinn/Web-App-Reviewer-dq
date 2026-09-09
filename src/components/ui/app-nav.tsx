@@ -3,7 +3,15 @@
 import { PhotoCropper } from "@/components/ui/photo-cropper";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { isStaff, landingFor, staffTitleFor } from "@/lib/helper/roles";
-import { LogOut, User } from "lucide-react";
+import {
+  Award,
+  FileText,
+  Info,
+  LifeBuoy,
+  LogOut,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -15,6 +23,9 @@ import { useEffect, useRef, useState } from "react";
 //
 // Staff get the console where a reviewee gets the dashboard: the study screens
 // redirect them away, so linking there would only bounce.
+//
+// Certificates is not here either: it is what the account has to show for
+// itself rather than a place to work, so it is reached from the user menu.
 const learnerLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/glossary", label: "Glossary" },
@@ -215,6 +226,63 @@ function UserMenu() {
               </p>
             )}
           </div>
+
+          {/* Certificates is what the account has to show for itself rather
+              than a place to work, so it belongs beside the name and photo.
+              Staff hold none — the page turns them away — so the entry is
+              left out for them rather than linking somewhere that bounces. */}
+          {!isStaff(session?.user?.role) && (
+            <Link
+              href="/certificates"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-3 border-t border-border px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Award className="size-4" />
+              Certificates
+            </Link>
+          )}
+
+          {/* About, Help, Privacy and Terms sit here rather than in the main
+              nav: that row is for the work — dashboards, decks, the console —
+              and it is built per role, so these would have had to be repeated
+              in every list. This menu is already the same for everyone. */}
+          <Link
+            href="/about"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-3 border-t border-border px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Info className="size-4" />
+            About
+          </Link>
+          <Link
+            href="/help"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <LifeBuoy className="size-4" />
+            Help
+          </Link>
+          <Link
+            href="/privacy"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ShieldCheck className="size-4" />
+            Privacy
+          </Link>
+          <Link
+            href="/terms"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <FileText className="size-4" />
+            Terms
+          </Link>
 
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
