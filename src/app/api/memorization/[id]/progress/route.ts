@@ -59,16 +59,23 @@ export async function POST(
       );
     }
 
+    // Mastery only ever goes up: an item mastered once stays mastered, even if
+    // a later pass gets it wrong. It used to take EXCLUDED.mastered outright,
+    // so every re-run traded newly-learnt items for freshly-missed ones and the
+    // count sat still — a learner could work through the deck repeatedly and
+    // watch "memorize (16/49)" never move, with the practice exam demanding all
+    // 49 be right in a single pass. is_correct still records the last answer,
+    // so the sitting itself is unchanged.
     const result = await pool.query(
-      `INSERT INTO memorization_progress 
+      `INSERT INTO memorization_progress
         (user_id, memorization_id, selected_choice_id, is_correct, reviewed_at, mastered)
        VALUES ($1, $2, $3, $4, now(), $5)
-       ON CONFLICT (user_id, memorization_id) 
-       DO UPDATE SET 
+       ON CONFLICT (user_id, memorization_id)
+       DO UPDATE SET
          selected_choice_id = EXCLUDED.selected_choice_id,
          is_correct = EXCLUDED.is_correct,
          reviewed_at = now(),
-         mastered = EXCLUDED.mastered
+         mastered = memorization_progress.mastered OR EXCLUDED.mastered
        RETURNING *`,
       [
         session.user.id,

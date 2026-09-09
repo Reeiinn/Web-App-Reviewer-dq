@@ -38,16 +38,19 @@ export async function POST(
 
     const isCorrect = choiceResult.rows[0].is_correct;
 
+    // Mastery is sticky here for the same reason it is on
+    // POST /api/memorization/[id]/progress: a later wrong answer records itself
+    // in is_correct without taking back an item the learner has already had right.
     const result = await pool.query(
-      `INSERT INTO memorization_progress 
+      `INSERT INTO memorization_progress
         (user_id, memorization_id, selected_choice_id, is_correct, reviewed_at, mastered)
        VALUES ($1, $2, $3, $4, now(), $4)
-       ON CONFLICT (user_id, memorization_id) 
-       DO UPDATE SET 
+       ON CONFLICT (user_id, memorization_id)
+       DO UPDATE SET
          selected_choice_id = EXCLUDED.selected_choice_id,
          is_correct = EXCLUDED.is_correct,
          reviewed_at = now(),
-         mastered = EXCLUDED.mastered
+         mastered = memorization_progress.mastered OR EXCLUDED.mastered
        RETURNING *`,
       [user_id, memorizationId, selected_choice_id, isCorrect],
     );

@@ -38,6 +38,10 @@ export async function POST(
       );
     }
 
+    // "A card counts as mastered once you have" — the About page's words, and
+    // now the query's. Taking EXCLUDED.mastered outright meant a card known in
+    // one pass and missed in the next went back to unmastered, so repeated runs
+    // swapped one card for another and the tally stood still.
     const result = await pool.query(
       `INSERT INTO flashcard_progress
         (user_id, flashcard_id, reviewed_at, mastered)
@@ -45,7 +49,7 @@ export async function POST(
        ON CONFLICT (user_id, flashcard_id)
        DO UPDATE SET
          reviewed_at = now(),
-         mastered = EXCLUDED.mastered
+         mastered = flashcard_progress.mastered OR EXCLUDED.mastered
        RETURNING *`,
       [session.user.id, flashcardId, mastered],
     );

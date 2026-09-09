@@ -532,10 +532,55 @@ function PracticeExamContent() {
                     Question {index + 1} · {wasRight ? "Correct" : "Incorrect"}
                   </p>
                   <QuestionText text={question.text} />
-                  <p className="mt-3 text-sm text-[#0F7B52]">
-                    <strong>Correct answer:</strong>{" "}
-                    {question.choices.find((choice) => choice.is_correct)?.text}
-                  </p>
+
+                  {/* The paper is over, so the choices are read rather than
+                      pressed: the right answer is marked on every question,
+                      and a wrong pick is marked beside it so the two can be
+                      compared without hunting for what was chosen. */}
+                  <div className="mt-4 flex flex-col gap-2.5">
+                    {question.choices.map((choice, choiceIndex) => {
+                      const picked = chosen === choice.id;
+                      const pickedWrong = picked && !choice.is_correct;
+
+                      return (
+                        <div
+                          key={choice.id}
+                          className={`flex items-center gap-4 rounded-lg border-2 px-4 py-3 text-left text-sm ${
+                            choice.is_correct
+                              ? "border-[#0F7B52] bg-[#0F7B52]/10"
+                              : pickedWrong
+                                ? "border-[#C91D1D] bg-[#C91D1D]/10"
+                                : "border-border"
+                          }`}
+                        >
+                          <span
+                            className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                              choice.is_correct
+                                ? "border-[#0F7B52] bg-[#0F7B52] text-white"
+                                : pickedWrong
+                                  ? "border-[#C91D1D] bg-[#C91D1D] text-white"
+                                  : "border-border text-muted-foreground"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + choiceIndex)}
+                          </span>
+
+                          <span className="flex-1">{choice.text}</span>
+
+                          {choice.is_correct && (
+                            <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-[#0F7B52]">
+                              {picked ? "Your answer · Correct" : "Correct answer"}
+                            </span>
+                          )}
+                          {pickedWrong && (
+                            <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-[#C91D1D]">
+                              Your answer
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </section>
               );
             })}
