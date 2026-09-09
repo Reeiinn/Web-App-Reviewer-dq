@@ -1,4 +1,5 @@
 import pool from "@/lib/db";
+import { appUrl } from "@/lib/helper/app-url";
 import { createResetToken } from "@/lib/helper/reset-token";
 import { forgotPasswordSchema } from "@/lib/validation/auth.validation";
 import { NextResponse } from "next/server";
@@ -49,8 +50,9 @@ export async function POST(req: Request) {
       [userId, tokenHash, expiresAt],
     );
 
-    const origin = new URL(req.url).origin;
-    const resetUrl = `${origin}/reset-password?token=${token}`;
+    // The app's own address: a reset link is opened from an inbox, not from
+    // the host this request arrived at.
+    const resetUrl = appUrl(req, `/reset-password?token=${token}`);
 
     // No mailer is wired up yet. Outside production the link comes back in the
     // response so the flow is usable; in production it is withheld.

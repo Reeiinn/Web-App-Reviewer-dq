@@ -29,9 +29,18 @@ export function Invite() {
         return;
       }
 
-      setLink(
-        `${window.location.origin}/signup?code=${encodeURIComponent(data.code)}`,
-      );
+      // The server builds the link on the app's canonical address. Pasting
+      // together window.location.origin instead handed out whatever host this
+      // browser happened to be on — a localhost link from a dev session, a
+      // one-off deployment address from a preview build.
+      if (!data.link) {
+        setError(
+          "The invitation was created without a link. Please try again.",
+        );
+        return;
+      }
+
+      setLink(data.link);
       setExpiresAt(new Date(data.expires_at).toLocaleDateString());
     } catch {
       setError("Could not reach the server. Please try again.");

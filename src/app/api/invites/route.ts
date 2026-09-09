@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { auth } from "@/lib/auth";
+import { appUrl } from "@/lib/helper/app-url";
 import { touchLastSeen } from "@/app/api/_lib/presence-store";
 import pool from "@/lib/db";
 import {
@@ -98,10 +99,14 @@ export async function POST(req: Request) {
     );
 
     const invite = result.rows[0];
-    const link = `${new URL(req.url).origin}/signup?code=${encodeURIComponent(invite.code)}`;
+    // Built on the app's own address, not on the host this request arrived at:
+    // an invite is pasted into a chat or an inbox and opened elsewhere.
+    const link = appUrl(req, `/signup?code=${encodeURIComponent(invite.code)}`);
 
+    // The open link goes back with the invite too, so the console shows the
+    // same address the emailed one carries.
     if (!email) {
-      return NextResponse.json(invite, { status: 201 });
+      return NextResponse.json({ ...invite, link }, { status: 201 });
     }
 
     const title = staffTitleFor(role) ?? "reviewee";
