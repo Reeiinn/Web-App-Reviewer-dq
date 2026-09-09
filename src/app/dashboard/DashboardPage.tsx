@@ -340,13 +340,25 @@ function TrackCard({
             href={`/learningMethods/practiceExam?exam_type=${type}${
               trackPassed ? "&mode=review" : ""
             }`}
-            className={`w-full whitespace-nowrap rounded-lg px-3 py-2 text-center text-sm font-bold transition sm:w-auto ${
+            className={`w-full rounded-lg px-3 py-2 text-center text-sm font-bold leading-tight transition sm:w-auto ${
               trackPassed
                 ? "border-2 border-[#0F7B52] text-[#0F7B52] hover:bg-[#E7F4EE]"
                 : "bg-[var(--exam)] text-white hover:bg-[var(--exam-strong)]"
             }`}
           >
-            {trackPassed ? "Review Practice Exam" : "Practice Exam"}
+            {trackPassed ? (
+              // Two track cards sit side by side on a phone, and "Review
+              // Practice Exam" is wider than half that screen: nowrap pushed
+              // the label straight out through the button's own border. The
+              // short label says the same thing in the room there is, and the
+              // full one returns as soon as a card is wide enough to hold it.
+              <>
+                <span className="sm:hidden">Review Exam</span>
+                <span className="hidden sm:inline">Review Practice Exam</span>
+              </>
+            ) : (
+              "Practice Exam"
+            )}
           </Link>
         )}
 
