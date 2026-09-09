@@ -3,8 +3,13 @@
 import { AppNav } from "@/components/ui/app-nav";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { fresh } from "@/lib/helper/fetch-fresh";
+import {
+  filterSearch,
+  indexForSearch,
+  searchNeedle,
+} from "@/lib/helper/search";
 
 type Term = {
   id: string;
@@ -37,19 +42,28 @@ export function GlossaryPage() {
     };
   }, []);
 
-  // Filtering client-side keeps typing instant; the list is small by nature.
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+  // Terms and their definitions are folded once, when the glossary arrives.
+  // A definition is a paragraph, and refolding every one of them per letter was
+  // the whole cost of typing here.
+  const index = useMemo(
+    () => indexForSearch(terms, (item) => [item.term, item.definition]),
+    [terms],
+  );
 
-    return terms.filter((item) => {
-      if (track !== "ALL" && item.exam_type !== track) return false;
-      if (!needle) return true;
-      return (
-        item.term.toLowerCase().includes(needle) ||
-        item.definition.toLowerCase().includes(needle)
-      );
-    });
-  }, [terms, query, track]);
+  // The box holds what was typed; the list follows a beat behind under load.
+  // React keeps the input painting at typing speed rather than making each
+  // keystroke wait for the filtered list to render.
+  const deferredQuery = useDeferredValue(query);
+
+  const visible = useMemo(
+    () =>
+      filterSearch(
+        index,
+        searchNeedle(deferredQuery),
+        (item) => track === "ALL" || item.exam_type === track,
+      ),
+    [index, deferredQuery, track],
+  );
 
   const countFor = (filter: TrackFilter) =>
     filter === "ALL"

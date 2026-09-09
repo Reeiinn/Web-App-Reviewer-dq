@@ -13,6 +13,11 @@ import { SummaryTile } from "@/components/ui/summary-tile";
 import { staffTitleFor } from "@/lib/helper/roles";
 import { NUDGE_MAX_LENGTH, nudgeAge, nudgePresets } from "@/lib/helper/nudges";
 import { PASSES_REQUIRED, passesLabel } from "@/lib/helper/practice-exam";
+import {
+  filterSearch,
+  indexForSearch,
+  searchNeedle,
+} from "@/lib/helper/search";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import {
   readinessStatus,
@@ -31,7 +36,7 @@ import {
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 type Recruiter = {
   id: string;
@@ -689,32 +694,38 @@ export function AdminPage() {
     [roster],
   );
 
-  const visible = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-
-    const filtered = roster.filter((row) => {
-      if (statusFilter !== "ALL" && row.status !== statusFilter) return false;
-      if (!needle) return true;
-
-      // An admin looking at everyone should be able to pull up a manager's
-      // whole intake by typing that manager's name.
-      const haystack = [
+  // The roster is folded once per load. An admin looking at everyone should be
+  // able to pull up a manager's whole intake by typing that manager's name, so
+  // the recruiter's details are part of the row's text for them.
+  const index = useMemo(
+    () =>
+      indexForSearch(roster, (row) => [
         row.name,
         row.email,
         ...(isAdmin && row.manager
           ? [row.manager.name, row.manager.email]
           : []),
-      ];
+      ]),
+    [roster, isAdmin],
+  );
 
-      return haystack.some((field) => field.toLowerCase().includes(needle));
-    });
+  // The box holds what was typed; the table follows a beat behind on a long
+  // roster, so a keystroke never waits on fifteen rows re-rendering.
+  const deferredSearch = useDeferredValue(search);
 
-    return [...filtered].sort((a, b) => {
+  const visible = useMemo(() => {
+    const filtered = filterSearch(
+      index,
+      searchNeedle(deferredSearch),
+      (row) => statusFilter === "ALL" || row.status === statusFilter,
+    );
+
+    return filtered.sort((a, b) => {
       if (sort === "name_asc") return a.name.localeCompare(b.name);
       if (sort === "readiness_asc") return a.readiness - b.readiness;
       return b.readiness - a.readiness;
     });
-  }, [roster, statusFilter, sort, search, isAdmin]);
+  }, [index, statusFilter, sort, deferredSearch]);
 
   const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -867,8 +878,10 @@ export function AdminPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {roster.length === 0
                 ? "No reviewees have been registered yet."
-                : search.trim()
-                  ? `Nothing matches "${search.trim()}". Try a different name or email.`
+                : // The term the table was actually filtered by, so the message
+                  // cannot name one the rows have not been matched against yet.
+                  deferredSearch.trim()
+                  ? `Nothing matches "${deferredSearch.trim()}". Try a different name or email.`
                   : "Try clearing the status filter."}
             </p>
           </div>

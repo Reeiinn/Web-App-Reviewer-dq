@@ -12,6 +12,11 @@ import {
   recruitProgress,
 } from "@/lib/helper/field-manager";
 import { presenceLabels, type PresenceStatus } from "@/lib/helper/presence";
+import {
+  filterSearch,
+  indexForSearch,
+  searchNeedle,
+} from "@/lib/helper/search";
 import { staffTitleFor } from "@/lib/helper/roles";
 import {
   AlertTriangle,
@@ -24,7 +29,7 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
 type FieldManager = {
   id: string;
@@ -370,18 +375,24 @@ export function FieldManagerPage() {
     [managers],
   );
 
+  // Folded once per ranking rather than once per letter typed.
+  const index = useMemo(
+    () => indexForSearch(ranked, (row) => [row.name, row.email]),
+    [ranked],
+  );
+
+  // The box holds what was typed; the cards follow a beat behind, so typing
+  // never waits on a page of them re-rendering.
+  const deferredSearch = useDeferredValue(search);
+
   const visible = useMemo(() => {
-    const needle = search.trim().toLowerCase();
+    const filtered = filterSearch(
+      index,
+      searchNeedle(deferredSearch),
+      (row) => activity === "ALL" || row.status === activity,
+    );
 
-    const filtered = ranked.filter((row) => {
-      if (activity !== "ALL" && row.status !== activity) return false;
-      if (!needle) return true;
-      return [row.name, row.email].some((field) =>
-        field.toLowerCase().includes(needle),
-      );
-    });
-
-    return [...filtered].sort((a, b) => {
+    return filtered.sort((a, b) => {
       if (sort === "name_asc") return a.name.localeCompare(b.name);
       if (sort === "new_desc") return b.newThisMonth - a.newThisMonth;
       if (sort === "recent_active") {
@@ -392,7 +403,7 @@ export function FieldManagerPage() {
       // The default order is the ranking itself, ties already settled.
       return a.rank - b.rank;
     });
-  }, [ranked, activity, search, sort]);
+  }, [index, activity, deferredSearch, sort]);
 
   const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -509,8 +520,8 @@ export function FieldManagerPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {managers.length === 0
                 ? "No field manager accounts have been created yet."
-                : search.trim()
-                  ? `Nothing matches "${search.trim()}". Try a different name or email.`
+                : deferredSearch.trim()
+                  ? `Nothing matches "${deferredSearch.trim()}". Try a different name or email.`
                   : "Try clearing the activity filter."}
             </p>
           </div>
