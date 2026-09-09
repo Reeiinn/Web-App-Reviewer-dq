@@ -26,9 +26,12 @@ const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
  *
  * The order belongs to the attempt rather than to the page, so a refresh
  * returns to the same questions in the same places instead of reshuffling
- * under answers already given. Questions added to the track since the sitting
- * began go on the end; ones withdrawn since simply drop out. An attempt with
- * no stored order — one dealt before this was kept — falls back to a shuffle.
+ * under answers already given. The paper is fixed at that: questions added to
+ * the track mid-sitting used to go on the end, which grew the paper under a
+ * learner who had already seen its length and scored them against a total the
+ * attempt never recorded. They wait for the next sitting now. Questions
+ * withdrawn since simply drop out. An attempt with no stored order — one dealt
+ * before this was kept — falls back to a shuffle.
  */
 function dealt(
   items: Question[],
@@ -40,12 +43,9 @@ function dealt(
   if (!order) return shuffled(items);
 
   const byId = new Map(items.map((item) => [item.id, item]));
-  const inOrder = order
+  return order
     .map((id) => byId.get(id))
     .filter((item): item is Question => Boolean(item));
-
-  const seen = new Set(inOrder.map((item) => item.id));
-  return [...inOrder, ...items.filter((item) => !seen.has(item.id))];
 }
 
 /**
