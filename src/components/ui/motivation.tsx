@@ -118,13 +118,48 @@ export function AnswerFeedback({
 export function SessionMastery({
   accuracy,
   averageSeconds,
+  trackMastery,
 }: {
   accuracy: number;
   averageSeconds: number;
+  /**
+   * Mastery for the whole track, which is the figure the practice exam is
+   * gated on. The counter in the header is a place in the deck — "question 27
+   * of 49" — and the two were read as the same number when only one of them
+   * was on screen. Null until the count has been fetched.
+   */
+  trackMastery?: { mastered: number; total: number } | null;
 }) {
   return (
     <section className="rv-card p-5">
       <h2 className="text-lg font-extrabold">Session Mastery</h2>
+
+      {trackMastery && trackMastery.total > 0 && (
+        <div className="mt-4">
+          <div className="flex items-baseline justify-between text-sm">
+            <span className="text-muted-foreground">
+              Mastered on this track
+            </span>
+            <strong className="tabular-nums">
+              {trackMastery.mastered} / {trackMastery.total}
+            </strong>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-[#8A6D0B] transition-[width] duration-500"
+              style={{
+                width: `${Math.round(
+                  (trackMastery.mastered / trackMastery.total) * 100,
+                )}%`,
+              }}
+            />
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            What the practice exam unlocks on. The number beside the title is
+            your place in the deck.
+          </p>
+        </div>
+      )}
 
       <div className="mt-4">
         <div className="flex items-baseline justify-between text-sm">

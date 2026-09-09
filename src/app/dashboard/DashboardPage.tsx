@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type ProgressSummaryRow = {
@@ -508,13 +508,20 @@ export function DashboardPage() {
   const [recent, setRecent] = useState<RecentItem[]>([]);
   const [activeTab, setActiveTab] = useState<"tracks" | "quick">("tracks");
 
-  useEffect(() => {
-    let active = true;
+  /**
+   * The generation of the newest load. A reply from an older one is dropped, so
+   * a slow first request cannot land on top of a fresher refresh.
+   */
+  const generation = useRef(0);
+
+  const load = useCallback(() => {
+    const mine = ++generation.current;
+    const current = () => generation.current === mine;
 
     fetch("/api/recent-activity")
       .then((response) => response.json())
       .then((rows: RecentItem[]) => {
-        if (active && Array.isArray(rows)) setRecent(rows);
+        if (current() && Array.isArray(rows)) setRecent(rows);
       })
       .catch((error) =>
         console.error("Failed to load recent activity:", error),
@@ -523,7 +530,7 @@ export function DashboardPage() {
     fetch("/api/progress")
       .then((response) => response.json())
       .then((rows: ProgressSummaryRow[]) => {
-        if (!active || !Array.isArray(rows)) return;
+        if (!current() || !Array.isArray(rows)) return;
         const next = { ...emptyProgress };
         const passCounts = { ...emptyPasses };
         const stamps: TrackActivity = {};
@@ -546,14 +553,41 @@ export function DashboardPage() {
       ),
     )
       .then((entries) => {
-        if (active) setEligibility(Object.fromEntries(entries));
+        if (current()) setEligibility(Object.fromEntries(entries));
       })
       .catch((error) => console.error("Failed to load eligibility:", error));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  /**
+   * Reload whatever the learner did while they were away.
+   *
+   * These counts used to be read once, when the dashboard first mounted.
+   * Returning from a study screen restores this page from the router cache
+   * rather than mounting it again, so the effect never re-ran and the card sat
+   * on the figure it was given: "Finish memorize (20/49) to unlock" beside a
+   * practice-exam screen that had just fetched 27/49. Every study screen is a
+   * navigation away and back, or a tab left and returned to, so both are what
+   * this listens for.
+   */
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") load();
+    };
+
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    document.addEventListener("visibilitychange", refresh);
 
     return () => {
-      active = false;
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [load]);
 
   const firstName = session?.user?.name?.split(" ")[0] ?? "Scholar";
 
