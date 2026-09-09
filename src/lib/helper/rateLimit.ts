@@ -41,11 +41,27 @@ function buildLimiter(
 /**
  * General write protection.
  *
- * 30 write requests per minute per IP.
+ * 60 write requests per minute, per signed-in account where there is one and
+ * per IP otherwise. Keying on the account is the point: a training centre puts
+ * every reviewee behind one address, and an IP budget there is a budget they
+ * spend on each other — one learner working quickly could throttle the room.
  */
 export const writeLimiter = buildLimiter(
-  Ratelimit.slidingWindow(30, "60 s"),
+  Ratelimit.slidingWindow(60, "60 s"),
   "ratelimit:write",
+);
+
+/**
+ * Answers written while sitting a practice exam.
+ *
+ * A paper runs to sixty questions and each pick is written through as it is
+ * made, so a learner moving quickly through a paper they know is a burst of
+ * writes that is entirely legitimate. It gets its own, wider budget rather
+ * than eating the general one.
+ */
+export const examAnswerLimiter = buildLimiter(
+  Ratelimit.slidingWindow(240, "60 s"),
+  "ratelimit:exam-answers",
 );
 
 /**

@@ -1,7 +1,11 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 import { NextRequest, NextResponse } from "next/server";
-import { writeLimiter, authIpLimiter } from "@/lib/helper/rateLimit";
+import {
+  writeLimiter,
+  authIpLimiter,
+  examAnswerLimiter,
+} from "@/lib/helper/rateLimit";
 
 const { auth } = NextAuth(authConfig);
 
@@ -30,7 +34,27 @@ function tooManyRequests(error: string) {
   return NextResponse.json({ error }, { status: 429 });
 }
 
-async function applySecurityHeaders(req: NextRequest, res: NextResponse) {
+/**
+ * Where a credentials sign-in is actually posted.
+ *
+ * The limiter used to watch /api/auth/signin, which is the page Auth.js serves,
+ * not the endpoint it posts to — signIn("credentials") goes to the callback
+ * below. Guarding the wrong path meant the per-IP login limit had never once
+ * fired, leaving the per-email limit in authorize() as the only thing standing
+ * between the app and a run through a credential list.
+ */
+const SIGN_IN_PATH = "/api/auth/callback/credentials";
+
+/** Auth.js needs these unrestricted: session, csrf and signout are plumbing. */
+const isSignInPost = (pathname: string, method: string) =>
+  method === "POST" && pathname === SIGN_IN_PATH;
+
+async function applySecurityHeaders(
+  req: NextRequest,
+  res: NextResponse,
+  /** The signed-in account, when there is one, for per-account limiting. */
+  userId?: string,
+) {
   const forwardedFor = req.headers.get("x-forwarded-for");
 
   const ip =
@@ -41,19 +65,16 @@ async function applySecurityHeaders(req: NextRequest, res: NextResponse) {
   const pathname = req.nextUrl.pathname;
 
   const isAuthRoute = pathname.startsWith("/api/auth");
-  const isSignIn = pathname === "/api/auth/signin";
-
   const isWrite = req.method !== "GET";
 
-  /*
-   * Only rate-limit the actual sign-in endpoint by IP.
-   *
-   * Auth.js needs unrestricted access to:
-   * - /api/auth/session
-   * - /api/auth/csrf
-   * - /api/auth/signout
-   */
-  if (isSignIn && req.method === "POST") {
+  // A shared address is one budget between everyone behind it, so a signed-in
+  // caller is limited as themselves and only an anonymous one falls back to IP.
+  const writeKey = userId ? `user:${userId}` : `ip:${ip}`;
+
+  const isExamAnswer =
+    /^\/api\/attempts\/[^/]+\/answers$/.test(pathname) && req.method === "POST";
+
+  if (isSignInPost(pathname, req.method)) {
     const allowed = await safeLimitCheck(authIpLimiter, ip);
 
     if (!allowed) {
@@ -61,8 +82,14 @@ async function applySecurityHeaders(req: NextRequest, res: NextResponse) {
         "Too many login attempts. Please try again later.",
       );
     }
+  } else if (isExamAnswer) {
+    const allowed = await safeLimitCheck(examAnswerLimiter, writeKey);
+
+    if (!allowed) {
+      return tooManyRequests("Answers are being saved too quickly.");
+    }
   } else if (!isAuthRoute && isWrite) {
-    const allowed = await safeLimitCheck(writeLimiter, ip);
+    const allowed = await safeLimitCheck(writeLimiter, writeKey);
 
     if (!allowed) {
       return tooManyRequests("Too many requests. Please slow down.");
@@ -102,26 +129,27 @@ async function applySecurityHeaders(req: NextRequest, res: NextResponse) {
   return res;
 }
 
-export default auth(async (req: NextRequest) => {
-  return applySecurityHeaders(req, NextResponse.next());
+export default auth(async (req) => {
+  return applySecurityHeaders(
+    req as NextRequest,
+    NextResponse.next(),
+    req.auth?.user?.id,
+  );
 });
 
 export const config = {
+  /**
+   * Everything, rather than a list of routes to keep in step with the app.
+   *
+   * The list left /api/auth, /api/user, /api/nudges and /api/recent-activity
+   * outside: no write limit on any of them, no login limit at all, and no
+   * security headers on the sign-in page — the one screen where a header is
+   * worth most. A route added tomorrow would have been outside it too.
+   *
+   * Excluded are Next's own build output and the icons in /public, which carry
+   * nothing to protect and would only add a middleware invocation per asset.
+   */
   matcher: [
-    "/dashboard/:path*",
-    "/learningMethods/:path*",
-    "/glossary/:path*",
-    "/analytics/:path*",
-    "/certificates/:path*",
-    "/admin/:path*",
-    "/api/admin/:path*",
-    "/api/invites/:path*",
-    "/api/attempts/:path*",
-    "/api/flashcards/:path*",
-    "/api/glossary/:path*",
-    "/api/memorization/:path*",
-    "/api/progress/:path*",
-    "/api/questions/:path*",
-    "/api/streaks/:path*",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff2?)$).*)",
   ],
 };
