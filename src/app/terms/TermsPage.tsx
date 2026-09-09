@@ -4,7 +4,7 @@ import {
   LEGAL_LAST_UPDATED,
   LEGAL_SERVICE_NAME,
 } from "@/lib/legal";
-import { AlertTriangle, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
 
 /**
  * Static prose, so this stays a server component — same reasoning as About
@@ -40,14 +40,9 @@ export function TermsPage({ signedIn }: { signedIn: boolean }) {
 
       <InfoSection title="What INSURE is not">
         <div className="rv-card mt-4 p-6">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#0B2340] text-[#FFD400]">
-              <AlertTriangle className="size-4" aria-hidden="true" />
-            </span>
-            <h3 className="text-lg font-extrabold text-foreground">
-              Read this part first
-            </h3>
-          </div>
+          <h3 className="text-lg font-extrabold text-foreground">
+            Read this part first
+          </h3>
           <ul className="mt-3 ml-5 list-disc space-y-2 text-sm leading-6">
             <li>
               {LEGAL_SERVICE_NAME} is study material. It is not affiliated with,

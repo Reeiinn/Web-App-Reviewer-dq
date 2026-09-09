@@ -1,5 +1,5 @@
 import { InfoSection, InfoShell } from "@/components/ui/info-shell";
-import { LifeBuoy, Lock, Mail } from "lucide-react";
+import { Lock } from "lucide-react";
 
 /**
  * Static prose, so this stays a server component — same reasoning as About.
@@ -97,14 +97,7 @@ export function HelpPage({ signedIn }: { signedIn: boolean }) {
 
       <InfoSection title="Suggestions and concerns">
         <div className="rv-card mt-4 p-6">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#0B2340] text-[#FFD400]">
-              <LifeBuoy className="size-4" aria-hidden="true" />
-            </span>
-            <h3 className="text-lg font-extrabold text-foreground">
-              Email us
-            </h3>
-          </div>
+          <h3 className="text-lg font-extrabold text-foreground">Email us</h3>
 
           {SUPPORT_EMAIL ? (
             <p className="mt-3 text-sm leading-6">
@@ -113,10 +106,6 @@ export function HelpPage({ signedIn }: { signedIn: boolean }) {
                 href={`mailto:${SUPPORT_EMAIL}`}
                 className="font-semibold text-[#8A6D0B] underline underline-offset-2 hover:text-foreground"
               >
-                <Mail
-                  className="mr-1.5 inline size-4 align-[-2px]"
-                  aria-hidden="true"
-                />
                 {SUPPORT_EMAIL}
               </a>{" "}
               with a suggestion, a concern, or anything the app is getting wrong.
