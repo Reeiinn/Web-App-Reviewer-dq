@@ -46,7 +46,20 @@ export const authConfig: NextAuthConfig = {
    */
   trustHost: true,
 
-  session: { strategy: "jwt" },
+  /**
+   * A day, refreshed at most hourly.
+   *
+   * The default is thirty. Role and manager live in the token, so for thirty
+   * days a demoted Sales Manager kept the console, a reassigned reviewee kept
+   * their old manager's oversight, and a deleted account kept a working
+   * session. Shortening the window bounds that; the jwt callback below closes
+   * the rest of it by re-reading the account each time the token is refreshed.
+   */
+  session: {
+    strategy: "jwt",
+    maxAge: 24 * 60 * 60,
+    updateAge: 60 * 60,
+  },
 
   /**
    * Spelled out rather than inherited.
