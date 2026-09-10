@@ -119,7 +119,7 @@ export function NotificationBell() {
   }
 
   return (
-    <div className="relative" ref={container}>
+    <div ref={container}>
       <button
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
@@ -140,7 +140,12 @@ export function NotificationBell() {
       {open && (
         <div
           role="menu"
-          className="rv-pop-in absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
+          // `right-0` here is the nav cluster's right edge — the page gutter —
+          // rather than the bell's, which sits an avatar and a gap short of it.
+          // Anchored to the bell, a 20rem panel ran off the left of the screen
+          // on any viewport under 384px, which is most phones, and left
+          // overflow is not something the browser lets you scroll back to.
+          className="rv-pop-in absolute right-0 top-11 z-50 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
         >
           <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
             <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -162,7 +167,10 @@ export function NotificationBell() {
               {loaded ? "Nothing from your manager yet." : "Loading…"}
             </p>
           ) : (
-            <ul className="max-h-80 overflow-y-auto">
+            // `dvh` rather than a fixed cap: a phone held sideways has less height
+            // than the list wants, and the browser's collapsing address bar
+            // moves the number.
+            <ul className="max-h-[min(20rem,60dvh)] overflow-y-auto">
               {nudges.map((nudge) => (
                 <li
                   key={nudge.id}

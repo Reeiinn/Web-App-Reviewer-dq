@@ -180,7 +180,7 @@ function UserMenu() {
       {open && (
         <div
           role="menu"
-          className="rv-pop-in absolute right-0 top-11 z-50 w-72 overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
+          className="rv-pop-in absolute right-0 top-11 z-50 w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
         >
           <div className="border-b border-border px-4 py-3">
             {/* Photo, then who you are: the same left-to-right order the
@@ -403,7 +403,10 @@ export function AppNav({
           </ul>
         </nav>
 
-        <div className="flex items-center gap-3">
+        {/* Positioned so the bell's panel can anchor to this cluster's right
+            edge — the page gutter — instead of to the bell itself. The user
+            menu keeps its own context: it is already the rightmost item. */}
+        <div className="relative flex items-center gap-3">
           {/* Staff send reminders and receive none, so the bell would only ever
               be empty for them. */}
           {session?.user && !isStaff(session.user.role) && <NotificationBell />}
