@@ -4,7 +4,7 @@ import { AppNav } from "@/components/ui/app-nav";
 import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
 import { motivationFor, MotivationMessage } from "@/lib/helper/motivation";
-import { splitStatements } from "@/lib/helper/question-text";
+import { labelChoices, splitStatements } from "@/lib/helper/question-text";
 import { createWriteQueue } from "@/lib/helper/session-writes";
 import {
   restoreSession,
@@ -163,6 +163,7 @@ function FlashCardContent() {
   const wrong = cards.filter((item) => ratings[item.id] === false);
   const front = splitStatements(card?.front ?? "");
   const back = splitStatements(card?.back ?? "");
+  const choices = labelChoices(card?.choices);
 
   // Keyed on the card rather than on its text: the frame is remounted per card,
   // so two cards that happen to read the same still need a fresh measurement of
@@ -389,6 +390,29 @@ function FlashCardContent() {
                           className="block rounded-lg bg-muted px-[0.7em] py-[0.35em] text-[1.125em] font-semibold leading-[1.3]"
                         >
                           {statement}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+
+                  {/* "Which of the following" cannot be answered from the
+                      prompt alone, so the options are on the question side
+                      rather than the answer side. They carry the card's own
+                      surface and a border instead of the statements' filled
+                      chip: on a card that enumerates statements too, the rows
+                      you choose between must not look like the rows you are
+                      being told. */}
+                  {choices.length > 0 && (
+                    <span className="flex w-full flex-col gap-[0.3em] text-left">
+                      {choices.map((choice) => (
+                        <span
+                          key={choice.id}
+                          className="flex items-start gap-[0.6em] rounded-lg border border-border bg-card px-[0.7em] py-[0.35em] text-[1.125em] font-semibold leading-[1.3]"
+                        >
+                          <span className="shrink-0 font-extrabold text-[#0B2340]/70">
+                            {choice.letter}.
+                          </span>
+                          <span>{choice.text}</span>
                         </span>
                       ))}
                     </span>
