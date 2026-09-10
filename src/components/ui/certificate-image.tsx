@@ -250,23 +250,46 @@ export function CertificateImage({
         </span>
       </div>
 
-      <Row top={71.4}>
+      {/* Raised to open up the band the signature sits in. The signature is
+          123px tall and cannot be scaled down without distorting, so the room
+          has to come from here rather than from it. */}
+      <Row top={69.3}>
         <span style={{ fontSize: w(2) }}>Signed by:</span>
       </Row>
 
       {/* Sits in the gap between "Signed by:" and the signer's printed name,
-          crossing neither. That gap is about 96px, so the signature is sized to
-          it rather than kept at the 123px it used to be and allowed to run over
-          the name below — which is the one thing it must not cover. */}
-      <Row top={76.4}>
+          crossing neither.
+
+          At its own 123px, and no smaller: satori sizes an image from whichever
+          dimensions it is given, so a height on its own keeps the artwork's
+          full width against a shorter box and squashes the writing. The gap is
+          opened above instead. */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: h(75.2),
+          // Spelled out, and equal to the image's own height. A row that sizes
+          // itself from its content gave satori licence to squash the writing
+          // flat while keeping its width — the artwork has to be told exactly
+          // how much room it has.
+          height: w(6.15),
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transform: "translateY(-50%)",
+        }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
         <img
           src={marks.signature ?? DRAWN_SIGNATURE}
           alt=""
-          height={w(4.9)}
-          style={{ height: w(4.9) }}
+          width={w(12.85)}
+          height={w(6.15)}
+          style={{ width: w(12.85), height: w(6.15) }}
         />
-      </Row>
+      </div>
 
       <Row top={81.7}>
         <span style={{ fontWeight: 700, fontSize: w(2.1), color: INK }}>
@@ -287,7 +310,7 @@ export function CertificateImage({
         style={{
           position: "absolute",
           left: w(4.2),
-          bottom: h(2),
+          bottom: h(2.8),
           width: w(11.8),
           display: "flex",
           flexDirection: "column",
@@ -296,7 +319,13 @@ export function CertificateImage({
       >
         {marks.logo ? (
           // eslint-disable-next-line @next/next/no-img-element -- as above.
-          <img src={marks.logo} alt="" width={w(10)} />
+          <img
+            src={marks.logo}
+            alt=""
+            width={w(10)}
+            height={w(7.3)}
+            style={{ width: w(10), height: w(7.3), objectFit: "contain" }}
+          />
         ) : (
           // A wrapper, not a fragment: satori lays a fragment's children out as
           // one row, which put the mark and the wordmark side by side.
@@ -308,7 +337,13 @@ export function CertificateImage({
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
-            <img src={DRAWN_LOGO} alt="" width={w(6.6)} />
+            <img
+              src={DRAWN_LOGO}
+              alt=""
+              width={w(6.6)}
+              height={w(4.81)}
+              style={{ width: w(6.6), height: w(4.81) }}
+            />
             <span
               style={{
                 fontFamily: SERIF,
