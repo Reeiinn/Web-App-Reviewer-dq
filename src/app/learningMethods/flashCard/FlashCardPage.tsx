@@ -72,6 +72,8 @@ function FlashCardContent() {
   const advanceTimer = useRef<number | null>(null);
   /** Card the deck resumed on, so the learner sees where they left off. */
   const [resumedAt, setResumedAt] = useState<number | null>(null);
+  /** Whether Reset has asked its question and is waiting on the answer. */
+  const [confirmingReset, setConfirmingReset] = useState(false);
 
   /** Saves and clearings of the deck, in the order this page issued them. */
   const writeQueue = useRef(
@@ -212,11 +214,15 @@ function FlashCardContent() {
     setFinished(false);
     setMessage(null);
     setResumedAt(null);
+    setConfirmingReset(false);
   };
 
   const answer = async (isCorrect: boolean) => {
     if (!card || !revealed || message) return;
 
+    // The deck is about to move on, so a Reset question left standing would be
+    // answered against a card the learner is no longer looking at.
+    setConfirmingReset(false);
     setRatings((current) => ({ ...current, [card.id]: isCorrect }));
 
     const nextRun = isCorrect ? run + 1 : 0;
@@ -307,13 +313,66 @@ function FlashCardContent() {
             </p>
           )}
 
-          <button
-            onClick={() => resetSession(shuffled(cards))}
-            disabled={Boolean(message)}
-            className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-border px-3 py-2 text-xs font-bold transition hover:border-[#C9A227] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <RotateCcw className="size-3.5" /> Reset
-          </button>
+          {/* Reset throws away the sitting, so it asks first. The question is
+              answered next to the button that raised it rather than in a
+              window over the deck: the learner is mid-card, and a modal would
+              cost more attention than the decision does. */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setConfirmingReset((current) => !current)}
+              disabled={Boolean(message)}
+              aria-expanded={confirmingReset}
+              className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-border px-3 py-2 text-xs font-bold transition hover:border-[#C9A227] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RotateCcw className="size-3.5" /> Reset
+            </button>
+
+            {confirmingReset && (
+              <>
+                {/* Anywhere else is "no". */}
+                <button
+                  type="button"
+                  aria-label="Keep the session"
+                  onClick={() => setConfirmingReset(false)}
+                  className="fixed inset-0 z-30 cursor-default"
+                />
+
+                <div
+                  role="dialog"
+                  aria-label="Reset this session"
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setConfirmingReset(false);
+                  }}
+                  className="rv-pop-in absolute left-0 top-full z-40 mt-2 w-64 rounded-xl border border-border bg-card p-3 text-left shadow-lg"
+                >
+                  <p className="text-xs font-extrabold">Reset this session?</p>
+                  <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                    Every card in this sitting goes back to unrated and the deck
+                    reshuffles. Mastery you have already saved is kept.
+                  </p>
+
+                  <div className="mt-3 flex justify-end gap-2">
+                    <button
+                      onClick={() => setConfirmingReset(false)}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold transition hover:border-[#C9A227]"
+                    >
+                      Keep going
+                    </button>
+                    <button
+                      autoFocus
+                      onClick={() => {
+                        setConfirmingReset(false);
+                        resetSession(shuffled(cards));
+                      }}
+                      className="rounded-lg bg-[#0B2340] px-3 py-1.5 text-xs font-bold text-[#FFD400] transition hover:bg-[#123055]"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           <button
             onClick={() => {
