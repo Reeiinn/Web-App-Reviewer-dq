@@ -332,28 +332,30 @@ function FlashCardContent() {
           </button>
         </div>
 
-        {/* The card starts right below the Reset row and takes the rest. The
-            resume note floats over its top corner rather than pushing it down:
-            a note that lasts three seconds must not cost the card a band of
-            height for the whole sitting. */}
+        {/* The card starts right below the Reset row and takes the rest. */}
         <div className="relative mt-2 flex min-h-0 flex-1">
           {/* The verdict takes the whole card face rather than floating in a
               strip over it, so the colour alone reads as the answer from across
-              the room and the words carry the rest. */}
+              the room and the words carry the rest.
+
+              The panel is opaque from its first frame; only what it carries
+              animates in. Fading the panel itself let the card read through it
+              for a fifth of a second, so the verdict arrived as a wash over the
+              answer rather than as a colour of its own. */}
           {message && (
             <div
               role="status"
-              className={`rv-pop-in pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 rounded-[var(--radius)] p-8 text-center text-white ${
+              className={`pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 rounded-[var(--radius)] p-8 text-center text-white ${
                 message.mood === "correct" ? "bg-[#0F7B52]" : "bg-[#C91D1D]"
               }`}
             >
-              <p className="text-3xl font-extrabold leading-tight sm:text-4xl">
+              <p className="rv-pop-in text-3xl font-extrabold leading-tight sm:text-4xl">
                 {message.headline}
               </p>
               {message.mood === "correct" ? (
-                <Check className="size-14" strokeWidth={3} />
+                <Check className="rv-pop-in size-14" strokeWidth={3} />
               ) : (
-                <X className="size-14" strokeWidth={3} />
+                <X className="rv-pop-in size-14" strokeWidth={3} />
               )}
             </div>
           )}
