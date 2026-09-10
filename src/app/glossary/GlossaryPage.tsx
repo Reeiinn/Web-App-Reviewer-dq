@@ -2,6 +2,7 @@
 
 import { AppNav } from "@/components/ui/app-nav";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
+import type { GlossaryTerm } from "@/lib/types/glossary";
 import { Search } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { fresh } from "@/lib/helper/fetch-fresh";
@@ -10,18 +11,17 @@ import {
   indexForSearch,
   searchNeedle,
 } from "@/lib/helper/search";
-
-type Term = {
-  id: string;
-  exam_type: ExamType;
-  term: string;
-  definition: string;
-};
+import {
+  anchorsFor,
+  detailsSearchText,
+  normalizeDetails,
+} from "@/lib/helper/glossary";
+import { TermCard } from "./term-card";
 
 type TrackFilter = ExamType | "ALL";
 
 export function GlossaryPage() {
-  const [terms, setTerms] = useState<Term[]>([]);
+  const [terms, setTerms] = useState<GlossaryTerm[]>([]);
   const [query, setQuery] = useState("");
   const [track, setTrack] = useState<TrackFilter>("ALL");
   const [loading, setLoading] = useState(true);
@@ -31,8 +31,20 @@ export function GlossaryPage() {
 
     fetch("/api/glossary", fresh)
       .then((response) => response.json())
-      .then((data: Term[]) => {
-        if (active) setTerms(Array.isArray(data) ? data : []);
+      .then((data: unknown) => {
+        if (!active) return;
+        if (!Array.isArray(data)) {
+          setTerms([]);
+          return;
+        }
+        // `details` is a jsonb column: it is checked here, once, so no card
+        // has to defend itself against a malformed row.
+        setTerms(
+          data.map((row) => ({
+            ...row,
+            details: normalizeDetails(row?.details),
+          })),
+        );
       })
       .catch(() => active && setTerms([]))
       .finally(() => active && setLoading(false));
@@ -44,9 +56,15 @@ export function GlossaryPage() {
 
   // Terms and their definitions are folded once, when the glossary arrives.
   // A definition is a paragraph, and refolding every one of them per letter was
-  // the whole cost of typing here.
+  // the whole cost of typing here. Examples and key points fold in alongside
+  // them, so "trust" finds Absolute Assignee by its example.
   const index = useMemo(
-    () => indexForSearch(terms, (item) => [item.term, item.definition]),
+    () =>
+      indexForSearch(terms, (item) => [
+        item.term,
+        item.definition,
+        detailsSearchText(item.details),
+      ]),
     [terms],
   );
 
@@ -64,6 +82,10 @@ export function GlossaryPage() {
       ),
     [index, deferredQuery, track],
   );
+
+  // Anchors come from the whole glossary, not the filtered view, so a term
+  // keeps the same link whatever is typed in the box.
+  const anchors = useMemo(() => anchorsFor(terms), [terms]);
 
   const countFor = (filter: TrackFilter) =>
     filter === "ALL"
@@ -154,20 +176,52 @@ export function GlossaryPage() {
             </p>
           </div>
         ) : (
-          <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {visible.map((item) => (
-              <article key={item.id} className="rv-card p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-2xl font-extrabold">{item.term}</h2>
-                  <span className="shrink-0 rounded-full bg-[#0B2340] px-2.5 py-1 text-[10px] font-bold text-[#FFD400]">
-                    {examLabels[item.exam_type]}
-                  </span>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                  {item.definition}
-                </p>
-              </article>
-            ))}
+          // Cards vary enormously in height once they carry their examples and
+          // tables, so they run down one column with an index beside them
+          // rather than across a grid that leaves ragged gaps.
+          //
+          // Both layouts size that column with minmax(0,…). An auto-sized track
+          // grows to fit its widest content, so the one card carrying a
+          // comparison table set the width of the whole page — and every other
+          // card with it — on anything narrower than the table.
+          <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
+            <nav
+              aria-label="Glossary terms"
+              // Parks below the sticky AppNav, not under it.
+              className="rv-card sticky top-20 hidden max-h-[calc(100vh-6rem)] overflow-y-auto p-4 lg:block"
+            >
+              <h2 className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                {visible.length} {visible.length === 1 ? "term" : "terms"}
+              </h2>
+              <ol className="flex flex-col gap-0.5">
+                {visible.map((item, position) => (
+                  <li key={item.id}>
+                    <a
+                      href={`#${anchors.get(item.id)}`}
+                      className="flex gap-2 rounded-md px-2 py-1.5 text-[13px] leading-snug text-[#2C3442] hover:bg-accent hover:text-[#0B2340]"
+                    >
+                      <span className="font-bold tabular-nums text-[#A9A092]">
+                        {String(position + 1).padStart(2, "0")}
+                      </span>
+                      <span>{item.term}</span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+
+            {/* min-w-0: a grid item will not shrink past its widest content
+                otherwise, and one card's comparison table would set the width
+                of every card in the column. */}
+            <div className="flex min-w-0 flex-col gap-4">
+              {visible.map((item) => (
+                <TermCard
+                  key={item.id}
+                  term={item}
+                  anchor={anchors.get(item.id) ?? item.id}
+                />
+              ))}
+            </div>
           </div>
         )}
       </main>

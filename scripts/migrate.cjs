@@ -147,15 +147,27 @@ const statements = [
 
   `CREATE INDEX IF NOT EXISTS admin_actions_target_idx
      ON admin_actions (target_id)`,
+
+  // The structured half of a glossary term: its examples, comparison table and
+  // key points, which used to be flattened into the definition paragraph.
+  `ALTER TABLE vocabulary_terms ADD COLUMN IF NOT EXISTS details jsonb`,
+
+  // Terms are upserted on (exam_type, term) below, which needs a constraint to
+  // be idempotent against. Any duplicates from before it are folded down to the
+  // earliest row.
+  `DELETE FROM vocabulary_terms a
+    USING vocabulary_terms b
+    WHERE a.exam_type = b.exam_type
+      AND a.term = b.term
+      AND a.ctid > b.ctid`,
+
+  `CREATE UNIQUE INDEX IF NOT EXISTS vocabulary_terms_exam_term_key
+     ON vocabulary_terms (exam_type, term)`,
 ];
 
-// One example term so the Glossary renders against real data.
-const seedTerm = {
-  exam_type: "VUL",
-  term: "Actuary",
-  definition:
-    "A business professional who deals with the measurement and management of risk and uncertainty. They use mathematics, statistics, and financial theory to study uncertain future events, especially those of concern to insurance and pension programs.",
-};
+// The glossary as its source document has it, so the page renders against real
+// content. Edits to the seed file land on the next run.
+const seedTerms = require("./glossary-seed.cjs");
 
 (async () => {
   const client = await pool.connect();
@@ -165,21 +177,22 @@ const seedTerm = {
       console.log("ok  " + sql.trim().split("\n")[0]);
     }
 
-    const existing = await client.query(
-      `SELECT id FROM vocabulary_terms WHERE term = $1 AND exam_type = $2`,
-      [seedTerm.term, seedTerm.exam_type],
-    );
-
-    if (existing.rowCount === 0) {
+    for (const seed of seedTerms) {
       await client.query(
-        `INSERT INTO vocabulary_terms (exam_type, term, definition)
-         VALUES ($1, $2, $3)`,
-        [seedTerm.exam_type, seedTerm.term, seedTerm.definition],
+        `INSERT INTO vocabulary_terms (exam_type, term, definition, details)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (exam_type, term)
+         DO UPDATE SET definition = EXCLUDED.definition,
+                       details    = EXCLUDED.details`,
+        [
+          seed.exam_type,
+          seed.term,
+          seed.definition,
+          seed.details ? JSON.stringify(seed.details) : null,
+        ],
       );
-      console.log(`ok  seeded vocabulary term "${seedTerm.term}"`);
-    } else {
-      console.log(`ok  vocabulary term "${seedTerm.term}" already present`);
     }
+    console.log(`ok  seeded ${seedTerms.length} vocabulary terms`);
 
     console.log("\nMigration complete.");
   } catch (error) {
