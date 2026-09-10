@@ -447,14 +447,19 @@ function FlashCardContent() {
                       {/* The letter and the words together: a letter alone
                           cannot be checked against the front once the card has
                           turned, and the words alone leave the learner to
-                          count the options back. */}
-                      <span className="flex items-start justify-center gap-[0.4em] text-[1.5em] font-bold leading-[1.35]">
+                          count the options back.
+
+                          It leads the text inline rather than sitting in a
+                          column of its own, so on a wrapped answer it stays
+                          against the first word instead of drifting out to the
+                          edge of the card, at any width. */}
+                      <span className="block text-[1.5em] font-bold leading-[1.35]">
                         {answerChoice && (
-                          <span className="shrink-0 text-[#FFD400]">
+                          <span className="mr-[0.3em] text-[#FFD400]">
                             {answerChoice.letter}.
                           </span>
                         )}
-                        <span>{back.prompt}</span>
+                        {back.prompt}
                       </span>
                     </span>
                   )}
