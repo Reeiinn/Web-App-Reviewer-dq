@@ -97,7 +97,8 @@ export default function ForgotPasswordPage() {
             {devLink && (
               <p className="mt-2 break-all">
                 <span className="font-semibold">
-                  Development mode — no email is sent. Use this link:
+                  No email went out — the mailer is not configured here. Use
+                  this link:
                 </span>
                 <br />
                 <Link
