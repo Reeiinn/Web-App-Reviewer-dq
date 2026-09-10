@@ -1,6 +1,7 @@
 "use client";
 
 import { PhotoCropper } from "@/components/ui/photo-cropper";
+import { Spinner } from "@/components/ui/spinner";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import { cachedFetch, putCached } from "@/lib/helper/client-cache";
 import { isStaff, landingFor, staffTitleFor } from "@/lib/helper/roles";
@@ -16,6 +17,7 @@ import {
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useRef, useState } from "react";
 
 /** The signed-in account's photo, held for the tab rather than re-read per screen. */
@@ -62,7 +64,7 @@ const linksFor = (role?: string | null) => {
 };
 
 function UserMenu() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [open, setOpen] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   /** The chosen file, held while the learner frames it in the cropper. */
@@ -154,6 +156,13 @@ function UserMenu() {
     };
   }, [open]);
 
+  // "Scholar" is the fallback name, so before the session lands the trigger
+  // read a confident "S" for every account — and then swapped to the real
+  // initials a moment later. A blank circle claims nothing.
+  if (status === "loading") {
+    return <Skeleton className="size-9 shrink-0 rounded-full" />;
+  }
+
   return (
     <div className="relative" ref={container}>
       <button
@@ -180,7 +189,7 @@ function UserMenu() {
       {open && (
         <div
           role="menu"
-          className="rv-pop-in absolute right-0 top-11 z-50 w-72 overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
+          className="rv-pop-in absolute right-0 top-11 z-50 w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
         >
           <div className="border-b border-border px-4 py-3">
             {/* Photo, then who you are: the same left-to-right order the
@@ -228,9 +237,11 @@ function UserMenu() {
                 <button
                   type="button"
                   onClick={() => filePicker.current?.click()}
+                  aria-busy={uploading}
                   disabled={uploading}
-                  className="mt-1.5 text-xs font-semibold text-[#8A6D0B] underline underline-offset-2 transition hover:text-[#0B2340] disabled:opacity-60"
+                  className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-[#8A6D0B] underline underline-offset-2 transition hover:text-[#0B2340] disabled:opacity-60"
                 >
+                  {uploading && <Spinner className="size-3" />}
                   {uploading ? "Uploading…" : "Upload photo"}
                 </button>
               </div>
@@ -337,8 +348,12 @@ export function AppNav({
   compact?: boolean;
 } = {}) {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const links = linksFor(session?.user?.role);
+  // Which links belong here depends on the role, so until the session lands
+  // the bar would show a reviewee's three and then swap them for a staff
+  // account's two. Placeholders hold the row instead.
+  const pending = status === "loading";
   const home = landingFor(session?.user?.role);
   // A reviewee holds one role and needs no reminder of it; a staff account is
   // read differently depending on whose reviewees it can see, so the wordmark
@@ -381,6 +396,13 @@ export function AppNav({
         </Link>
 
         <nav aria-label="Main" className="hidden md:block">
+          {pending ? (
+            <div className="flex items-center gap-7">
+              <Skeleton className="h-3.5 w-20" />
+              <Skeleton className="h-3.5 w-16" />
+              <Skeleton className="h-3.5 w-18" />
+            </div>
+          ) : (
           <ul className="flex items-center gap-7">
             {links.map((link) => {
               const active = link.href === activeHref;
@@ -401,9 +423,13 @@ export function AppNav({
               );
             })}
           </ul>
+          )}
         </nav>
 
-        <div className="flex items-center gap-3">
+        {/* Positioned so the bell's panel can anchor to this cluster's right
+            edge — the page gutter — instead of to the bell itself. The user
+            menu keeps its own context: it is already the rightmost item. */}
+        <div className="relative flex items-center gap-3">
           {/* Staff send reminders and receive none, so the bell would only ever
               be empty for them. */}
           {session?.user && !isStaff(session.user.role) && <NotificationBell />}
@@ -414,6 +440,13 @@ export function AppNav({
       {/* The link row wraps below the bar on narrow screens. */}
       {!compact && (
         <nav aria-label="Main" className="rv-shell pb-3 md:hidden">
+          {pending ? (
+            <div className="flex items-center gap-5">
+              <Skeleton className="h-3.5 w-20" />
+              <Skeleton className="h-3.5 w-16" />
+              <Skeleton className="h-3.5 w-18" />
+            </div>
+          ) : (
           <ul className="flex items-center gap-5 overflow-x-auto">
             {links.map((link) => {
               const active = link.href === activeHref;
@@ -434,6 +467,7 @@ export function AppNav({
               );
             })}
           </ul>
+          )}
         </nav>
       )}
     </header>

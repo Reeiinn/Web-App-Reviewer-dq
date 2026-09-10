@@ -1,6 +1,7 @@
 "use client";
 
 import { AppNav } from "@/components/ui/app-nav";
+import { GlossaryBodySkeleton } from "./GlossarySkeleton";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import type { GlossaryTerm } from "@/lib/types/glossary";
 import { Search } from "lucide-react";
@@ -161,7 +162,7 @@ export function GlossaryPage() {
         </div>
 
         {loading ? (
-          <p className="mt-8 text-sm text-muted-foreground">Loading terms…</p>
+          <GlossaryBodySkeleton />
         ) : visible.length === 0 ? (
           <div className="rv-card mt-6 p-8 text-center">
             <p className="font-bold">

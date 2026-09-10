@@ -1,6 +1,7 @@
 "use client";
 
 import { AppNav } from "@/components/ui/app-nav";
+import { DashboardBodySkeleton } from "./DashboardSkeleton";
 import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
 import {
@@ -519,6 +520,14 @@ export function DashboardPage() {
   const [expanded, setExpanded] = useState<ExamType | null>(null);
   const [recent, setRecent] = useState<RecentItem[]>([]);
   const [activeTab, setActiveTab] = useState<"tracks" | "quick">("tracks");
+  /**
+   * True until the first load settles, and never true again.
+   *
+   * The refresh below re-runs on every focus and tab return, and putting the
+   * skeleton back for those would blank a dashboard the learner is already
+   * reading. Only the first paint has nothing to show.
+   */
+  const [loading, setLoading] = useState(true);
 
   /**
    * The generation of the newest load. A reply from an older one is dropped, so
@@ -530,7 +539,7 @@ export function DashboardPage() {
     const mine = ++generation.current;
     const current = () => generation.current === mine;
 
-    fetch("/api/recent-activity")
+    const activity = fetch("/api/recent-activity")
       .then((response) => response.json())
       .then((rows: RecentItem[]) => {
         if (current() && Array.isArray(rows)) setRecent(rows);
@@ -539,7 +548,7 @@ export function DashboardPage() {
         console.error("Failed to load recent activity:", error),
       );
 
-    fetch("/api/progress")
+    const summary = fetch("/api/progress")
       .then((response) => response.json())
       .then((rows: ProgressSummaryRow[]) => {
         if (!current() || !Array.isArray(rows)) return;
@@ -560,12 +569,19 @@ export function DashboardPage() {
     // One request for every track. Asking per track meant four round trips and
     // eight counting queries before this screen could say which exams are
     // unlocked.
-    fetch("/api/attempts/eligibility")
+    const unlocks = fetch("/api/attempts/eligibility")
       .then((response) => response.json())
       .then((data: Partial<Record<ExamType, Eligibility>>) => {
         if (current()) setEligibility(data);
       })
       .catch((error) => console.error("Failed to load eligibility:", error));
+
+    // All three, because a card needs progress, passes and its lock reason
+    // before it says anything true. Clearing the skeleton on the first reply
+    // would only move the flash of wrong numbers later.
+    Promise.all([activity, summary, unlocks]).then(() => {
+      if (current()) setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -664,10 +680,16 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Each section is rendered once and only hidden by the tab below lg -
+        {/* The tab row above stays live while this loads: it switches between
+            two sections rather than reading anything, so there is nothing for
+            it to wait on. */}
+        {loading ? (
+          <DashboardBodySkeleton />
+        ) : (
+        /* Each section is rendered once and only hidden by the tab below lg -
             rendering a second copy for desktop would open two mode popovers at
             once, since a portal lands in the body where the copy's own
-            `lg:hidden` no longer reaches it. */}
+            `lg:hidden` no longer reaches it. */
         <div className="mt-4 lg:grid lg:grid-cols-[1.8fr_1fr] lg:gap-6">
           <div
             className={activeTab === "tracks" ? undefined : "hidden lg:block"}
@@ -691,6 +713,7 @@ export function DashboardPage() {
             <QuickAccess recent={recent} />
           </div>
         </div>
+        )}
       </main>
     </div>
   );

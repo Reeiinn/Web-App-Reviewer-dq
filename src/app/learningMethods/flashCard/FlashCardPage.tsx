@@ -32,6 +32,8 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { FlashCardBodySkeleton } from "./FlashCardSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { fresh } from "@/lib/helper/fetch-fresh";
 import { AnswerText, QuestionText } from "./card-text";
 
@@ -252,7 +254,7 @@ function FlashCardContent() {
   };
 
   if (loading) {
-    return <Shell type={type}>Loading flashcards…</Shell>;
+    return <LoadingScreen type={type} />;
   }
 
   if (finished) {
@@ -554,6 +556,38 @@ function FitBox({
   );
 }
 
+/**
+ * The reviewer while the deck is on its way.
+ *
+ * The track title is real whenever the caller knows it — it comes from the
+ * query string, not from the deck — and a bar stands in only for the Suspense
+ * fallback above, which runs before the search params have been read. The
+ * previous fallback named the VUL track there whatever track was actually
+ * being opened.
+ */
+function LoadingScreen({ type }: { type?: ExamType }) {
+  return (
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
+      <AppNav compact />
+
+      <main className="rv-shell flex min-h-0 max-w-3xl flex-1 flex-col py-3 text-center md:py-4">
+        <div className="relative flex shrink-0 items-center justify-center">
+          <BackLink className="absolute left-0" />
+          {type ? (
+            <h1 className="text-lg font-extrabold sm:text-xl md:text-2xl">
+              {trackTitles[type]}
+            </h1>
+          ) : (
+            <Skeleton className="h-7 w-56" />
+          )}
+        </div>
+
+        <FlashCardBodySkeleton />
+      </main>
+    </div>
+  );
+}
+
 function Shell({
   type,
   children,
@@ -576,7 +610,7 @@ function Shell({
 
 export function FlashCardPage() {
   return (
-    <Suspense fallback={<Shell type="VUL">Loading flashcards…</Shell>}>
+    <Suspense fallback={<LoadingScreen />}>
       <FlashCardContent />
     </Suspense>
   );

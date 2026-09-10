@@ -278,6 +278,36 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Route transitions
+
+   The sweep along the top edge of a loading.tsx header. Skeletons below it say
+   what kind of page is coming; this says a page is coming at all, which is the
+   part a nav click had no answer for before.
+   --------------------------------------------------------------------------- */
+
+@keyframes rv-route-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.rv-route-sweep {
+  animation: rv-route-sweep 1.1s ease-in-out infinite;
+}
+
+/* The global reduce block clamps this to a single 0.01ms pass, which would
+   park the bar off the right-hand edge. Held still at the left instead, so the
+   header keeps its accent rather than losing it. */
+@media (prefers-reduced-motion: reduce) {
+  .rv-route-sweep {
+    transform: translateX(0);
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Page scrollbar
 
    Scoped to html so the window bar on the right picks up the palette while

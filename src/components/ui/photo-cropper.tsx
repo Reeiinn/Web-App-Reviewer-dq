@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Spinner } from "@/components/ui/spinner";
 import { createPortal } from "react-dom";
 
 /**
@@ -242,8 +243,10 @@ export function PhotoCropper({
                 const node = canvas.current;
                 if (node) onConfirm(node.toDataURL("image/jpeg", 0.85));
               }}
-              className="rounded-lg bg-[#FFD400] px-4 py-2 text-sm font-bold text-[#0B2340] transition hover:bg-[#E8C200] disabled:cursor-not-allowed disabled:opacity-60"
+              aria-busy={busy}
+              className="flex items-center gap-2 rounded-lg bg-[#FFD400] px-4 py-2 text-sm font-bold text-[#0B2340] transition hover:bg-[#E8C200] disabled:cursor-not-allowed disabled:opacity-60"
             >
+              {busy && <Spinner />}
               {busy ? "Saving…" : "Confirm"}
             </button>
           </div>
