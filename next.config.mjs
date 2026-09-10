@@ -30,7 +30,41 @@ const nextConfig = {
         source: "/api/:path*",
         headers: [{ key: "Cache-Control", value: "no-store" }],
       },
+      /*
+       * The one exception, and it has to come after the rule it overrides: two
+       * rules matching the same path with the same key leave the last one
+       * standing.
+       *
+       * A certificate PNG is the rare API response worth keeping. It is issued
+       * once and never revised, so it cannot go stale, and re-rendering it is
+       * not free — every view otherwise redraws the whole sheet through satori,
+       * four times over on the list page. "private" is doing the work that
+       * "no-store" did: this is one holder's document, and a shared cache
+       * keyed on the URL alone would hand it to whoever asked next.
+       */
+      {
+        source: "/api/certificates/:id/image",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, max-age=31536000, immutable",
+          },
+        ],
+      },
     ];
+  },
+
+  /*
+   * The sheet's fonts and artwork are read from disk at runtime, through paths
+   * built from process.cwd() rather than imported. Nothing in the build can see
+   * that, so without this the files are left out of the serverless bundle and
+   * the route throws ENOENT in production while working perfectly in dev.
+   */
+  outputFileTracingIncludes: {
+    "/api/certificates/[id]/image": [
+      "./assets/fonts/**",
+      "./public/certificate-art/**",
+    ],
   },
 };
 

@@ -203,6 +203,8 @@ Everything else from `.env.local` belongs in the production environment too.
         validation/       → zod schemas
       middleware.ts       → auth gate, rate limiting, security headers
       migration/          → numbered SQL migrations
+    assets/fonts/         → the faces the certificate PNG is rendered in
+    public/certificate-art/ → the signature and phoenix the sheet places
 
 API routes group by what they serve: `flashcards`, `memorization`, `questions`
 and `attempts` for studying and sitting exams; `progress`, `streaks`,
