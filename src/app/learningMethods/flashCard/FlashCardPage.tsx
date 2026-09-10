@@ -4,7 +4,12 @@ import { AppNav } from "@/components/ui/app-nav";
 import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
 import { motivationFor, MotivationMessage } from "@/lib/helper/motivation";
-import { labelChoices, splitStatements } from "@/lib/helper/question-text";
+import {
+  labelChoices,
+  matchChoice,
+  splitStatements,
+  statementsNamed,
+} from "@/lib/helper/question-text";
 import { createWriteQueue } from "@/lib/helper/session-writes";
 import {
   restoreSession,
@@ -67,6 +72,8 @@ function FlashCardContent() {
   const advanceTimer = useRef<number | null>(null);
   /** Card the deck resumed on, so the learner sees where they left off. */
   const [resumedAt, setResumedAt] = useState<number | null>(null);
+  /** Whether Reset has asked its question and is waiting on the answer. */
+  const [confirmingReset, setConfirmingReset] = useState(false);
 
   /** Saves and clearings of the deck, in the order this page issued them. */
   const writeQueue = useRef(
@@ -150,6 +157,15 @@ function FlashCardContent() {
     write(() => fetch(sessionUrl(type), { method: "DELETE" }));
   }, [finished, type, write]);
 
+  // The resume note is an orientation cue, not a permanent label: it says where
+  // the deck picked up and then gives its room back to the card.
+  useEffect(() => {
+    if (resumedAt === null) return;
+
+    const timer = window.setTimeout(() => setResumedAt(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [resumedAt]);
+
   useEffect(
     () => () => {
       if (advanceTimer.current !== null) {
@@ -164,6 +180,12 @@ function FlashCardContent() {
   const front = splitStatements(card?.front ?? "");
   const back = splitStatements(card?.back ?? "");
   const choices = labelChoices(card?.choices);
+  /** The option the answer names, so the back can carry its letter. */
+  const answerChoice = matchChoice(choices, card?.back ?? "");
+  const namedStatements = statementsNamed(
+    front.statements,
+    answerChoice?.text ?? card?.back ?? "",
+  );
 
   // Keyed on the card rather than on its text: the frame is remounted per card,
   // so two cards that happen to read the same still need a fresh measurement of
@@ -192,11 +214,15 @@ function FlashCardContent() {
     setFinished(false);
     setMessage(null);
     setResumedAt(null);
+    setConfirmingReset(false);
   };
 
   const answer = async (isCorrect: boolean) => {
     if (!card || !revealed || message) return;
 
+    // The deck is about to move on, so a Reset question left standing would be
+    // answered against a card the learner is no longer looking at.
+    setConfirmingReset(false);
     setRatings((current) => ({ ...current, [card.id]: isCorrect }));
 
     const nextRun = isCorrect ? run + 1 : 0;
@@ -256,25 +282,97 @@ function FlashCardContent() {
   }
 
   return (
-    // The reviewer is a single screen: the shell owns the viewport height and
-    // the card takes whatever is left after the chrome, so the page itself
-    // never scrolls on a short or narrow window.
+    // The reviewer is one screen: the shell owns the viewport height and the
+    // card takes everything the chrome does not need, so the page itself never
+    // scrolls. The chrome is two short rows to keep that share large.
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
       <AppNav compact />
 
-      <main className="rv-shell flex min-h-0 max-w-3xl flex-1 flex-col py-4 text-center md:py-6">
-        <BackLink />
+      <main className="rv-shell flex min-h-0 max-w-3xl flex-1 flex-col py-3 text-center md:py-4">
+        {/* The title rides the back link's row rather than taking a band of
+            its own: on a laptop that band was the difference between a card
+            that fits its question and one that scrolls. */}
+        <div className="relative flex shrink-0 items-center justify-center">
+          <BackLink className="absolute left-0" />
+          <h1 className="text-lg font-extrabold sm:text-xl md:text-2xl">
+            {trackTitles[type]}
+          </h1>
+        </div>
+
         {/* Two separate jobs, kept at opposite ends of the row so the one that
             throws away the sitting is never a thumb-slip from the one that
             keeps it. */}
-        <div className="flex shrink-0 items-center justify-between">
-          <button
-            onClick={() => resetSession(shuffled(cards))}
-            disabled={Boolean(message)}
-            className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-border px-3 py-2 text-xs font-bold transition hover:border-[#C9A227] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <RotateCcw className="size-3.5" /> Reset
-          </button>
+        <div className="relative mt-2 flex shrink-0 items-center justify-between">
+          {/* Says where the deck picked up, so a resumed session never looks
+              like a restarted one. It sits in the gap this row already has
+              between its two buttons: a note that lasts three seconds must not
+              cost the card a band of height for the whole sitting. */}
+          {resumedAt === index && (
+            <p className="rv-pop-in pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-lg border border-[#C9A227] bg-[#FFF8D6] px-3 py-1 text-xs font-bold text-[#0B2340]">
+              Resumed at card {index + 1} of {cards.length}
+            </p>
+          )}
+
+          {/* Reset throws away the sitting, so it asks first. The question is
+              answered next to the button that raised it rather than in a
+              window over the deck: the learner is mid-card, and a modal would
+              cost more attention than the decision does. */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setConfirmingReset((current) => !current)}
+              disabled={Boolean(message)}
+              aria-expanded={confirmingReset}
+              className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-border px-3 py-2 text-xs font-bold transition hover:border-[#C9A227] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RotateCcw className="size-3.5" /> Reset
+            </button>
+
+            {confirmingReset && (
+              <>
+                {/* Anywhere else is "no". */}
+                <button
+                  type="button"
+                  aria-label="Keep the session"
+                  onClick={() => setConfirmingReset(false)}
+                  className="fixed inset-0 z-30 cursor-default"
+                />
+
+                <div
+                  role="dialog"
+                  aria-label="Reset this session"
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setConfirmingReset(false);
+                  }}
+                  className="rv-pop-in absolute left-0 top-full z-40 mt-2 w-64 rounded-xl border border-border bg-card p-3 text-left shadow-lg"
+                >
+                  <p className="text-xs font-extrabold">Reset this session?</p>
+                  <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                    Every card in this sitting goes back to unrated and the deck
+                    reshuffles. Mastery you have already saved is kept.
+                  </p>
+
+                  <div className="mt-3 flex justify-end gap-2">
+                    <button
+                      onClick={() => setConfirmingReset(false)}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-bold transition hover:border-[#C9A227]"
+                    >
+                      Keep going
+                    </button>
+                    <button
+                      autoFocus
+                      onClick={() => {
+                        setConfirmingReset(false);
+                        resetSession(shuffled(cards));
+                      }}
+                      className="rounded-lg bg-[#0B2340] px-3 py-1.5 text-xs font-bold text-[#FFD400] transition hover:bg-[#123055]"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           <button
             onClick={() => {
@@ -293,45 +391,30 @@ function FlashCardContent() {
           </button>
         </div>
 
-        {/* The heading block is the first thing to give up room on a short
-            window, so it steps down instead of pushing the card off-screen. */}
-        {/* The chrome starts giving up room at 850px, not 700px. A 800px-tall
-            laptop — the common case — used to pay for a full heading, subtitle
-            and margin while leaving the card less room than a 700px window got,
-            because every saving fired a breakpoint too late. */}
-        <h1 className="mt-4 text-2xl font-extrabold sm:text-3xl md:text-4xl [@media(max-height:850px)]:mt-2 [@media(max-height:700px)]:text-lg [@media(min-height:900px)]:text-5xl">
-          {trackTitles[type]}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground [@media(max-height:850px)]:hidden">
-          Master core concepts with active recall.
-        </p>
-
-        {/* Says where the deck picked up, so a resumed session never looks like
-            a restarted one. */}
-        {resumedAt === index && (
-          <p className="rv-pop-in mx-auto mt-3 w-fit shrink-0 rounded-lg border border-[#C9A227] bg-[#FFF8D6] px-4 py-1.5 text-xs font-bold text-[#0B2340]">
-            Resumed at card {index + 1} of {cards.length}
-          </p>
-        )}
-
-        <div className="relative mt-4 flex min-h-0 flex-1">
+        {/* The card starts right below the Reset row and takes the rest. */}
+        <div className="relative mt-2 flex min-h-0 flex-1">
           {/* The verdict takes the whole card face rather than floating in a
               strip over it, so the colour alone reads as the answer from across
-              the room and the words carry the rest. */}
+              the room and the words carry the rest.
+
+              The panel is opaque from its first frame; only what it carries
+              animates in. Fading the panel itself let the card read through it
+              for a fifth of a second, so the verdict arrived as a wash over the
+              answer rather than as a colour of its own. */}
           {message && (
             <div
               role="status"
-              className={`rv-pop-in pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 rounded-[var(--radius)] p-8 text-center text-white ${
+              className={`pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 rounded-[var(--radius)] p-8 text-center text-white ${
                 message.mood === "correct" ? "bg-[#0F7B52]" : "bg-[#C91D1D]"
               }`}
             >
-              <p className="text-3xl font-extrabold leading-tight sm:text-4xl">
+              <p className="rv-pop-in text-3xl font-extrabold leading-tight sm:text-4xl">
                 {message.headline}
               </p>
               {message.mood === "correct" ? (
-                <Check className="size-14" strokeWidth={3} />
+                <Check className="rv-pop-in size-14" strokeWidth={3} />
               ) : (
-                <X className="size-14" strokeWidth={3} />
+                <X className="rv-pop-in size-14" strokeWidth={3} />
               )}
             </div>
           )}
@@ -363,16 +446,7 @@ function FlashCardContent() {
                 revealed ? "[transform:rotateY(180deg)]" : ""
               }`}
             >
-              <span className="rv-card col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-3 overflow-hidden p-4 [backface-visibility:hidden] sm:gap-4 sm:p-8">
-                {/* A glyph rather than an icon: lucide encloses every question
-                    mark it has, and the bare mark matches the bare check. */}
-                <span
-                  aria-hidden="true"
-                  className="block shrink-0 text-lg font-extrabold leading-none text-[#C9A227] [@media(max-height:700px)]:hidden"
-                >
-                  ?
-                </span>
-
+              <span className="rv-card col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-2 overflow-hidden p-3 [backface-visibility:hidden] sm:gap-3 sm:p-5 [@media(max-height:700px)]:gap-1.5 [@media(max-height:700px)]:p-2">
                 <FitBox fit={frontFit}>
                   {front.prompt && (
                     <span className="block text-[1.5em] font-extrabold leading-[1.35]">
@@ -424,29 +498,47 @@ function FlashCardContent() {
                 </span>
               </span>
 
-              <span className="col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-3 overflow-hidden rounded-xl bg-[#0B2340] p-4 text-white [backface-visibility:hidden] sm:gap-4 [transform:rotateY(180deg)] sm:p-8">
+              <span className="col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-2 overflow-hidden rounded-xl bg-[#0B2340] p-3 text-white [backface-visibility:hidden] sm:gap-3 [transform:rotateY(180deg)] sm:p-5 [@media(max-height:700px)]:gap-1.5 [@media(max-height:700px)]:p-2">
                 <FitBox fit={backFit}>
-                  {back.prompt && (
-                    <span className="flex flex-col items-center gap-1">
+                  {(back.prompt || answerChoice) && (
+                    <span className="flex w-full flex-col items-center gap-[0.25em]">
                       <span className="text-[0.6em] font-semibold text-white/70">
                         Answer:
                       </span>
-                      <span className="block text-[1.5em] font-bold leading-[1.35]">
+                      {/* The letter and the words both: a letter alone cannot
+                          be checked against the front once the card has
+                          turned, and the words alone leave the learner to
+                          count the options back.
+
+                          The letter takes its own line under the label, so it
+                          reads as the answer's name at any width rather than
+                          as the first word of a sentence. */}
+                      {answerChoice && (
+                        <span className="block text-[2.1em] font-extrabold leading-none text-[#FFD400]">
+                          {answerChoice.letter}.
+                        </span>
+                      )}
+                      <span className="block text-[1.15em] font-bold leading-[1.4]">
                         {back.prompt}
                       </span>
                     </span>
                   )}
 
-                  {back.statements.length > 0 && (
+                  {/* Statements the answer names by numeral, spelled out, then
+                      any the answer itself enumerated. */}
+                  {(namedStatements.length > 0 ||
+                    back.statements.length > 0) && (
                     <span className="flex w-full flex-col gap-[0.3em] text-left">
-                      {back.statements.map((statement) => (
-                        <span
-                          key={statement}
-                          className="block rounded-lg bg-white/12 px-[0.7em] py-[0.35em] text-[1.25em] font-semibold leading-[1.3]"
-                        >
-                          {statement}
-                        </span>
-                      ))}
+                      {[...namedStatements, ...back.statements].map(
+                        (statement) => (
+                          <span
+                            key={statement}
+                            className="block rounded-lg bg-white/12 px-[0.7em] py-[0.35em] text-[1.125em] font-semibold leading-[1.3]"
+                          >
+                            {statement}
+                          </span>
+                        ),
+                      )}
                     </span>
                   )}
                 </FitBox>
@@ -455,12 +547,12 @@ function FlashCardContent() {
           </button>
         </div>
 
-        <div className="mt-4 flex shrink-0 items-center justify-center gap-8">
+        <div className="mt-3 flex shrink-0 items-center justify-center gap-8 [@media(max-height:700px)]:mt-2">
           <button
             aria-label="Still learning"
             onClick={() => answer(false)}
             disabled={!revealed || Boolean(message)}
-            className="flex size-14 items-center justify-center rounded-full border-2 border-rose-400 [@media(max-height:700px)]:size-11 text-rose-500 transition hover:bg-rose-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+            className="flex size-12 items-center justify-center rounded-full border-2 border-rose-400 [@media(max-height:700px)]:size-11 text-rose-500 transition hover:bg-rose-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
           >
             <X className="size-6" />
           </button>
@@ -473,14 +565,14 @@ function FlashCardContent() {
             aria-label="I know this"
             onClick={() => answer(true)}
             disabled={!revealed || Boolean(message)}
-            className="flex size-14 items-center justify-center rounded-full border-2 border-[#C9A227] [@media(max-height:700px)]:size-11 text-[#8A6D0B] transition hover:bg-[#FFD400] disabled:cursor-not-allowed disabled:opacity-35"
+            className="flex size-12 items-center justify-center rounded-full border-2 border-[#C9A227] [@media(max-height:700px)]:size-11 text-[#8A6D0B] transition hover:bg-[#FFD400] disabled:cursor-not-allowed disabled:opacity-35"
           >
             <Check className="size-6" />
           </button>
         </div>
 
         {/* Step through the deck without rating a card either way. */}
-        <div className="mt-3 flex shrink-0 items-center justify-center gap-3">
+        <div className="mt-3 flex shrink-0 items-center justify-center gap-3 [@media(max-height:700px)]:mt-1.5">
           <button
             onClick={() => move(-1)}
             disabled={index === 0 || Boolean(message)}

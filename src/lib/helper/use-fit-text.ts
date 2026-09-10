@@ -3,8 +3,11 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /** Base font size in px; every size inside the card is an em multiple of it. */
-const MAX_SIZE = 34;
-const MIN_SIZE = 9;
+/** The ceiling is a reading limit too: a two-word answer set in the whole card
+    reads as a poster, not as a card, so the text stops growing well before the
+    frame does. */
+const MAX_SIZE = 24;
+const MIN_SIZE = 11;
 const STEP = 0.5;
 
 export type FitText<Box extends HTMLElement, Content extends HTMLElement> = {
@@ -44,6 +47,8 @@ export function useFitText<
       content.style.fontSize = `${size}px`;
 
       // Step down until the text clears the frame, or the floor is reached.
+      // The frame is measured every pass: a step that removes the scrollbar
+      // widens the box, and the wrapping that follows is what has to fit.
       while (size > MIN_SIZE && content.scrollHeight > box.clientHeight) {
         size -= STEP;
         content.style.fontSize = `${size}px`;
@@ -54,6 +59,11 @@ export function useFitText<
 
     fit();
 
+    // A card mounts before the flip frame has its final height, so the first
+    // pass can fit against a box that is about to change size. Measure again
+    // on the next frame, when the layout it is fitting into is the real one.
+    const frame = window.requestAnimationFrame(fit);
+
     // The first pass can measure fallback metrics; redo it once the real font
     // is in place.
     document.fonts?.ready.then(fit).catch(() => {});
@@ -63,6 +73,7 @@ export function useFitText<
 
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(frame);
       observer.disconnect();
     };
   }, [contentKey]);
