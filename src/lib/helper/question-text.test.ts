@@ -1,5 +1,67 @@
 import { describe, expect, it } from "vitest";
-import { labelChoices, splitStatements } from "./question-text";
+import {
+  labelChoices,
+  matchChoice,
+  splitStatements,
+  statementsNamed,
+} from "./question-text";
+
+describe("matchChoice", () => {
+  const choices = labelChoices([
+    { id: "c1", text: "Must be issued with a maximum withdrawal value" },
+    { id: "c2", text: "It allows the investor a chance for capital preservation" },
+    { id: "c3", text: "Must be issued with a minimum death benefit" },
+  ]);
+
+  it("finds the option the answer text names", () => {
+    expect(matchChoice(choices, "Must be issued with a minimum death benefit")
+      ?.letter).toBe("C");
+  });
+
+  it("ignores case, spacing, punctuation and & against and", () => {
+    expect(matchChoice(choices, "  must be issued with a MAXIMUM withdrawal value. ")
+      ?.letter).toBe("A");
+    expect(
+      matchChoice(labelChoices([{ id: "c1", text: "II, III & IV" }]), "II, III, and IV")
+        ?.letter,
+    ).toBe("A");
+  });
+
+  it("returns null when the answer matches no option", () => {
+    expect(matchChoice(choices, "Something else entirely")).toBeNull();
+    expect(matchChoice(choices, "   ")).toBeNull();
+    expect(matchChoice([], "anything")).toBeNull();
+  });
+});
+
+describe("statementsNamed", () => {
+  const statements = [
+    "I. Are not directly linked to the investment performance",
+    "II. Have already been smoothened by the life company",
+    "III. Do not have the highs and lows of investment return",
+    "IV. Are not fixed at the inception of the policy",
+  ];
+
+  it("returns the statements the answer names, in the question's order", () => {
+    expect(statementsNamed(statements, "II, III, & IV")).toEqual([
+      statements[1],
+      statements[2],
+      statements[3],
+    ]);
+  });
+
+  it("does not confuse III with I", () => {
+    expect(statementsNamed(statements, "I & II")).toEqual([
+      statements[0],
+      statements[1],
+    ]);
+  });
+
+  it("returns nothing when the answer names no numeral", () => {
+    expect(statementsNamed(statements, "All of the above")).toEqual([]);
+    expect(statementsNamed([], "I, II")).toEqual([]);
+  });
+});
 
 describe("splitStatements", () => {
   it("returns the whole text as the prompt when nothing is enumerated", () => {
