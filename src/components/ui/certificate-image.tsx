@@ -4,7 +4,7 @@ import {
   CERTIFICATE_SIGNER_ROLE,
   certificateDesign,
 } from "@/lib/helper/certificate";
-import type { CertificateMarks } from "@/lib/helper/certificate-artwork";
+import type { CertificateMarks, Mark } from "@/lib/helper/certificate-artwork";
 import type { ExamType } from "@/lib/types/common";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -74,14 +74,27 @@ const BASE_SWEEP = svgUrl(
 );
 
 /** Stand-in until the real signature is supplied. */
-const DRAWN_SIGNATURE = svgUrl(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 110">
+const DRAWN_SIGNATURE: Mark = {
+  src: svgUrl(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 110">
      <path fill="none" stroke="#0B0B0B" stroke-width="5" stroke-linecap="round"
        d="M28,92 C 44,10 70,4 66,52 C 63,96 40,102 44,64 C 48,26 92,10 108,58 C 118,90 96,104 96,74 C 96,40 132,26 146,62 C 156,88 138,100 138,76 C 138,46 176,30 192,64 C 202,86 186,98 186,78 C 186,50 226,36 248,58 L 276,32"/>
      <path fill="none" stroke="#0B0B0B" stroke-width="4" stroke-linecap="round"
        d="M52,86 C 96,72 168,70 214,80"/>
    </svg>`,
-);
+  ),
+  width: 300,
+  height: 110,
+};
+
+/** A mark at a given width, keeping the proportions it declares. */
+function scaleToWidth(mark: Mark, width: number): Mark {
+  return {
+    src: mark.src,
+    width,
+    height: Math.round((width * mark.height) / mark.width),
+  };
+}
 
 /** Stand-in until the real phoenix is supplied. */
 const DRAWN_LOGO = svgUrl(
@@ -104,6 +117,14 @@ export function CertificateImage({
 }) {
   const design = certificateDesign(examType);
   const titleSize = w(Number.parseFloat(design.titleSize));
+
+  // Drawn to a fixed width at the artwork's own proportions, so the strokes are
+  // the weight they were signed at whatever the file's height happens to be,
+  // and a replacement export is never squashed to fit a number written here.
+  const signature = scaleToWidth(marks.signature ?? DRAWN_SIGNATURE, w(13.25));
+
+  // The phoenix, once it is supplied, at the width the artwork gives it.
+  const logo = marks.logo && scaleToWidth(marks.logo, w(10));
 
   return (
     <div
@@ -269,26 +290,23 @@ export function CertificateImage({
           position: "absolute",
           left: 0,
           right: 0,
-          top: h(74.8),
-          // Taller than the artwork rather than equal to it. A box sized to the
-          // image exactly leaves satori no margin for how it rounds an image's
-          // height, and the signature's descending loop came off the bottom.
-          // A row that sizes itself from its content is worse still — it lets
-          // satori flatten the writing while keeping its width.
-          height: w(8.6),
+          // Anchored by its top, not centred: in the signed artwork the
+          // signature starts here and its tail runs down across the printed
+          // name below. A fuller export is taller, and this way the extra
+          // length falls downward over that name the way it was signed,
+          // instead of pushing the whole thing up off "Signed by:".
+          top: h(73.5),
           display: "flex",
-          alignItems: "center",
           justifyContent: "center",
-          transform: "translateY(-50%)",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
         <img
-          src={marks.signature ?? DRAWN_SIGNATURE}
+          src={signature.src}
           alt=""
-          width={w(12.85)}
-          height={w(6.15)}
-          style={{ width: w(12.85), height: w(6.15) }}
+          width={signature.width}
+          height={signature.height}
+          style={{ width: signature.width, height: signature.height }}
         />
       </div>
 
@@ -320,14 +338,14 @@ export function CertificateImage({
           alignItems: "center",
         }}
       >
-        {marks.logo ? (
+        {logo ? (
           // eslint-disable-next-line @next/next/no-img-element -- as above.
           <img
-            src={marks.logo}
+            src={logo.src}
             alt=""
-            width={w(10)}
-            height={w(7.3)}
-            style={{ width: w(10), height: w(7.3), objectFit: "contain" }}
+            width={logo.width}
+            height={logo.height}
+            style={{ width: logo.width, height: logo.height }}
           />
         ) : (
           // A wrapper, not a fragment: satori lays a fragment's children out as
