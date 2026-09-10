@@ -40,8 +40,12 @@ export async function GET(req: Request) {
 
     if (query?.trim()) {
       values.push(`%${query.trim()}%`);
+      // Examples and key points are searchable too, so "trust" finds the term
+      // whose example mentions one even though its definition does not.
       conditions.push(
-        `(term ILIKE $${values.length} OR definition ILIKE $${values.length})`,
+        `(term ILIKE $${values.length}
+          OR definition ILIKE $${values.length}
+          OR details::text ILIKE $${values.length})`,
       );
     }
 
