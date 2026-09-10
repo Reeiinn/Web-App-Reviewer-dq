@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
+import { DialogPanel } from "@/components/ui/dialog-panel";
 import { AppNav } from "@/components/ui/app-nav";
 import { Avatar } from "@/components/ui/avatar";
 import {
@@ -150,8 +151,7 @@ function ExamResults({ reviewee }: { reviewee: Reviewee }) {
       </AlertDialog.Trigger>
 
       <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-[#0B2340]/50 backdrop-blur-[2px]" />
-        <AlertDialog.Popup className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-left shadow-xl">
+        <DialogPanel width="30rem">
           <AlertDialog.Title className="text-lg font-extrabold">
             Practice exams — {reviewee.name}
           </AlertDialog.Title>
@@ -193,7 +193,7 @@ function ExamResults({ reviewee }: { reviewee: Reviewee }) {
               Close
             </AlertDialog.Close>
           </div>
-        </AlertDialog.Popup>
+        </DialogPanel>
       </AlertDialog.Portal>
     </AlertDialog.Root>
   );
@@ -355,8 +355,7 @@ function NudgeReviewee({
       </AlertDialog.Trigger>
 
       <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-[#0B2340]/50 backdrop-blur-[2px]" />
-        <AlertDialog.Popup className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-left shadow-xl">
+        <DialogPanel>
           <AlertDialog.Title className="text-lg font-extrabold">
             Remind {reviewee.name}
           </AlertDialog.Title>
@@ -471,7 +470,7 @@ function NudgeReviewee({
               {sending ? "Sending…" : "Send"}
             </button>
           </div>
-        </AlertDialog.Popup>
+        </DialogPanel>
       </AlertDialog.Portal>
     </AlertDialog.Root>
   );
@@ -553,8 +552,7 @@ function RemoveReviewee({
       </AlertDialog.Trigger>
 
       <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-[#0B2340]/50 backdrop-blur-[2px]" />
-        <AlertDialog.Popup className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-6 text-left shadow-xl">
+        <DialogPanel>
           <div className="flex items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-700">
               <AlertTriangle className="size-5" />
@@ -629,7 +627,7 @@ function RemoveReviewee({
               className="h-9 px-3 text-sm"
             />
           </div>
-        </AlertDialog.Popup>
+        </DialogPanel>
       </AlertDialog.Portal>
     </AlertDialog.Root>
   );

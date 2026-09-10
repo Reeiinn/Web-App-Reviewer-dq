@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
+import { DialogPanel } from "@/components/ui/dialog-panel";
 import { Check, Copy, UserPlus } from "lucide-react";
 import { useState } from "react";
 
@@ -89,8 +90,7 @@ export function InviteFieldManager({ onInvited }: { onInvited?: () => void }) {
       </AlertDialog.Trigger>
 
       <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-[#0B2340]/50 backdrop-blur-[2px]" />
-        <AlertDialog.Popup className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-left shadow-xl">
+        <DialogPanel>
           <AlertDialog.Title className="text-lg font-extrabold">
             Add a Field Manager
           </AlertDialog.Title>
@@ -180,7 +180,7 @@ export function InviteFieldManager({ onInvited }: { onInvited?: () => void }) {
               </button>
             )}
           </div>
-        </AlertDialog.Popup>
+        </DialogPanel>
       </AlertDialog.Portal>
     </AlertDialog.Root>
   );

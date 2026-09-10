@@ -1,3 +1,4 @@
+import { imageSize } from "@/lib/helper/image-size";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -8,23 +9,36 @@ import path from "node:path";
  */
 const ARTWORK_DIR = "certificate-art";
 
-/** Formats a mark may be supplied in, in the order they are preferred. */
-const EXTENSIONS = ["png", "webp", "svg", "jpg", "jpeg"] as const;
+/**
+ * Formats a mark may be supplied in, in the order they are preferred.
+ *
+ * No webp: satori renders the sheet, and it cannot decode one — a webp mark
+ * does not fall back to anything, it throws mid-render and the certificate
+ * comes back a 500.
+ */
+const EXTENSIONS = ["png", "svg", "jpg", "jpeg"] as const;
 
 const MIME: Record<(typeof EXTENSIONS)[number], string> = {
   png: "image/png",
-  webp: "image/webp",
   svg: "image/svg+xml",
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
 };
 
+/** A mark, and the size it declares — satori has to be told both. */
+export type Mark = {
+  /** The image itself, as a data URI. */
+  src: string;
+  width: number;
+  height: number;
+};
+
 /** The marks the drawn sheet cannot produce itself. */
 export type CertificateMarks = {
   /** The Sales Manager's signature, cut from the signed artwork. */
-  signature: string | null;
+  signature: Mark | null;
   /** The DRACAENA phoenix. */
-  logo: string | null;
+  logo: Mark | null;
 };
 
 /**
@@ -34,7 +48,7 @@ export type CertificateMarks = {
  * route handler, which has no page to resolve `/certificate-art/...` against
  * and does not fetch relative URLs. The bytes have to travel with the markup.
  */
-function markData(name: string): string | null {
+function markData(name: string): Mark | null {
   for (const extension of EXTENSIONS) {
     const file = path.join(
       process.cwd(),
@@ -43,10 +57,23 @@ function markData(name: string): string | null {
       `${name}.${extension}`,
     );
 
-    if (existsSync(file)) {
-      const bytes = readFileSync(file).toString("base64");
-      return `data:${MIME[extension]};base64,${bytes}`;
+    if (!existsSync(file)) continue;
+
+    const bytes = readFileSync(file);
+    const size = imageSize(bytes);
+
+    // A file whose header says nothing about its size is treated as absent.
+    // The sheet's fallback is a drawn approximation, which is a better outcome
+    // than a mark stretched to whatever satori guessed.
+    if (!size) {
+      console.error(`Certificate mark has no readable size, ignoring: ${file}`);
+      continue;
     }
+
+    return {
+      src: `data:${MIME[extension]};base64,${bytes.toString("base64")}`,
+      ...size,
+    };
   }
 
   return null;
