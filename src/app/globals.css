@@ -1,4 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Great+Vibes&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Playfair+Display:wght@400;700;900&display=swap");
+/* Playfair Display and Great Vibes used to be here for the certificate sheet.
+   The sheet is rendered to a PNG on the server now, which carries its own cut
+   of both from assets/fonts, so the browser no longer downloads either. */
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -307,21 +310,6 @@
   html::-webkit-scrollbar-thumb:hover {
     background: var(--primary);
   }
-}
-
-/* ---------------------------------------------------------------------------
-   Certificates
-
-   The sheet is drawn in its own two faces — a display serif for the headings
-   and a script for the recipient's name — because the artwork it stands in for
-   is set that way. Neither belongs to the rest of the app's type.
-   --------------------------------------------------------------------------- */
-.cert-serif {
-  font-family: "Playfair Display", Georgia, serif;
-}
-
-.cert-script {
-  font-family: "Great Vibes", "Playfair Display", Georgia, cursive;
 }
 
 @media print {

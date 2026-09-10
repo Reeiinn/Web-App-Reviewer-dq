@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
-import { certificateMarks } from "@/lib/helper/certificate-artwork";
 import { trackRecord, type Sitting } from "@/lib/helper/certificate-record";
 import { isStaff } from "@/lib/helper/roles";
 import type { Certificate as CertificateRow } from "@/lib/types/attempt";
@@ -73,10 +72,6 @@ export default async function Page() {
   }));
 
   return (
-    <CertificatesPage
-      standings={standings}
-      recipient={session.user.name ?? "Scholar"}
-      marks={certificateMarks()}
-    />
+    <CertificatesPage standings={standings} />
   );
 }

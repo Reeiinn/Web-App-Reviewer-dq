@@ -1,7 +1,6 @@
 import { AppNav } from "@/components/ui/app-nav";
-import { Certificate } from "@/components/ui/certificate";
 import { SummaryTile } from "@/components/ui/summary-tile";
-import type { CertificateMarks } from "@/lib/helper/certificate-artwork";
+import { certificateImageSrc } from "@/lib/helper/certificate-image-src";
 import { triesLabel, type TrackRecord } from "@/lib/helper/certificate-record";
 import { PASSES_REQUIRED, passesLabel } from "@/lib/helper/practice-exam";
 import { examLabels, type ExamType } from "@/lib/types/common";
@@ -50,13 +49,9 @@ function RecordStat({ label, value }: { label: string; value: string }) {
 function EarnedCard({
   certificate,
   record,
-  recipient,
-  marks,
 }: {
   certificate: EarnedCertificate;
   record: TrackRecord;
-  recipient: string;
-  marks: CertificateMarks;
 }) {
   const revision = record.total - record.tries;
 
@@ -66,10 +61,13 @@ function EarnedCard({
         href={`/certificates/${certificate.id}`}
         className="block rounded-lg border border-border transition hover:border-[#C9A227]"
       >
-        <Certificate
-          examType={certificate.exam_type}
-          recipient={recipient}
-          marks={marks}
+        {/* eslint-disable-next-line @next/next/no-img-element -- the sheet is
+            rendered by /api/certificates/[id]/image, which already serves it at
+            one fixed size; the loader would only re-encode it. */}
+        <img
+          src={certificateImageSrc(certificate.id)}
+          alt={`${examLabels[certificate.exam_type]} certificate`}
+          className="block aspect-[1000/707] w-full"
         />
       </Link>
 
@@ -148,15 +146,7 @@ function OpenTrackRow({ standing }: { standing: TrackStanding }) {
   );
 }
 
-export function CertificatesPage({
-  standings,
-  recipient,
-  marks,
-}: {
-  standings: TrackStanding[];
-  recipient: string;
-  marks: CertificateMarks;
-}) {
+export function CertificatesPage({ standings }: { standings: TrackStanding[] }) {
   // Newest certificate first, the order this page has always shown them in.
   const earned = standings
     .filter(
@@ -242,8 +232,6 @@ export function CertificatesPage({
                   key={standing.exam_type}
                   certificate={standing.certificate}
                   record={standing.record}
-                  recipient={recipient}
-                  marks={marks}
                 />
               ))}
             </div>
