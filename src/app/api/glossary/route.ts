@@ -23,15 +23,19 @@ export async function GET(req: Request) {
 
     if (query?.trim()) {
       values.push(`%${query.trim()}%`);
+      // Examples and key points are searchable too, so "trust" finds the term
+      // whose example mentions one even though its definition does not.
       conditions.push(
-        `(term ILIKE $${values.length} OR definition ILIKE $${values.length})`,
+        `(term ILIKE $${values.length}
+          OR definition ILIKE $${values.length}
+          OR details::text ILIKE $${values.length})`,
       );
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const result = await pool.query(
-      `SELECT id, exam_type, term, definition
+      `SELECT id, exam_type, term, definition, details
        FROM vocabulary_terms ${where}
        ORDER BY term ASC`,
       values,
