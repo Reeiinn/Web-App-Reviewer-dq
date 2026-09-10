@@ -254,16 +254,17 @@ export function CertificateImage({
         <span style={{ fontSize: w(2) }}>Signed by:</span>
       </Row>
 
-      {/* Centre and height are the signature's own box in the artwork
-          (y 1044-1167 of 1414). Sized any taller, its ascender climbs into
-          "Signed by:" instead of rising beside it. */}
-      <Row top={78.2}>
+      {/* Sits in the gap between "Signed by:" and the signer's printed name,
+          crossing neither. That gap is about 96px, so the signature is sized to
+          it rather than kept at the 123px it used to be and allowed to run over
+          the name below — which is the one thing it must not cover. */}
+      <Row top={76.4}>
         {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
         <img
           src={marks.signature ?? DRAWN_SIGNATURE}
           alt=""
-          height={w(6.15)}
-          style={{ height: w(6.15) }}
+          height={w(4.9)}
+          style={{ height: w(4.9) }}
         />
       </Row>
 
@@ -279,11 +280,13 @@ export function CertificateImage({
         </span>
       </Row>
 
+      {/* Clear of the base sweep's lower rule rather than sitting on it, so the
+          wordmark reads against flat navy instead of across a gold line. */}
       <div
         style={{
           position: "absolute",
           left: w(4.2),
-          bottom: h(1.7),
+          bottom: h(3.4),
           width: w(11.8),
           display: "flex",
           flexDirection: "column",
@@ -294,21 +297,31 @@ export function CertificateImage({
           // eslint-disable-next-line @next/next/no-img-element -- as above.
           <img src={marks.logo} alt="" width={w(10)} />
         ) : (
-          <>
+          // A wrapper, not a fragment: satori lays a fragment's children out as
+          // one row, which put the mark and the wordmark side by side.
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
-            <img src={DRAWN_LOGO} alt="" width={w(6.6)} />
+            <img src={DRAWN_LOGO} alt="" width={w(7.4)} />
             <span
               style={{
                 fontFamily: SERIF,
                 fontWeight: 700,
-                fontSize: w(1.3),
-                letterSpacing: w(1.3) * 0.16,
-                color: "#E0AE45",
+                fontSize: w(1.9),
+                letterSpacing: w(1.9) * 0.16,
+                // The mark's own gold was too close to the navy behind it to
+                // read at the size this prints at.
+                color: GOLD_LIGHT,
               }}
             >
               DRACAENA
             </span>
-          </>
+          </div>
         )}
       </div>
 
