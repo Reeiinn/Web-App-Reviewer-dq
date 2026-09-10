@@ -33,6 +33,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { fresh } from "@/lib/helper/fetch-fresh";
+import { AnswerText, QuestionText } from "./card-text";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -448,49 +449,11 @@ function FlashCardContent() {
             >
               <span className="rv-card col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-2 overflow-hidden p-3 [backface-visibility:hidden] sm:gap-3 sm:p-5 [@media(max-height:700px)]:gap-1.5 [@media(max-height:700px)]:p-2">
                 <FitBox fit={frontFit}>
-                  {front.prompt && (
-                    <span className="block text-[1.5em] font-extrabold leading-[1.35]">
-                      {front.prompt}
-                    </span>
-                  )}
-
-                  {/* Enumerated statements read as a list, not as one paragraph
-                      run together with the question. */}
-                  {front.statements.length > 0 && (
-                    <span className="flex w-full flex-col gap-[0.3em] text-left">
-                      {front.statements.map((statement) => (
-                        <span
-                          key={statement}
-                          className="block rounded-lg bg-muted px-[0.7em] py-[0.35em] text-[1.125em] font-semibold leading-[1.3]"
-                        >
-                          {statement}
-                        </span>
-                      ))}
-                    </span>
-                  )}
-
-                  {/* "Which of the following" cannot be answered from the
-                      prompt alone, so the options are on the question side
-                      rather than the answer side. They carry the card's own
-                      surface and a border instead of the statements' filled
-                      chip: on a card that enumerates statements too, the rows
-                      you choose between must not look like the rows you are
-                      being told. */}
-                  {choices.length > 0 && (
-                    <span className="flex w-full flex-col gap-[0.3em] text-left">
-                      {choices.map((choice) => (
-                        <span
-                          key={choice.id}
-                          className="flex items-start gap-[0.6em] rounded-lg border border-border bg-card px-[0.7em] py-[0.35em] text-[1.125em] font-semibold leading-[1.3]"
-                        >
-                          <span className="shrink-0 font-extrabold text-[#0B2340]/70">
-                            {choice.letter}.
-                          </span>
-                          <span>{choice.text}</span>
-                        </span>
-                      ))}
-                    </span>
-                  )}
+                  <QuestionText
+                    prompt={front.prompt}
+                    statements={front.statements}
+                    choices={choices}
+                  />
                 </FitBox>
 
                 <span className="block shrink-0 text-xs font-semibold text-muted-foreground [@media(max-height:700px)]:hidden">
@@ -500,47 +463,13 @@ function FlashCardContent() {
 
               <span className="col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-2 overflow-hidden rounded-xl bg-[#0B2340] p-3 text-white [backface-visibility:hidden] sm:gap-3 [transform:rotateY(180deg)] sm:p-5 [@media(max-height:700px)]:gap-1.5 [@media(max-height:700px)]:p-2">
                 <FitBox fit={backFit}>
-                  {(back.prompt || answerChoice) && (
-                    <span className="flex w-full flex-col items-center gap-[0.25em]">
-                      <span className="text-[0.6em] font-semibold text-white/70">
-                        Answer:
-                      </span>
-                      {/* The letter and the words both: a letter alone cannot
-                          be checked against the front once the card has
-                          turned, and the words alone leave the learner to
-                          count the options back.
-
-                          The letter takes its own line under the label, so it
-                          reads as the answer's name at any width rather than
-                          as the first word of a sentence. */}
-                      {answerChoice && (
-                        <span className="block text-[2.1em] font-extrabold leading-none text-[#FFD400]">
-                          {answerChoice.letter}.
-                        </span>
-                      )}
-                      <span className="block text-[1.15em] font-bold leading-[1.4]">
-                        {back.prompt}
-                      </span>
-                    </span>
-                  )}
-
                   {/* Statements the answer names by numeral, spelled out, then
                       any the answer itself enumerated. */}
-                  {(namedStatements.length > 0 ||
-                    back.statements.length > 0) && (
-                    <span className="flex w-full flex-col gap-[0.3em] text-left">
-                      {[...namedStatements, ...back.statements].map(
-                        (statement) => (
-                          <span
-                            key={statement}
-                            className="block rounded-lg bg-white/12 px-[0.7em] py-[0.35em] text-[1.125em] font-semibold leading-[1.3]"
-                          >
-                            {statement}
-                          </span>
-                        ),
-                      )}
-                    </span>
-                  )}
+                  <AnswerText
+                    letter={answerChoice?.letter}
+                    prompt={back.prompt}
+                    statements={[...namedStatements, ...back.statements]}
+                  />
                 </FitBox>
               </span>
             </span>
@@ -598,6 +527,9 @@ function FlashCardContent() {
 /**
  * Holds one card face's text. The outer span is the measured frame; the inner
  * one carries the fitted base size that every em inside it scales from.
+ *
+ * The frame is all this knows. How the text it holds is sized and spaced is
+ * `card-text.tsx`'s alone.
  */
 function FitBox({
   fit,
@@ -614,7 +546,7 @@ function FitBox({
       <span
         ref={fit.contentRef}
         style={{ fontSize: `${fit.fontSize}px` }}
-        className="flex w-full flex-col items-center gap-[0.5em]"
+        className="block w-full"
       >
         {children}
       </span>
