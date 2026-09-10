@@ -1,12 +1,12 @@
 "use client";
 
 import { AuthShell } from "@/components/ui/auth-shell";
+import { Spinner } from "@/components/ui/spinner";
 import {
   ArrowRight,
   CheckCircle2,
   Eye,
   EyeOff,
-  LoaderCircle,
   LockKeyhole,
 } from "lucide-react";
 import Link from "next/link";
@@ -203,11 +203,12 @@ function ResetPasswordForm() {
 
         <button
           type="submit"
+          aria-busy={isSubmitting}
           disabled={isSubmitting || Boolean(message)}
           className="mt-1.5 flex w-full items-center justify-center gap-2 bg-[#FDB913] px-4 py-3.5 text-base font-semibold text-[#0B2340] shadow-sm transition-colors hover:bg-[#C98A00] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0B2340] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isSubmitting ? (
-            <LoaderCircle className="size-4 animate-spin" />
+            <Spinner />
           ) : (
             <ArrowRight className="size-4" />
           )}

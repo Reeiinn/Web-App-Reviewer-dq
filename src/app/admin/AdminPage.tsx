@@ -10,7 +10,12 @@ import {
 } from "@/components/ui/hold-and-release-button";
 import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
-import { SummaryTile } from "@/components/ui/summary-tile";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  SummaryTile,
+  SummaryTilesSkeleton,
+} from "@/components/ui/summary-tile";
+import { RosterTableSkeleton } from "./RosterSkeleton";
 import { staffTitleFor } from "@/lib/helper/roles";
 import { NUDGE_MAX_LENGTH, nudgeAge, nudgePresets } from "@/lib/helper/nudges";
 import { PASSES_REQUIRED, passesLabel } from "@/lib/helper/practice-exam";
@@ -463,10 +468,12 @@ function NudgeReviewee({
             </AlertDialog.Close>
             <button
               type="button"
+              aria-busy={sending}
               disabled={sending || !trimmed || tooLong}
               onClick={() => send({ message: trimmed })}
-              className="rounded-lg bg-[#0B2340] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#0F2E4D] disabled:opacity-40"
+              className="flex items-center gap-2 rounded-lg bg-[#0B2340] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#0F2E4D] disabled:opacity-40"
             >
+              {sending && <Spinner />}
               {sending ? "Sending…" : "Send"}
             </button>
           </div>
@@ -622,6 +629,7 @@ function RemoveReviewee({
               holdDuration={2000}
               onHoldComplete={remove}
               disabled={!confirmed || removing}
+              busy={removing}
               idleLabel={removing ? "Removing…" : "Hold to remove"}
               holdingLabel="Keep holding…"
               className="h-9 px-3 text-sm"
@@ -767,6 +775,18 @@ export function AdminPage() {
           </p>
         )}
 
+        {/* The counts are tallied from the roster, so until it lands they
+            would every one of them read a confident nought. */}
+        {loading ? (
+          <SummaryTilesSkeleton
+            tiles={[
+              { label: "Total Reviewees", tone: "bg-muted" },
+              { label: "Exam Ready", tone: "bg-emerald-50" },
+              { label: "On Track", tone: "bg-amber-50" },
+              { label: "At Risk", tone: "bg-rose-50" },
+            ]}
+          />
+        ) : (
         <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryTile
             label="Total Reviewees"
@@ -796,6 +816,7 @@ export function AdminPage() {
             tone="bg-rose-50 text-rose-700"
           />
         </div>
+        )}
 
         <div className="rv-card mt-6 flex flex-wrap items-end gap-6 p-5">
           <FilterSelect
@@ -867,7 +888,7 @@ export function AdminPage() {
         </div>
 
         {loading ? (
-          <p className="mt-8 text-sm text-muted-foreground">Loading roster…</p>
+          <RosterTableSkeleton isAdmin={isAdmin} />
         ) : error ? (
           <p className="mt-8 text-sm font-semibold text-destructive">{error}</p>
         ) : rows.length === 0 ? (

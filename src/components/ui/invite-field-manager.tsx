@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
+import { Spinner } from "@/components/ui/spinner";
 import { DialogPanel } from "@/components/ui/dialog-panel";
 import { Check, Copy, UserPlus } from "lucide-react";
 import { useState } from "react";
@@ -172,10 +173,12 @@ export function InviteFieldManager({ onInvited }: { onInvited?: () => void }) {
             {!link && (
               <button
                 type="button"
+                aria-busy={sending}
                 disabled={sending || !trimmed}
                 onClick={invite}
-                className="rounded-lg bg-[#0B2340] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#0F2E4D] disabled:opacity-40"
+                className="flex items-center gap-2 rounded-lg bg-[#0B2340] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#0F2E4D] disabled:opacity-40"
               >
+                {sending && <Spinner />}
                 {sending ? "Sending…" : "Send invitation"}
               </button>
             )}

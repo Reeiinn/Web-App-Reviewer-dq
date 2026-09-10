@@ -4,6 +4,7 @@ import { cachedFetch, invalidateCached } from "@/lib/helper/client-cache";
 import { nudgeAge } from "@/lib/helper/nudges";
 import { Bell } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { LoadingRegion, Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useRef, useState } from "react";
 
 type Nudge = {
@@ -162,9 +163,25 @@ export function NotificationBell() {
             )}
           </div>
 
-          {nudges.length === 0 ? (
+          {!loaded ? (
+            // Two placeholder reminders, so the panel opens at roughly the
+            // height it will settle at instead of snapping taller when they
+            // arrive underneath the cursor.
+            <LoadingRegion label="Loading reminders">
+              {Array.from({ length: 2 }, (_, row) => (
+                <div
+                  key={row}
+                  className="border-b border-border px-4 py-3 last:border-b-0"
+                >
+                  <Skeleton className="h-3.5 w-full" />
+                  <Skeleton className="mt-2 h-3.5 w-2/3" />
+                  <Skeleton className="mt-2.5 h-3 w-32" />
+                </div>
+              ))}
+            </LoadingRegion>
+          ) : nudges.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              {loaded ? "Nothing from your manager yet." : "Loading…"}
+              Nothing from your manager yet.
             </p>
           ) : (
             // `dvh` rather than a fixed cap: a phone held sideways has less height

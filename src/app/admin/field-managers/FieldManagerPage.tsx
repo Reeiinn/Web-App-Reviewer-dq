@@ -1,9 +1,13 @@
 "use client";
 
 import { AppNav } from "@/components/ui/app-nav";
+import { ManagerGridSkeleton } from "./ManagerSkeleton";
 import { Avatar } from "@/components/ui/avatar";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
-import { SummaryTile } from "@/components/ui/summary-tile";
+import {
+  SummaryTile,
+  SummaryTilesSkeleton,
+} from "@/components/ui/summary-tile";
 import { InviteFieldManager } from "@/components/ui/invite-field-manager";
 import {
   RECRUIT_TARGET,
@@ -438,6 +442,16 @@ export function FieldManagerPage() {
           count.
         </p>
 
+        {loading ? (
+          <SummaryTilesSkeleton
+            tiles={[
+              { label: "Field Managers", tone: "bg-muted" },
+              { label: "Active Today", tone: "bg-emerald-50" },
+              { label: "Total Recruits", tone: "bg-[#FFF8D6]" },
+              { label: "Inactive", tone: "bg-rose-50" },
+            ]}
+          />
+        ) : (
         <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryTile
             label="Field Managers"
@@ -466,6 +480,7 @@ export function FieldManagerPage() {
             tone="bg-rose-50 text-rose-700"
           />
         </div>
+        )}
 
         <div className="rv-card mt-6 flex flex-wrap items-end gap-6 p-5">
           <FilterSelect
@@ -509,9 +524,7 @@ export function FieldManagerPage() {
         </div>
 
         {loading ? (
-          <p className="mt-8 text-sm text-muted-foreground">
-            Loading field managers…
-          </p>
+          <ManagerGridSkeleton />
         ) : error ? (
           <p className="mt-8 text-sm font-semibold text-destructive">{error}</p>
         ) : rows.length === 0 ? (
