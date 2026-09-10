@@ -1,10 +1,12 @@
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
+import redis from "@/lib/redis";
 import { Flashcard } from "@/lib/types/flashcard";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
   const session = await auth();
+
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -13,22 +15,23 @@ export async function GET(req: Request) {
   const examType = searchParams.get("exam_type");
   const category = searchParams.get("category");
 
+  // Include filters in the cache key
+  const cacheKey = `flashcards:${examType ?? "all"}:${category ?? "all"}`;
+
   try {
-    // A card's options come from the exam question it was drawn from. The two
-    // tables share no key, so the question is found by its text — which is
-    // enough on its own for all but a handful of texts that are reused across
-    // questions with different options (three IIAP questions read "Which of
-    // the following statements is correct?"). Matching those on text alone
-    // would pool every one of their choices onto the same card, so where the
-    // text is ambiguous the card's own back — the correct option — picks out
-    // the question that was meant.
-    //
-    // The back cannot be the only test: on ten cards the correct choice is
-    // "all of the above", and the flashcard spells the answer out instead of
-    // repeating a phrase that means nothing on its own, so no back matches.
-    // Those texts are unique, so the count check resolves them and the back
-    // is consulted only where it is actually needed. LIMIT 1 keeps a card
-    // that satisfies neither from multiplying the rows.
+    // 1. Check Redis
+    if (redis) {
+      const cached = await redis.get<Flashcard[]>(cacheKey);
+
+      if (cached) {
+        console.log("🟢 REDIS CACHE HIT:", cacheKey);
+        return NextResponse.json(cached);
+      }
+
+      console.log("🔴 REDIS CACHE MISS:", cacheKey);
+    }
+
+    // 2. Cache miss → query PostgreSQL
     let query = `
       SELECT
         f.id,
@@ -91,9 +94,19 @@ export async function GET(req: Request) {
     query += ` ORDER BY f.category ASC`;
 
     const result = await pool.query<Flashcard>(query, values);
+
+    // 3. Save result to Redis
+    if (redis) {
+      await redis.set(cacheKey, result.rows, {
+        ex: 60 * 5, // 5 minutes
+      });
+    }
+
+    // 4. Return result
     return NextResponse.json(result.rows);
   } catch (error) {
     console.error("Error fetching flashcards:", error);
+
     return NextResponse.json(
       { error: "Failed to fetch flashcards" },
       { status: 500 },
