@@ -440,25 +440,24 @@ function FlashCardContent() {
               <span className="col-start-1 row-start-1 flex h-full flex-col items-center justify-center gap-2 overflow-hidden rounded-xl bg-[#0B2340] p-3 text-white [backface-visibility:hidden] sm:gap-3 [transform:rotateY(180deg)] sm:p-5 [@media(max-height:700px)]:gap-1.5 [@media(max-height:700px)]:p-2">
                 <FitBox fit={backFit}>
                   {(back.prompt || answerChoice) && (
-                    <span className="flex w-full flex-col items-center gap-1">
+                    <span className="flex w-full flex-col items-center gap-[0.25em]">
                       <span className="text-[0.6em] font-semibold text-white/70">
                         Answer:
                       </span>
-                      {/* The letter and the words together: a letter alone
-                          cannot be checked against the front once the card has
+                      {/* The letter and the words both: a letter alone cannot
+                          be checked against the front once the card has
                           turned, and the words alone leave the learner to
                           count the options back.
 
-                          It leads the text inline rather than sitting in a
-                          column of its own, so on a wrapped answer it stays
-                          against the first word instead of drifting out to the
-                          edge of the card, at any width. */}
-                      <span className="block text-[1.5em] font-bold leading-[1.35]">
-                        {answerChoice && (
-                          <span className="mr-[0.3em] text-[#FFD400]">
-                            {answerChoice.letter}.
-                          </span>
-                        )}
+                          The letter takes its own line under the label, so it
+                          reads as the answer's name at any width rather than
+                          as the first word of a sentence. */}
+                      {answerChoice && (
+                        <span className="block text-[2.1em] font-extrabold leading-none text-[#FFD400]">
+                          {answerChoice.letter}.
+                        </span>
+                      )}
+                      <span className="block text-[1.15em] font-bold leading-[1.4]">
                         {back.prompt}
                       </span>
                     </span>
