@@ -269,12 +269,13 @@ export function CertificateImage({
           position: "absolute",
           left: 0,
           right: 0,
-          top: h(75.2),
-          // Spelled out, and equal to the image's own height. A row that sizes
-          // itself from its content gave satori licence to squash the writing
-          // flat while keeping its width — the artwork has to be told exactly
-          // how much room it has.
-          height: w(6.15),
+          top: h(74.8),
+          // Taller than the artwork rather than equal to it. A box sized to the
+          // image exactly leaves satori no margin for how it rounds an image's
+          // height, and the signature's descending loop came off the bottom.
+          // A row that sizes itself from its content is worse still — it lets
+          // satori flatten the writing while keeping its width.
+          height: w(8.6),
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -291,13 +292,15 @@ export function CertificateImage({
         />
       </div>
 
-      <Row top={81.7}>
+      {/* Both dropped a little to leave the signature's descender its own room,
+          and no further: the base sweep's gold begins just below the role. */}
+      <Row top={83}>
         <span style={{ fontWeight: 700, fontSize: w(2.1), color: INK }}>
           {CERTIFICATE_SIGNER}
         </span>
       </Row>
 
-      <Row top={84.4}>
+      <Row top={85.7}>
         <span style={{ fontSize: w(1.8), color: INK }}>
           {CERTIFICATE_SIGNER_ROLE}
         </span>
