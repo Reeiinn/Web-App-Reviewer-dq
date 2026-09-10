@@ -38,7 +38,7 @@ export function TermsPage({ signedIn }: { signedIn: boolean }) {
         </p>
       </InfoSection>
 
-      <InfoSection title="What INSURE is not">
+      <InfoSection title="What INSURE is">
         <div className="rv-card mt-4 p-6">
           <h3 className="text-lg font-extrabold text-foreground">
             Read this part first
