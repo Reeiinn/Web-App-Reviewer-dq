@@ -1,6 +1,7 @@
 // lib/rateLimit.ts
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import redis from "../redis";
 
 const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
 const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -10,14 +11,6 @@ if (!redisUrl || !redisToken) {
     "Upstash Redis env vars are missing — rate limiting is disabled.",
   );
 }
-
-const redis =
-  redisUrl && redisToken
-    ? new Redis({
-        url: redisUrl,
-        token: redisToken,
-      })
-    : null;
 
 function buildLimiter(
   limiter: ReturnType<typeof Ratelimit.slidingWindow>,
