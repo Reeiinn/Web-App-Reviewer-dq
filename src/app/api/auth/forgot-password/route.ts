@@ -1,6 +1,7 @@
 import pool from "@/lib/db";
 import { appUrl } from "@/lib/helper/app-url";
 import { createResetToken } from "@/lib/helper/reset-token";
+import { mailerConfigured, sendMail } from "@/lib/mailer";
 import { forgotPasswordSchema } from "@/lib/validation/auth.validation";
 import { NextResponse } from "next/server";
 
@@ -55,13 +56,43 @@ export async function POST(req: Request) {
     // the host this request arrived at.
     const resetUrl = appUrl(req, `/reset-password?token=${token}`);
 
-    // No mailer is wired up yet. Outside production the link comes back in the
-    // response so the flow is usable; in production it is withheld.
+    const mail = await sendMail({
+      to: email,
+      subject: "Reset your INSURE password",
+      text: [
+        "A password reset was requested for this INSURE account.",
+        "",
+        `Reset your password here: ${resetUrl}`,
+        "",
+        "The link works once and expires in one hour.",
+        "If you did not ask for this, ignore this email and your password stays as it is.",
+      ].join("\n"),
+    });
+
+    // A reset nobody receives looks the same from the outside as one that
+    // arrived, so the failure is only visible if it is written down.
+    if (!mail.sent) {
+      console.error(
+        "Password reset email not sent:",
+        mail.reason,
+        mail.reason === "failed" ? (mail.detail ?? "") : "",
+      );
+    }
+
+    // The link rides back in the response only outside production, where there
+    // may be no mailer to carry it. In production it would reach whoever typed
+    // the address rather than whoever owns it, which is an account takeover.
     if (process.env.NODE_ENV === "production") {
       return NextResponse.json({ message: GENERIC_MESSAGE });
     }
 
-    return NextResponse.json({ message: GENERIC_MESSAGE, resetUrl });
+    return NextResponse.json({
+      message: GENERIC_MESSAGE,
+      // Nothing to open by hand once the mail is on its way.
+      ...(mail.sent ? {} : { resetUrl }),
+      sent: mail.sent,
+      mailerConfigured: mailerConfigured(),
+    });
   } catch (error) {
     console.error("Error creating password reset token:", error);
     return NextResponse.json(
