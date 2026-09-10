@@ -85,14 +85,6 @@ export default async function Page({
             marks={marks}
           />
         </div>
-
-        {!marks.logo && (
-          <p className="rv-print-hide mt-4 text-center text-xs text-muted-foreground">
-            The phoenix is a stand-in. Drop the real one at{" "}
-            <code className="font-mono">public/certificate-art/dracaena.png</code>{" "}
-            and it replaces this with no other change.
-          </p>
-        )}
       </main>
     </div>
   );
