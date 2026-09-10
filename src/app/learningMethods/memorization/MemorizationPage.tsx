@@ -245,6 +245,15 @@ function MemorizationContent() {
     refreshTrackMastery();
   }, [refreshTrackMastery]);
 
+  // The resume note is an orientation cue, not a permanent label: it says where
+  // the sitting picked up and then gives its room back to the question.
+  useEffect(() => {
+    if (resumedAt === null) return;
+
+    const timer = window.setTimeout(() => setResumedAt(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [resumedAt]);
+
   const resetSession = (nextQuestions: MemorizationQuestion[]) => {
     setQuestions(nextQuestions);
     setIndex(0);
