@@ -280,13 +280,14 @@ export function CertificateImage({
         </span>
       </Row>
 
-      {/* Clear of the base sweep's lower rule rather than sitting on it, so the
-          wordmark reads against flat navy instead of across a gold line. */}
+      {/* Low enough that the mark sits on the navy rather than in the gold band
+          above it. The mark's wings are the same gold as that band, so raising
+          the lockup any further makes them disappear into it. */}
       <div
         style={{
           position: "absolute",
           left: w(4.2),
-          bottom: h(3.4),
+          bottom: h(2),
           width: w(11.8),
           display: "flex",
           flexDirection: "column",
@@ -307,7 +308,7 @@ export function CertificateImage({
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- as above. */}
-            <img src={DRAWN_LOGO} alt="" width={w(7.4)} />
+            <img src={DRAWN_LOGO} alt="" width={w(6.6)} />
             <span
               style={{
                 fontFamily: SERIF,
