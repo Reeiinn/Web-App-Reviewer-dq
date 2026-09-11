@@ -1,19 +1,11 @@
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
 import type { Question } from "@/lib/types/questions";
+import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
 
-export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const examType = searchParams.get("exam_type");
-  const category = searchParams.get("category");
-
-  try {
+const getQuestions = unstable_cache(
+  async (examType: string | null, category: string | null) => {
     let query = `
       SELECT 
         q.id,
@@ -54,7 +46,25 @@ export async function GET(request: Request) {
     query += ` GROUP BY q.id ORDER BY q.created_at DESC`;
 
     const result = await pool.query<Question>(query, values);
-    return NextResponse.json(result.rows);
+    return result.rows;
+  },
+  ["questions"],
+  { tags: ["questions"] },
+);
+
+export async function GET(request: Request) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const examType = searchParams.get("exam_type");
+  const category = searchParams.get("category");
+
+  try {
+    const rows = await getQuestions(examType, category);
+    return NextResponse.json(rows);
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch questions" },

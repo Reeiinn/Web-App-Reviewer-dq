@@ -1,37 +1,11 @@
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
-import redis from "@/lib/redis";
 import { Flashcard } from "@/lib/types/flashcard";
+import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
 
-export async function GET(req: Request) {
-  const session = await auth();
-
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const examType = searchParams.get("exam_type");
-  const category = searchParams.get("category");
-
-  // Include filters in the cache key
-  const cacheKey = `flashcards:${examType ?? "all"}:${category ?? "all"}`;
-
-  try {
-    // 1. Check Redis
-    if (redis) {
-      const cached = await redis.get<Flashcard[]>(cacheKey);
-
-      if (cached) {
-        console.log("🟢 REDIS CACHE HIT:", cacheKey);
-        return NextResponse.json(cached);
-      }
-
-      console.log("🔴 REDIS CACHE MISS:", cacheKey);
-    }
-
-    // 2. Cache miss → query PostgreSQL
+const getFlashcards = unstable_cache(
+  async (examType: string | null, category: string | null) => {
     let query = `
       SELECT
         f.id,
@@ -94,16 +68,26 @@ export async function GET(req: Request) {
     query += ` ORDER BY f.category ASC`;
 
     const result = await pool.query<Flashcard>(query, values);
+    return result.rows;
+  },
+  ["flashcards"],
+  { tags: ["flashcards"] },
+);
 
-    // 3. Save result to Redis
-    if (redis) {
-      await redis.set(cacheKey, result.rows, {
-        ex: 60 * 5, // 5 minutes
-      });
-    }
+export async function GET(req: Request) {
+  const session = await auth();
 
-    // 4. Return result
-    return NextResponse.json(result.rows);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const examType = searchParams.get("exam_type");
+  const category = searchParams.get("category");
+
+  try {
+    const rows = await getFlashcards(examType, category);
+    return NextResponse.json(rows);
   } catch (error) {
     console.error("Error fetching flashcards:", error);
 
