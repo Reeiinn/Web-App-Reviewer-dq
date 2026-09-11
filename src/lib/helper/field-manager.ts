@@ -1,7 +1,7 @@
 /**
- * How a field manager is measured on the Sales Manager's console.
+ * How a unit manager is measured on the Sales Manager's console.
  *
- * A field manager does not study, so none of the readiness maths that scores a
+ * A unit manager does not study, so none of the readiness maths that scores a
  * reviewee applies to them. What they are accountable for is recruiting, and
  * the console ranks them on exactly that: the count of reviewees who signed up
  * through their invite. Their last visit rides alongside the count rather than

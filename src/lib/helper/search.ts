@@ -2,7 +2,7 @@
  * Text search over a list already in the browser.
  *
  * Every search box in the app filters rows it has fetched: the glossary, the
- * reviewee roster, the field manager console. The naive version lowercases
+ * reviewee roster, the unit manager console. The naive version lowercases
  * every field of every row on every keystroke, so the cost of typing grows with
  * the list and with how much text each row carries — glossary definitions are
  * paragraphs, and they were being folded to lowercase again for each letter.

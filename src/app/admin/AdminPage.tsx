@@ -3,6 +3,7 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { DialogPanel } from "@/components/ui/dialog-panel";
 import { AppNav } from "@/components/ui/app-nav";
+import { OnboardingTour } from "@/components/ui/onboarding-tour";
 import { Avatar } from "@/components/ui/avatar";
 import {
   ButtonHoldAndRelease,
@@ -249,9 +250,12 @@ const samePhrase = (a: string, b: string) => tidy(a) === tidy(b);
 function NudgeReviewee({
   reviewee,
   onSent,
+  tourTarget = false,
 }: {
   reviewee: Reviewee;
   onSent: (message: string) => void;
+  /** Marks this row's trigger as the onboarding tour's "Nudge" stop. */
+  tourTarget?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -353,6 +357,7 @@ function NudgeReviewee({
     <AlertDialog.Root open={open} onOpenChange={close}>
       <AlertDialog.Trigger
         aria-label={`Send ${reviewee.name} a reminder`}
+        data-tour={tourTarget ? "tour-nudge" : undefined}
         className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-[#C9A227] hover:bg-[#FFF8D6] hover:text-[#0B2340]"
       >
         <Bell className="size-3.5" />
@@ -425,7 +430,7 @@ function NudgeReviewee({
                   and the composer off the screen. */}
               <ul className="mt-2 flex max-h-42 flex-col gap-2 overflow-y-auto overscroll-contain">
                 {sent.map((nudge) => {
-                  // A field manager unsends their own only; the Sales Manager
+                  // A unit manager unsends their own only; the Sales Manager
                   // owns the console and can clear any of them.
                   const mine =
                     viewer?.role === "ADMIN" || nudge.senderId === viewer?.id;
@@ -665,7 +670,7 @@ export function AdminPage() {
   // needs the column saying whose they are.
   const isAdmin = session?.user?.role === "ADMIN";
 
-  // "View recruits" on a field manager's card lands here carrying that
+  // "View recruits" on a unit manager's card lands here carrying that
   // manager's email. The roster already searches the recruiter's address for an
   // admin, so the link only has to seed the box the admin could have typed into
   // themselves — which leaves the filter visible, and clearable, rather than
@@ -764,6 +769,7 @@ export function AdminPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppNav />
+      <OnboardingTour />
 
       <main className="mx-auto w-full max-w-[1500px] px-6 py-8">
         <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] lg:items-start">
@@ -886,7 +892,7 @@ export function AdminPage() {
           </div>
 
           <label className="ml-auto text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            {isAdmin ? "Search Reviewee or Field Manager" : "Search Reviewee"}
+            {isAdmin ? "Search Reviewee or Unit Manager" : "Search Reviewee"}
             <div className="relative mt-1.5">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -897,7 +903,7 @@ export function AdminPage() {
                   setPage(1);
                 }}
                 placeholder={
-                  isAdmin ? "Name, email or field manager" : "Name or email"
+                  isAdmin ? "Name, email or unit manager" : "Name or email"
                 }
                 className="w-72 rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm font-semibold text-foreground outline-none focus:border-[#0B2340]"
               />
@@ -923,7 +929,7 @@ export function AdminPage() {
             </p>
           </div>
         ) : (
-          <div className="rv-card mt-6 overflow-hidden">
+          <div data-tour="tour-roster" className="rv-card mt-6 overflow-hidden">
             <div className="overflow-x-auto">
               {/* The Sales Manager's table carries an extra Recruited By
                   column, so it needs the wider floor before the cells start
@@ -956,7 +962,7 @@ export function AdminPage() {
                 </thead>
 
                 <tbody>
-                  {rows.map((row) => (
+                  {rows.map((row, rowIndex) => (
                     <tr
                       key={row.id}
                       className="border-t border-border align-top"
@@ -1059,6 +1065,7 @@ export function AdminPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <NudgeReviewee
                             reviewee={row}
+                            tourTarget={rowIndex === 0}
                             onSent={(message) => setNotice(message)}
                           />
                           <RemoveReviewee

@@ -77,7 +77,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
              password,
              name,
              role,
-             manager_id
+             manager_id,
+             onboarding_tours_seen
            FROM users
            WHERE email = $1 AND deleted_at IS NULL`,
           [normalizedEmail],
@@ -101,6 +102,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: user.name,
           role: user.role,
           managerId: user.manager_id,
+          onboardingToursSeen: user.onboarding_tours_seen ?? [],
         };
       },
     }),
@@ -135,7 +137,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       try {
         const current = await pool.query(
-          `SELECT role, manager_id FROM users
+          `SELECT role, manager_id, onboarding_tours_seen FROM users
             WHERE id = $1 AND deleted_at IS NULL`,
           [base.id],
         );
@@ -145,6 +147,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         base.role = account.role;
         base.managerId = account.manager_id;
+        base.onboardingToursSeen = account.onboarding_tours_seen ?? [];
       } catch (error) {
         // A database that cannot answer is not grounds for signing everyone
         // out; the claims already in the token stand until the next refresh.

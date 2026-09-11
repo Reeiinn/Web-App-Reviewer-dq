@@ -7,6 +7,7 @@ import { cachedFetch, putCached } from "@/lib/helper/client-cache";
 import { isStaff, landingFor, staffTitleFor } from "@/lib/helper/roles";
 import {
   Award,
+  Compass,
   FileText,
   Info,
   LifeBuoy,
@@ -33,28 +34,40 @@ const AVATAR_TTL_MS = 5 * 60_000;
 //
 // Certificates is not here either: it is what the account has to show for
 // itself rather than a place to work, so it is reached from the user menu.
-const learnerLinks = [
+type NavLink = {
+  href: string;
+  label: string;
+  /** Onboarding step (see onboarding-tour.ts) that points at this link, when
+   * one does. Rendered as a `data-tour` attribute below. */
+  tour?: string;
+};
+
+const learnerLinks: NavLink[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/glossary", label: "Glossary" },
-  { href: "/analytics", label: "Analytics" },
+  { href: "/analytics", label: "Analytics", tour: "tour-analytics" },
 ];
 
 // No Analytics here: it charts the signed-in account's own per-track mastery,
 // which is empty for staff since they do not study. Reviewee performance is
 // what the console is for.
-const staffLinks = [
+const staffLinks: NavLink[] = [
   { href: "/admin", label: "Admin Console" },
-  { href: "/glossary", label: "Glossary" },
+  { href: "/glossary", label: "Glossary", tour: "tour-glossary" },
 ];
 
-// The field manager console ranks managers against each other, which is the
-// Sales Manager's view of their team and nobody else's — a field manager
+// The unit manager console ranks managers against each other, which is the
+// Sales Manager's view of their team and nobody else's — a unit manager
 // signed in here would be reading their own standing among colleagues. The
 // route and the API refuse them too; this only keeps the link out of a nav
 // that would bounce them.
-const adminLinks = [
+const adminLinks: NavLink[] = [
   { href: "/admin", label: "Admin Console" },
-  { href: "/admin/field-managers", label: "Field Managers" },
+  {
+    href: "/admin/field-managers",
+    label: "Unit Managers",
+    tour: "tour-field-managers",
+  },
   { href: "/glossary", label: "Glossary" },
 ];
 
@@ -270,6 +283,19 @@ function UserMenu() {
             </Link>
           )}
 
+          {/* Replay tour re-runs the three-stop walkthrough for whatever role
+              is signed in, on the screen it belongs to — the same tour a
+              first login sees, not a settings toggle for it. */}
+          <Link
+            href={`${landingFor(session?.user?.role)}?tour=1`}
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-3 border-t border-border px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Compass className="size-4" />
+            Replay tour
+          </Link>
+
           {/* About, Help, Privacy and Terms sit here rather than in the main
               nav: that row is for the work — dashboards, decks, the console —
               and it is built per role, so these would have had to be repeated
@@ -411,6 +437,7 @@ export function AppNav({
                   <Link
                     href={link.href}
                     aria-current={active ? "page" : undefined}
+                    data-tour={link.tour}
                     className={
                       active
                         ? "border-b-2 border-[#C9A227] pb-1 text-sm font-bold text-[#8A6D0B]"
@@ -432,7 +459,11 @@ export function AppNav({
         <div className="relative flex items-center gap-3">
           {/* Staff send reminders and receive none, so the bell would only ever
               be empty for them. */}
-          {session?.user && !isStaff(session.user.role) && <NotificationBell />}
+          {session?.user && !isStaff(session.user.role) && (
+            <span data-tour="tour-bell" className="inline-flex">
+              <NotificationBell />
+            </span>
+          )}
           <UserMenu />
         </div>
       </div>
@@ -455,6 +486,7 @@ export function AppNav({
                   <Link
                     href={link.href}
                     aria-current={active ? "page" : undefined}
+                    data-tour={link.tour}
                     className={
                       active
                         ? "whitespace-nowrap border-b-2 border-[#C9A227] pb-1 text-sm font-bold text-[#8A6D0B]"

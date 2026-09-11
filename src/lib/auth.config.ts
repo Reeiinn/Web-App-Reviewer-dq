@@ -147,6 +147,7 @@ export const authConfig: NextAuthConfig = {
         token.id = user.id;
         token.role = (user as any).role;
         token.managerId = (user as any).managerId;
+        token.onboardingToursSeen = (user as any).onboardingToursSeen ?? [];
       }
       return token;
     },
@@ -155,6 +156,8 @@ export const authConfig: NextAuthConfig = {
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
         (session.user as any).managerId = token.managerId;
+        (session.user as any).onboardingToursSeen =
+          token.onboardingToursSeen ?? [];
       }
       return session;
     },
