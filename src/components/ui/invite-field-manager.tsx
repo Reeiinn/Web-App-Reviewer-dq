@@ -85,13 +85,13 @@ export function InviteFieldManager({ onInvited }: { onInvited?: () => void }) {
 
   return (
     <AlertDialog.Root open={open} onOpenChange={close}>
-      <AlertDialog.Trigger className="flex items-center gap-2 rounded-lg bg-[#0B2340] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#0F2E4D]">
+      <AlertDialog.Trigger className="rv-press flex items-center gap-2 rounded-lg bg-[#0B2340] px-3 py-2 text-sm font-bold text-white hover:bg-[#0F2E4D]">
         <UserPlus className="size-4" />
         Add Field Manager
       </AlertDialog.Trigger>
 
       <AlertDialog.Portal>
-        <DialogPanel>
+        <DialogPanel animated>
           <AlertDialog.Title className="text-lg font-extrabold">
             Add a Field Manager
           </AlertDialog.Title>

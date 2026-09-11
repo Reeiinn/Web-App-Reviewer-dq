@@ -577,7 +577,7 @@ function RemoveReviewee({
       </AlertDialog.Trigger>
 
       <AlertDialog.Portal>
-        <DialogPanel>
+        <DialogPanel animated>
           <div className="flex items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-700">
               <AlertTriangle className="size-5" />
