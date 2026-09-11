@@ -154,6 +154,48 @@
   }
 }
 
+/* A button that answers the press: it lifts under the cursor and gives way
+   under the click. Both figures are deliberately small — this sits in a page
+   header, and anything further reads as the button relocating rather than
+   responding. The press is quicker than the lift, because a control that takes
+   as long to go down as it does to come up feels slack.
+
+   Replaces the `transition` utility rather than sitting beside it: this sets
+   the same property, and whichever landed later in the sheet would win. Opt-in,
+   so no button picks it up without being given it. */
+@utility rv-press {
+  transition:
+    translate 140ms cubic-bezier(0.2, 0, 0, 1),
+    scale 140ms cubic-bezier(0.2, 0, 0, 1),
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+
+  /* Guarded, because a touch browser leaves :hover stuck on after the tap and
+     the button would stay lifted with nothing hovering it. */
+  @media (hover: hover) {
+    &:hover {
+      translate: 0 -1px;
+      box-shadow: 0 4px 12px -4px rgb(11 35 64 / 0.45);
+    }
+  }
+
+  &:active {
+    translate: 0 1px;
+    scale: 0.98;
+    box-shadow: none;
+    transition-duration: 60ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:hover,
+    &:active {
+      translate: 0 0;
+      scale: 1;
+    }
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Dialogs
 
