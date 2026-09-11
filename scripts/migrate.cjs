@@ -163,6 +163,12 @@ const statements = [
 
   `CREATE UNIQUE INDEX IF NOT EXISTS vocabulary_terms_exam_term_key
      ON vocabulary_terms (exam_type, term)`,
+
+  // Which role-specific onboarding tours an account has already sat through.
+  // Keyed by role rather than a single flag so a promotion — a reviewee made
+  // a Field Manager, say — still gets that role's own tour instead of being
+  // treated as fully onboarded already.
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_tours_seen text[] NOT NULL DEFAULT '{}'`,
 ];
 
 // The glossary as its source document has it, so the page renders against real

@@ -3,6 +3,7 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { DialogPanel } from "@/components/ui/dialog-panel";
 import { AppNav } from "@/components/ui/app-nav";
+import { OnboardingTour } from "@/components/ui/onboarding-tour";
 import { Avatar } from "@/components/ui/avatar";
 import {
   ButtonHoldAndRelease,
@@ -249,9 +250,12 @@ const samePhrase = (a: string, b: string) => tidy(a) === tidy(b);
 function NudgeReviewee({
   reviewee,
   onSent,
+  tourTarget = false,
 }: {
   reviewee: Reviewee;
   onSent: (message: string) => void;
+  /** Marks this row's trigger as the onboarding tour's "Nudge" stop. */
+  tourTarget?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -353,6 +357,7 @@ function NudgeReviewee({
     <AlertDialog.Root open={open} onOpenChange={close}>
       <AlertDialog.Trigger
         aria-label={`Send ${reviewee.name} a reminder`}
+        data-tour={tourTarget ? "tour-nudge" : undefined}
         className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-[#C9A227] hover:bg-[#FFF8D6] hover:text-[#0B2340]"
       >
         <Bell className="size-3.5" />
@@ -764,6 +769,7 @@ export function AdminPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppNav />
+      <OnboardingTour />
 
       <main className="mx-auto w-full max-w-[1500px] px-6 py-8">
         <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] lg:items-start">
@@ -923,7 +929,7 @@ export function AdminPage() {
             </p>
           </div>
         ) : (
-          <div className="rv-card mt-6 overflow-hidden">
+          <div data-tour="tour-roster" className="rv-card mt-6 overflow-hidden">
             <div className="overflow-x-auto">
               {/* The Sales Manager's table carries an extra Recruited By
                   column, so it needs the wider floor before the cells start
@@ -956,7 +962,7 @@ export function AdminPage() {
                 </thead>
 
                 <tbody>
-                  {rows.map((row) => (
+                  {rows.map((row, rowIndex) => (
                     <tr
                       key={row.id}
                       className="border-t border-border align-top"
@@ -1059,6 +1065,7 @@ export function AdminPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <NudgeReviewee
                             reviewee={row}
+                            tourTarget={rowIndex === 0}
                             onSent={(message) => setNotice(message)}
                           />
                           <RemoveReviewee

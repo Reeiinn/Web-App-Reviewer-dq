@@ -464,6 +464,34 @@
   animation: rv-pop-in 220ms ease-out both;
 }
 
+/* ---------------------------------------------------------------------------
+   Onboarding tour spotlight
+
+   The ring around whatever step a role's tour is pointing at. Position, size
+   and darkness are all one element: a huge box-shadow spread doubles as the
+   scrim over the rest of the page, so there is nothing separate to keep
+   aligned with the ring as the target moves between steps.
+   --------------------------------------------------------------------------- */
+.rv-tour-scrim {
+  position: fixed;
+  z-index: 55;
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+  box-shadow:
+    0 0 0 4000px rgb(11 35 64 / 55%),
+    0 0 0 3px #ffd400,
+    0 0 20px 2px rgb(255 212 0 / 55%);
+  transition:
+    top 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    left 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    width 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    height 320ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
 @keyframes rv-streak-pulse {
   0%,
   100% {
