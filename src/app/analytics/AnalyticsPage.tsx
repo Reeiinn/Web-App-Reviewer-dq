@@ -1,6 +1,7 @@
 "use client";
 
 import { AppNav } from "@/components/ui/app-nav";
+import { AnalyticsBodySkeleton } from "./AnalyticsSkeleton";
 import { examTypes, type ExamType } from "@/lib/types/common";
 import { hasPassedTrack, passesLabel } from "@/lib/helper/practice-exam";
 import { useEffect, useState } from "react";
@@ -144,9 +145,7 @@ export function AnalyticsPage() {
         </p>
 
         {loading ? (
-          <p className="mt-8 text-sm text-muted-foreground">
-            Loading your performance…
-          </p>
+          <AnalyticsBodySkeleton />
         ) : (
           <div className="mt-9 grid gap-6 lg:grid-cols-2">
             {examTypes.map((type) => {

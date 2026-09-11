@@ -1,6 +1,6 @@
 import { AppNav } from "@/components/ui/app-nav";
+import { CertificateThumb } from "@/components/ui/certificate-thumb";
 import { SummaryTile } from "@/components/ui/summary-tile";
-import { certificateImageSrc } from "@/lib/helper/certificate-image-src";
 import { triesLabel, type TrackRecord } from "@/lib/helper/certificate-record";
 import { PASSES_REQUIRED, passesLabel } from "@/lib/helper/practice-exam";
 import { examLabels, type ExamType } from "@/lib/types/common";
@@ -61,13 +61,9 @@ function EarnedCard({
         href={`/certificates/${certificate.id}`}
         className="block rounded-lg border border-border transition hover:border-[#C9A227]"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- the sheet is
-            rendered by /api/certificates/[id]/image, which already serves it at
-            one fixed size; the loader would only re-encode it. */}
-        <img
-          src={certificateImageSrc(certificate.id)}
+        <CertificateThumb
+          id={certificate.id}
           alt={`${examLabels[certificate.exam_type]} certificate`}
-          className="block aspect-[1000/707] w-full"
         />
       </Link>
 

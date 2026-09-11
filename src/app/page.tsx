@@ -1,10 +1,10 @@
 "use client";
 
+import { Spinner } from "@/components/ui/spinner";
 import {
   ArrowRight,
   Eye,
   EyeOff,
-  LoaderCircle,
   LockKeyhole,
   Mail,
 } from "lucide-react";
@@ -190,11 +190,12 @@ export default function LoginPage() {
             )}
             <button
               type="submit"
+              aria-busy={isSubmitting}
               disabled={isSubmitting}
               className="mt-1.5 flex min-h-12 w-full items-center justify-center gap-2 bg-[#FDB913] px-4 py-3.5 text-base text-[#0B2340] shadow-sm transition-colors hover:bg-[#C98A00] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0B2340] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {isSubmitting ? (
-                <LoaderCircle className="size-4 animate-spin" />
+                <Spinner />
               ) : (
                 <ArrowRight className="size-4" />
               )}

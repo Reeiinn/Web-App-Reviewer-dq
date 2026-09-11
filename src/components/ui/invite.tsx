@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Copy, LoaderCircle, UserPlus } from "lucide-react";
+import { Check, Copy, UserPlus } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
 
@@ -100,10 +101,11 @@ export function Invite() {
 
       <button
         onClick={generate}
+        aria-busy={isCreating}
         disabled={isCreating}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#FFD400] px-4 py-3 text-sm font-bold text-[#0B2340] transition hover:bg-[#E8C200] disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {isCreating && <LoaderCircle className="size-4 animate-spin" />}
+        {isCreating && <Spinner />}
         {link ? "Generate a new link" : "Generate invitation link"}
       </button>
     </section>

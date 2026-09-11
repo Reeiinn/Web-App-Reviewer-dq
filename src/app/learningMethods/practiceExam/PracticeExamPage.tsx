@@ -1,5 +1,6 @@
 "use client";
 
+import { Spinner } from "@/components/ui/spinner";
 import { AppNav } from "@/components/ui/app-nav";
 import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
@@ -17,6 +18,7 @@ import { Award, Lock } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { PracticeExamBodySkeleton } from "./PracticeExamSkeleton";
 import { fresh } from "@/lib/helper/fetch-fresh";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
@@ -469,9 +471,7 @@ function PracticeExamContent() {
   if (loading) {
     return (
       <Frame title={`${examLabels[type]} Practice Exam`}>
-        <p className="text-sm text-muted-foreground">
-          Loading practice questions…
-        </p>
+        <PracticeExamBodySkeleton />
       </Frame>
     );
   }
@@ -535,9 +535,11 @@ function PracticeExamContent() {
 
             <button
               onClick={retake}
+              aria-busy={submitting}
               disabled={submitting}
-              className="w-full whitespace-nowrap rounded-lg bg-[var(--exam)] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[var(--exam-strong)] disabled:opacity-60 xs:w-auto"
+              className="flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[var(--exam)] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[var(--exam-strong)] disabled:opacity-60 xs:w-auto"
             >
+              {submitting && <Spinner />}
               {submitting ? "Starting…" : "Retake exam"}
             </button>
           </section>
@@ -752,9 +754,11 @@ function PracticeExamContent() {
 
         <button
           onClick={submit}
+          aria-busy={submitting}
           disabled={submitting}
-          className="sticky bottom-5 mt-5 w-full rounded-lg bg-[var(--exam)] px-5 py-3.5 font-bold text-white transition hover:bg-[var(--exam-strong)] disabled:opacity-60"
+          className="sticky bottom-5 mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--exam)] px-5 py-3.5 font-bold text-white transition hover:bg-[var(--exam-strong)] disabled:opacity-60"
         >
+          {submitting && <Spinner />}
           {submitting ? "Submitting…" : "Finish exam"}
         </button>
       </div>
@@ -837,7 +841,7 @@ export function PracticeExamPage() {
     <Suspense
       fallback={
         <Frame title="Practice Exam">
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <PracticeExamBodySkeleton />
         </Frame>
       }
     >

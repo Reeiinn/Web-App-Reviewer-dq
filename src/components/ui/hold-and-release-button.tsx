@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -18,6 +19,8 @@ type ButtonHoldAndReleaseProps = Omit<
   /** Copy for the resting and held states. */
   idleLabel?: string;
   holdingLabel?: string;
+  /** The hold completed and its request is still in flight. */
+  busy?: boolean;
   ref?: React.Ref<HoldHandle>;
 };
 
@@ -47,6 +50,7 @@ function ButtonHoldAndRelease({
   onHoldComplete,
   idleLabel = "Hold to delete",
   holdingLabel = "Keep holding…",
+  busy = false,
   disabled,
   ref,
   ...props
@@ -136,6 +140,7 @@ function ButtonHoldAndRelease({
         "relative min-w-44 touch-none overflow-hidden font-bold",
         className,
       )}
+      aria-busy={busy}
       disabled={disabled}
       onMouseDown={handleHoldStart}
       onMouseUp={handleHoldEnd}
@@ -155,7 +160,11 @@ function ButtonHoldAndRelease({
         className="absolute left-0 top-0 h-full bg-destructive/30"
       />
       <span className="relative z-10 flex w-full items-center justify-center gap-2">
-        <Trash2 className="size-4" />
+        {/* Once the hold is done and the request is away, the icon is the
+            only thing that can say so: the label has already changed, and a
+            trash can beside "Removing…" reads as a button still waiting to
+            be pressed. */}
+        {busy ? <Spinner /> : <Trash2 className="size-4" />}
         {isHolding ? holdingLabel : idleLabel}
       </span>
     </Button>

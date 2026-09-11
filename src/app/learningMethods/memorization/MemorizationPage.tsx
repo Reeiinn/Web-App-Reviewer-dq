@@ -16,6 +16,8 @@ import type {
   MemorizationQuestion,
 } from "@/lib/types/memo";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { MemorizationBodySkeleton } from "./MemorizationSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchParams } from "next/navigation";
 import { Check, X } from "lucide-react";
 import { fresh } from "@/lib/helper/fetch-fresh";
@@ -329,7 +331,7 @@ function MemorizationContent() {
   };
 
   if (loading) {
-    return <Shell type={type}>Loading questions…</Shell>;
+    return <LoadingScreen type={type} />;
   }
 
   if (finished) {
@@ -576,6 +578,40 @@ function MemorizationContent() {
   );
 }
 
+/**
+ * The reviewer while the question set is on its way.
+ *
+ * The track pill is real whenever the caller knows the track — it comes from
+ * the query string, not from the questions — and stands in as a bar only for
+ * the Suspense fallback above, which runs before the search params are read.
+ */
+function LoadingScreen({ type }: { type?: ExamType }) {
+  return (
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
+      <AppNav compact />
+
+      <main className="rv-shell flex min-h-0 flex-1 flex-col py-4 md:py-6">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <BackLink className="[@media(max-height:800px)]:min-h-9" />
+          {type ? (
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-[#FFD400] px-2.5 py-1 text-[11px] font-bold text-[#0B2340] sm:px-3 sm:text-xs">
+              {examLabels[type]}
+            </span>
+          ) : (
+            <Skeleton className="h-6 w-24 shrink-0 rounded-full" />
+          )}
+          <h1 className="hidden truncate text-xl font-extrabold md:block [@media(max-height:850px)]:sr-only [@media(min-height:900px)]:text-2xl">
+            Memorization Mode
+          </h1>
+          <Skeleton className="ml-auto h-4 w-24 shrink-0" />
+        </div>
+
+        <MemorizationBodySkeleton />
+      </main>
+    </div>
+  );
+}
+
 function Shell({
   type,
   children,
@@ -600,7 +636,7 @@ function Shell({
 
 export function MemorizationPage() {
   return (
-    <Suspense fallback={<Shell type="VUL">Loading questions…</Shell>}>
+    <Suspense fallback={<LoadingScreen />}>
       <MemorizationContent />
     </Suspense>
   );

@@ -1,6 +1,7 @@
 import { Button as ButtonPrimitive } from '@base-ui/react/button'
 import { cva, type VariantProps } from 'class-variance-authority'
 
+import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
@@ -44,14 +45,30 @@ function Button({
   className,
   variant = 'default',
   size = 'default',
+  loading = false,
+  disabled,
+  children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonPrimitive.Props &
+  VariantProps<typeof buttonVariants> & {
+    /**
+     * An action is in flight: the button goes disabled and grows a spinner
+     * ahead of its label. Caller keeps ownership of the label, since only it
+     * knows whether the verb is "Saving" or "Sending".
+     */
+    loading?: boolean
+  }) {
   return (
     <ButtonPrimitive
       data-slot="button"
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {loading && <Spinner />}
+      {children}
+    </ButtonPrimitive>
   )
 }
 
