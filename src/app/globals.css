@@ -176,7 +176,9 @@
   @media (hover: hover) {
     &:hover {
       translate: 0 -1px;
-      box-shadow: 0 4px 12px -4px rgb(11 35 64 / 0.45);
+      /* Read through a fallback rather than declared as a default, so
+         rv-press-soft can set it without the two racing on source order. */
+      box-shadow: var(--press-shadow, 0 4px 12px -4px rgb(11 35 64 / 0.45));
     }
   }
 
@@ -194,6 +196,13 @@
       scale: 1;
     }
   }
+}
+
+/* The same press, with the shadow scaled for a pale outline control instead of
+   a filled navy one. Under a chip the size of a table-row button, the default
+   45% reads as a smudge rather than a lift. */
+@utility rv-press-soft {
+  --press-shadow: 0 2px 6px -2px rgb(11 35 64 / 0.22);
 }
 
 /* ---------------------------------------------------------------------------

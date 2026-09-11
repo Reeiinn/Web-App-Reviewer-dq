@@ -151,12 +151,12 @@ function ExamResults({ reviewee }: { reviewee: Reviewee }) {
 
   return (
     <AlertDialog.Root>
-      <AlertDialog.Trigger className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-[#0B2340] transition hover:border-[#C9A227] hover:bg-[#FFF8D6]">
+      <AlertDialog.Trigger className="rv-press rv-press-soft rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-[#0B2340] hover:border-[#C9A227] hover:bg-[#FFF8D6]">
         View
       </AlertDialog.Trigger>
 
       <AlertDialog.Portal>
-        <DialogPanel width="30rem">
+        <DialogPanel width="30rem" animated>
           <AlertDialog.Title className="text-lg font-extrabold">
             Practice exams — {reviewee.name}
           </AlertDialog.Title>
