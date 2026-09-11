@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 import { FieldManagerPage } from "./FieldManagerPage";
 
 /**
- * The Sales Manager's view of their field managers.
+ * The Sales Manager's view of their unit managers.
  *
- * A field manager is refused rather than shown a version of their own row:
+ * A unit manager is refused rather than shown a version of their own row:
  * ranking peers against each other is the Sales Manager's job, and a screen
  * that told a manager where they place among colleagues is a different feature
  * with a different conversation behind it. /api/admin/managers refuses them

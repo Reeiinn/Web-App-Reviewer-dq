@@ -56,8 +56,8 @@ const staffLinks: NavLink[] = [
   { href: "/glossary", label: "Glossary", tour: "tour-glossary" },
 ];
 
-// The field manager console ranks managers against each other, which is the
-// Sales Manager's view of their team and nobody else's — a field manager
+// The unit manager console ranks managers against each other, which is the
+// Sales Manager's view of their team and nobody else's — a unit manager
 // signed in here would be reading their own standing among colleagues. The
 // route and the API refuse them too; this only keeps the link out of a nav
 // that would bounce them.
@@ -65,7 +65,7 @@ const adminLinks: NavLink[] = [
   { href: "/admin", label: "Admin Console" },
   {
     href: "/admin/field-managers",
-    label: "Field Managers",
+    label: "Unit Managers",
     tour: "tour-field-managers",
   },
   { href: "/glossary", label: "Glossary" },

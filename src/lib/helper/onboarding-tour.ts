@@ -43,8 +43,8 @@ export const ONBOARDING_TOURS: Partial<
     },
     {
       target: "tour-field-managers",
-      title: "Oversee your Field Managers",
-      body: "Add a new Field Manager, or review the reps assigned to each one.",
+      title: "Oversee your Unit Managers",
+      body: "Add a new Unit Manager, or review the reps assigned to each one.",
     },
   ],
   MANAGER: [

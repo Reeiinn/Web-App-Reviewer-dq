@@ -191,7 +191,7 @@ export async function GET(
 }
 
 /**
- * Takes back one reminder. A field manager may delete only what they sent; the
+ * Takes back one reminder. A unit manager may delete only what they sent; the
  * Sales Manager may clear any of them.
  */
 export async function DELETE(

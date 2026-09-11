@@ -5,7 +5,7 @@ import { presenceStatus } from "@/lib/helper/presence";
 import { NextResponse } from "next/server";
 
 /**
- * Field managers and when each one last opened the app.
+ * Unit managers and when each one last opened the app.
  *
  * Admin-only. A manager comparing themselves against their peers is a
  * different feature with a different conversation behind it, so MANAGER is

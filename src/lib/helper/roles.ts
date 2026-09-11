@@ -20,7 +20,7 @@ export const isStaff = (role?: string | null) =>
  */
 export const staffTitleFor = (role?: string | null) => {
   if (role === "ADMIN") return "Sales Manager";
-  if (role === "MANAGER") return "Field Manager";
+  if (role === "MANAGER") return "Unit Manager";
   return null;
 };
 

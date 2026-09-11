@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       ? normaliseEmail(body.email)
       : null;
 
-  // An addressed invite is the whole point of the Field Manager flow — there
+  // An addressed invite is the whole point of the Unit Manager flow — there
   // is nobody to hand an open link to.
   if (role === "MANAGER" && !email) {
     return NextResponse.json(

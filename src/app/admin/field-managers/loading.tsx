@@ -11,7 +11,7 @@ export default function Loading() {
       <main className="mx-auto w-full max-w-[1500px] px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-extrabold">Field Manager Console</h1>
+            <h1 className="text-3xl font-extrabold">Unit Manager Console</h1>
             <Skeleton className="h-7 w-36 rounded-full" />
           </div>
           <Skeleton className="h-10 w-44 rounded-lg" />
@@ -20,7 +20,7 @@ export default function Loading() {
 
         <SummaryTilesSkeleton
           tiles={[
-            { label: "Field Managers", tone: "bg-muted" },
+            { label: "Unit Managers", tone: "bg-muted" },
             { label: "Active Today", tone: "bg-emerald-50" },
             { label: "Total Recruits", tone: "bg-[#FFF8D6]" },
             { label: "Inactive", tone: "bg-rose-50" },

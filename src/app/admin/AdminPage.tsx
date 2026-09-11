@@ -430,7 +430,7 @@ function NudgeReviewee({
                   and the composer off the screen. */}
               <ul className="mt-2 flex max-h-42 flex-col gap-2 overflow-y-auto overscroll-contain">
                 {sent.map((nudge) => {
-                  // A field manager unsends their own only; the Sales Manager
+                  // A unit manager unsends their own only; the Sales Manager
                   // owns the console and can clear any of them.
                   const mine =
                     viewer?.role === "ADMIN" || nudge.senderId === viewer?.id;
@@ -670,7 +670,7 @@ export function AdminPage() {
   // needs the column saying whose they are.
   const isAdmin = session?.user?.role === "ADMIN";
 
-  // "View recruits" on a field manager's card lands here carrying that
+  // "View recruits" on a unit manager's card lands here carrying that
   // manager's email. The roster already searches the recruiter's address for an
   // admin, so the link only has to seed the box the admin could have typed into
   // themselves — which leaves the filter visible, and clearable, rather than
@@ -892,7 +892,7 @@ export function AdminPage() {
           </div>
 
           <label className="ml-auto text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            {isAdmin ? "Search Reviewee or Field Manager" : "Search Reviewee"}
+            {isAdmin ? "Search Reviewee or Unit Manager" : "Search Reviewee"}
             <div className="relative mt-1.5">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -903,7 +903,7 @@ export function AdminPage() {
                   setPage(1);
                 }}
                 placeholder={
-                  isAdmin ? "Name, email or field manager" : "Name or email"
+                  isAdmin ? "Name, email or unit manager" : "Name or email"
                 }
                 className="w-72 rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm font-semibold text-foreground outline-none focus:border-[#0B2340]"
               />

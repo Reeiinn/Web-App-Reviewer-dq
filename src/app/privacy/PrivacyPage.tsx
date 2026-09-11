@@ -23,7 +23,7 @@ const collected = [
   },
   {
     heading: "Your role and who you report to",
-    body: "Whether the account is a reviewee, a Field Manager, or the Sales Manager, and which manager a reviewee belongs to. This is what decides which screens you land on and whose progress a manager can see.",
+    body: "Whether the account is a reviewee, a Unit Manager, or the Sales Manager, and which manager a reviewee belongs to. This is what decides which screens you land on and whose progress a manager can see.",
   },
   {
     heading: "Your profile photo",
@@ -43,7 +43,7 @@ const collected = [
   },
   {
     heading: "Invitations",
-    body: "If you were invited to join as a Field Manager, the invitation record holds the code, who created it, when it expires, and when it was claimed.",
+    body: "If you were invited to join as a Unit Manager, the invitation record holds the code, who created it, when it expires, and when it was claimed.",
   },
 ];
 
@@ -124,7 +124,7 @@ export function PrivacyPage({ signedIn }: { signedIn: boolean }) {
           </h3>
           <p className="mt-3 text-sm leading-6">
             This is worth stating plainly rather than burying. If you are a
-            reviewee, the Field Manager you are assigned to can see your name,
+            reviewee, the Unit Manager you are assigned to can see your name,
             your email address, your progress on each track, and when you were
             last active, and can send you a reminder to keep going. The Sales
             Manager can see the same for everyone. Neither can see your password
@@ -158,7 +158,7 @@ export function PrivacyPage({ signedIn }: { signedIn: boolean }) {
           </li>
           <li>
             <span className="font-semibold text-foreground">Resend</span> sends
-            outbound mail. It is used only for Field Manager invitations, and it
+            outbound mail. It is used only for Unit Manager invitations, and it
             sees the address an invitation is going to.
           </li>
         </ul>
