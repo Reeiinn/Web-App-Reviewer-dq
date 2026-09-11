@@ -1,35 +1,10 @@
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
-import redis from "@/lib/redis";
+import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
 
-export async function GET(req: Request) {
-  const session = await auth();
-
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const examType = searchParams.get("exam_type");
-  const query = searchParams.get("q");
-
-  const cacheKey = `vocabulary:${examType ?? "all"}:${query?.trim().toLowerCase() ?? "all"}`;
-
-  try {
-    // Check Redis first
-    if (redis) {
-      const cached = await redis.get(cacheKey);
-
-      if (cached) {
-        console.log("🟢 CACHE HIT:", cacheKey);
-        return NextResponse.json(cached);
-      }
-
-      console.log("🔴 CACHE MISS:", cacheKey);
-    }
-
-    // Query PostgreSQL
+const getVocabulary = unstable_cache(
+  async (examType: string | null, query: string | null) => {
     const conditions: string[] = [];
     const values: string[] = [];
 
@@ -59,16 +34,26 @@ export async function GET(req: Request) {
       values,
     );
 
-    // Save result to Redis
-    if (redis) {
-      await redis.set(cacheKey, result.rows, {
-        ex: 60 * 5,
-      });
+    return result.rows;
+  },
+  ["vocabulary"],
+  { tags: ["vocabulary"] },
+);
 
-      console.log("💾 SAVED TO CACHE:", cacheKey);
-    }
+export async function GET(req: Request) {
+  const session = await auth();
 
-    return NextResponse.json(result.rows);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const examType = searchParams.get("exam_type");
+  const query = searchParams.get("q")?.trim().toLowerCase() ?? null;
+
+  try {
+    const rows = await getVocabulary(examType, query);
+    return NextResponse.json(rows);
   } catch (error) {
     console.error("Error fetching glossary terms:", error);
 
