@@ -154,6 +154,162 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Dialogs
+
+   The panel's inner padding is published as a variable because the sticky
+   bands inside it have to cancel exactly as much as the panel added. Hard
+   coding 1.5rem in three places is how they drift apart.
+   --------------------------------------------------------------------------- */
+
+/* Inner padding for a DialogPanel. Phones under the xs breakpoint — the Fold's
+   cover screen, the first SE — get the tighter figure: at 320px, 24px a side
+   costs a quarter of the line and wraps preset labels to three lines. */
+@utility rv-dialog-pad {
+  --dialog-pad: 1.25rem;
+
+  padding: var(--dialog-pad);
+  /* Clears the home indicator on a phone that has one; on a phone or a desktop
+     that does not, the inset is zero and this is the plain padding. */
+  padding-bottom: max(var(--dialog-pad), env(safe-area-inset-bottom, 0px));
+
+  @media (width >= 23.75rem) {
+    --dialog-pad: 1.5rem;
+  }
+
+  /* A sticky band owns the inset on its own edge, and the panel gives it up.
+     A sticky box is clamped to its containing block — here the panel's content
+     box — so it cannot be pulled out over the panel's own padding however
+     negative a margin it is given. Padding left on that edge stays a live strip
+     that the body scrolls through in plain sight, above the title and below the
+     buttons. The band restores the same figure as its own padding. */
+  &:has(> .rv-dialog-head) {
+    padding-top: 0;
+  }
+
+  &:has(> .rv-dialog-foot) {
+    padding-bottom: 0;
+  }
+}
+
+/* A dialog title that stays put while the body scrolls under it. The negative
+   inline margins widen the band to the panel's edges — horizontal room is not
+   clamped, only the axis it is stuck in — and the padding puts the text back
+   where it was. */
+@utility rv-dialog-head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin-inline: calc(var(--dialog-pad) * -1);
+  padding: var(--dialog-pad) var(--dialog-pad) 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+/* The matching band at the other end, for the actions. Without it the primary
+   button sits after every preset, the composer and the whole send history —
+   on a phone that is a long scroll to reach the thing you opened the dialog
+   to press. */
+@utility rv-dialog-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  margin-top: 1.25rem;
+  margin-inline: calc(var(--dialog-pad) * -1);
+  padding: 1rem var(--dialog-pad)
+    max(var(--dialog-pad), env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+
+/* ---------------------------------------------------------------------------
+   Dialog motion
+
+   Base UI stamps data-starting-style on mount and data-ending-style on close,
+   and keeps the element mounted until the transition finishes — so the exit
+   animation needs no state of its own and no JS.
+
+   The panel moves with the independent `translate` and `scale` properties
+   rather than `transform`, because DialogPanel has already spent `transform`
+   on the -translate-x-1/2/-translate-y-1/2 pair that centres it from sm up.
+   The two would overwrite each other; these compose.
+   --------------------------------------------------------------------------- */
+@utility rv-dialog-backdrop-motion {
+  opacity: 1;
+  transition: opacity 240ms ease;
+
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+  }
+}
+
+@utility rv-dialog-popup-motion {
+  opacity: 1;
+
+  /* Below sm the panel is a sheet against the bottom edge, so it slides.
+     The slide is confined to this branch because `translate` is the same
+     property Tailwind v4's translate utilities compile to — they are not
+     `transform` as they were in v3. Animating it at sm would overwrite the
+     -translate-x-1/2/-translate-y-1/2 pair that centres the panel, and the
+     dialog would swing in from a quarter of a screen to the right. Below sm
+     the panel is not centred and no translate utility is in play. */
+  @media (width < 40rem) {
+    translate: 0 0;
+    /* The curve iOS uses for its own sheets: quick off the edge, long settle. */
+    transition:
+      translate 320ms cubic-bezier(0.32, 0.72, 0, 1),
+      opacity 180ms ease;
+
+    &[data-starting-style],
+    &[data-ending-style] {
+      translate: 0 100%;
+    }
+  }
+
+  /* Centred from sm up, where sliding a whole panel height would read as
+     overshoot anyway. `scale` is left alone by the centring utilities, so the
+     panel can settle out of it without the two fighting. */
+  @media (width >= 40rem) {
+    scale: 1;
+    transition:
+      scale 220ms cubic-bezier(0.2, 0, 0, 1),
+      opacity 160ms ease;
+
+    &[data-starting-style],
+    &[data-ending-style] {
+      scale: 0.97;
+      opacity: 0;
+    }
+  }
+
+  /* Movement removed, but not the transition: Base UI waits for one to finish
+     before unmounting, so a panel with no transition at all would leave on a
+     different code path than the one everything else was tested against. */
+  @media (prefers-reduced-motion: reduce) {
+    transition: opacity 120ms ease;
+
+    &[data-starting-style],
+    &[data-ending-style] {
+      opacity: 0;
+    }
+
+    @media (width < 40rem) {
+      &[data-starting-style],
+      &[data-ending-style] {
+        translate: 0 0;
+      }
+    }
+
+    @media (width >= 40rem) {
+      &[data-starting-style],
+      &[data-ending-style] {
+        scale: 1;
+      }
+    }
+  }
+}
+
 @layer base {
   html {
     /* Stop iOS from inflating text when the phone is rotated to landscape. */

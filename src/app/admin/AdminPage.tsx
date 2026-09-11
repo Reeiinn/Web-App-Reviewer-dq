@@ -360,13 +360,18 @@ function NudgeReviewee({
       </AlertDialog.Trigger>
 
       <AlertDialog.Portal>
-        <DialogPanel>
-          <AlertDialog.Title className="text-lg font-extrabold">
-            Remind {reviewee.name}
-          </AlertDialog.Title>
-          <AlertDialog.Description className="mt-1 text-sm text-muted-foreground">
-            They see it in their notifications the next time they open the app.
-          </AlertDialog.Description>
+        <DialogPanel animated>
+          {/* Pinned, because the title is the only thing naming who receives
+              this and it was the first thing to scroll away. */}
+          <div className="rv-dialog-head">
+            <AlertDialog.Title className="text-lg font-extrabold">
+              Remind {reviewee.name}
+            </AlertDialog.Title>
+            <AlertDialog.Description className="mt-1 text-sm text-muted-foreground">
+              They see it in their notifications the next time they open the
+              app.
+            </AlertDialog.Description>
+          </div>
 
           <div className="mt-4 flex flex-col gap-2">
             {nudgePresets.map((preset) => (
@@ -398,7 +403,10 @@ function NudgeReviewee({
               rows={3}
               disabled={sending}
               onChange={(event) => setCustom(event.target.value)}
-              className="mt-1.5 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[#C9A227]"
+              // 16px on a phone: iOS Safari zooms the page whenever a focused
+              // field is smaller than that, which throws the sheet off centre
+              // the moment the manager starts typing.
+              className="mt-1.5 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-base outline-none focus:border-[#C9A227] sm:text-sm"
             />
             <p
               className={`mt-1 text-xs ${tooLong ? "font-bold text-rose-700" : "text-muted-foreground"}`}
@@ -412,7 +420,10 @@ function NudgeReviewee({
               <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                 Already sent
               </p>
-              <ul className="mt-2 flex flex-col gap-2">
+              {/* The one section with no ceiling on its length. Capped and
+                  scrolled on its own so a long history cannot push the presets
+                  and the composer off the screen. */}
+              <ul className="mt-2 flex max-h-42 flex-col gap-2 overflow-y-auto overscroll-contain">
                 {sent.map((nudge) => {
                   // A field manager unsends their own only; the Sales Manager
                   // owns the console and can clear any of them.
@@ -438,7 +449,9 @@ function NudgeReviewee({
                           aria-label="Delete this reminder"
                           disabled={deleting === nudge.id}
                           onClick={() => remove(nudge.id)}
-                          className="shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+                          // A full touch target on a phone: this destroys a
+                          // record and it sits inches from Send.
+                          className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50 sm:size-8"
                         >
                           <Trash2 className="size-3.5" />
                         </button>
@@ -459,10 +472,15 @@ function NudgeReviewee({
             </p>
           )}
 
-          <div className="mt-5 flex justify-end gap-2">
+          {/* Pinned for the same reason as the title: these sat after every
+              preset, the composer and the whole history, so on a phone the
+              button the dialog was opened to press was a scroll away. Both go
+              full width at 44px — the previous px-3 py-2 pair came to about 36
+              and was crowded into the right edge, out of a left thumb's reach. */}
+          <div className="rv-dialog-foot flex gap-2 sm:justify-end">
             <AlertDialog.Close
               disabled={sending}
-              className="rounded-lg border border-border px-3 py-2 text-sm font-bold transition hover:border-[#C9A227] disabled:opacity-60"
+              className="min-h-11 flex-1 rounded-lg border border-border px-3 text-sm font-bold transition hover:border-[#C9A227] disabled:opacity-60 sm:flex-none sm:py-2"
             >
               Cancel
             </AlertDialog.Close>
@@ -471,7 +489,7 @@ function NudgeReviewee({
               aria-busy={sending}
               disabled={sending || !trimmed || tooLong}
               onClick={() => send({ message: trimmed })}
-              className="flex items-center gap-2 rounded-lg bg-[#0B2340] px-3 py-2 text-sm font-bold text-white transition hover:bg-[#0F2E4D] disabled:opacity-40"
+              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0B2340] px-3 text-sm font-bold text-white transition hover:bg-[#0F2E4D] disabled:opacity-40 sm:flex-none sm:py-2"
             >
               {sending && <Spinner />}
               {sending ? "Sending…" : "Send"}
