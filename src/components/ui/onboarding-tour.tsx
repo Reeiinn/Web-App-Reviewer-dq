@@ -74,15 +74,30 @@ export function OnboardingTour() {
   const [active, setActive] = useState(false);
   const cancelledRef = useRef(false);
 
+  /**
+   * Records this role's tour as seen, so it never opens by itself again.
+   *
+   * This runs when the tour *opens*, not when it is dismissed. A first-timer
+   * who wanders off half way — closes the tab, or comes back tomorrow — has
+   * still had their one showing, and greeting them with it a second time is
+   * exactly what "first login only" rules out. Skip and Finish are then only
+   * about closing what is on screen.
+   */
+  const markSeen = useCallback(async () => {
+    try {
+      await fetch("/api/user/tour", { method: "POST" });
+      await update();
+    } catch {
+      // Worst case it opens once more next time — harmless.
+    }
+  }, [update]);
+
   // Only flips active on a genuine settled false→true transition, comparing
   // against the last *settled* (non-"loading") read rather than every
-  // render. The session's own `update()` — called when the tour finishes, to
-  // record that this role has been seen — briefly flips `status` back to
-  // "loading" and then to "authenticated" again before the URL's `?tour=1`
-  // has been stripped yet, so a naive `[eligible]` dependency sees a
-  // false→true blip on the way back up and reopens the tour it had just
-  // closed. Ignoring "loading" renders entirely removes that blip instead of
-  // racing to close the window it opens in.
+  // render. `update()` above briefly flips `status` back to "loading" and
+  // then to "authenticated" again, so a naive `[eligible]` dependency sees a
+  // false→true blip on the way back up and reopens the tour it is in the
+  // middle of. Ignoring "loading" renders entirely removes that blip.
   const settledEligibleRef = useRef(false);
   useEffect(() => {
     if (status === "loading") return;
@@ -91,29 +106,18 @@ export function OnboardingTour() {
     if (eligible && !wasEligible) {
       setStepIndex(0);
       setActive(true);
+      void markSeen();
     }
-  }, [status, eligible]);
+  }, [status, eligible, markSeen]);
 
   const measure = useCallback((el: HTMLElement) => {
     const r = el.getBoundingClientRect();
     setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
   }, []);
 
-  const finish = useCallback(async () => {
+  const finish = useCallback(() => {
     setActive(false);
     setRect(null);
-
-    // The session has to say this role is seen *before* ?tour=1 is stripped
-    // from the URL, not after: dropping the query re-renders this component,
-    // and if `seen` had not caught up yet at that render, `forced` going
-    // false while `seen` still excluded the role would read as eligible all
-    // over again and restart the tour it had just finished.
-    try {
-      await fetch("/api/user/tour", { method: "POST" });
-      await update();
-    } catch {
-      // Worst case the tour runs once more next time — harmless.
-    }
 
     if (forced) {
       const params = new URLSearchParams(searchParams);
@@ -123,7 +127,7 @@ export function OnboardingTour() {
         scroll: false,
       });
     }
-  }, [forced, pathname, router, searchParams, update]);
+  }, [forced, pathname, router, searchParams]);
 
   // Finds the current step's target, waiting out data that is still loading
   // (a fresh roster, a dashboard still fetching progress) rather than giving
@@ -147,7 +151,7 @@ export function OnboardingTour() {
       attempts += 1;
       if (attempts > 30) {
         if (stepIndex < steps.length - 1) setStepIndex((i) => i + 1);
-        else void finish();
+        else finish();
         return;
       }
       setTimeout(tryFind, 150);
@@ -181,6 +185,9 @@ export function OnboardingTour() {
 
   return (
     <>
+      {/* Nothing on the page answers a press until the tour is closed — the
+          buttons being pointed at least of all. */}
+      <div aria-hidden className="rv-tour-guard" />
       <div
         aria-hidden
         className="rv-tour-scrim"
@@ -231,16 +238,14 @@ export function OnboardingTour() {
             )}
             <button
               type="button"
-              onClick={() => void finish()}
+              onClick={finish}
               className="text-xs font-semibold text-muted-foreground"
             >
               Skip
             </button>
             <button
               type="button"
-              onClick={() =>
-                last ? void finish() : setStepIndex((i) => i + 1)
-              }
+              onClick={() => (last ? finish() : setStepIndex((i) => i + 1))}
               className="rounded-lg bg-[#FFD400] px-3 py-1.5 text-xs font-bold text-[#0B2340] transition hover:bg-[#E8C200]"
             >
               {last ? "Finish" : "Next"}

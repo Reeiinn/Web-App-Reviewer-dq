@@ -44,7 +44,7 @@ type NavLink = {
 
 const learnerLinks: NavLink[] = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/glossary", label: "Glossary" },
+  { href: "/glossary", label: "Glossary", tour: "tour-glossary" },
   { href: "/analytics", label: "Analytics", tour: "tour-analytics" },
 ];
 
@@ -68,7 +68,7 @@ const adminLinks: NavLink[] = [
     label: "Unit Managers",
     tour: "tour-field-managers",
   },
-  { href: "/glossary", label: "Glossary" },
+  { href: "/glossary", label: "Glossary", tour: "tour-glossary" },
 ];
 
 const linksFor = (role?: string | null) => {
@@ -183,6 +183,7 @@ function UserMenu() {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Open user menu"
+        data-tour="tour-profile"
         className="flex size-9 items-center justify-center overflow-hidden rounded-full border border-border bg-[#0B2340] text-xs font-bold text-white transition hover:border-[#0B2340]"
       >
         {image ? (

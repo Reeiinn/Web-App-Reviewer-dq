@@ -1,8 +1,12 @@
 /**
- * The three-stop tour each role sees the first time they land on their home
- * screen. `target` matches a `data-tour` attribute somewhere on that screen —
- * the nav, or the page underneath it — rather than naming a component, so the
- * tour and the layout it points at can change independently.
+ * The tour each role sees the first time they land on their home screen.
+ * `target` matches a `data-tour` attribute somewhere on that screen — the nav,
+ * or the page underneath it — rather than naming a component, so the tour and
+ * the layout it points at can change independently.
+ *
+ * Steps run in the order a pair of eyes would find them: the page's own
+ * content first, then the nav left to right, then the bell and the account
+ * menu on the right of the bar.
  */
 export type TourStep = {
   target: string;
@@ -20,6 +24,16 @@ export const ONBOARDING_TOURS: Partial<
       body: "Pick VUL, Traditional Life, or IIAP, then start with Flashcards, Memorize, or a Practice Exam.",
     },
     {
+      target: "tour-quick",
+      title: "Pick up where you left off",
+      body: "Quick Access keeps the decks you opened most recently, so you can jump straight back in.",
+    },
+    {
+      target: "tour-glossary",
+      title: "Look up any term",
+      body: "Every term from your tracks, defined — handy when something mid-deck doesn't click.",
+    },
+    {
       target: "tour-analytics",
       title: "Watch your progress climb",
       body: "Analytics breaks your scores down by track, so you know exactly what to review next.",
@@ -28,6 +42,11 @@ export const ONBOARDING_TOURS: Partial<
       target: "tour-bell",
       title: "Nudges land here",
       body: "If your manager sends a nudge to keep you on track, it shows up right on this bell.",
+    },
+    {
+      target: "tour-profile",
+      title: "Your account lives here",
+      body: "Upload a profile photo, collect the certificates you earn, and replay this tour anytime.",
     },
   ],
   ADMIN: [
@@ -46,6 +65,16 @@ export const ONBOARDING_TOURS: Partial<
       title: "Oversee your Unit Managers",
       body: "Add a new Unit Manager, or review the reps assigned to each one.",
     },
+    {
+      target: "tour-glossary",
+      title: "Glossary's one click away",
+      body: "Every term your reviewees study, defined — worth a look before you answer one.",
+    },
+    {
+      target: "tour-profile",
+      title: "Your account lives here",
+      body: "Upload a profile photo, and replay this tour anytime you need it.",
+    },
   ],
   MANAGER: [
     {
@@ -62,6 +91,11 @@ export const ONBOARDING_TOURS: Partial<
       target: "tour-glossary",
       title: "Glossary's one click away",
       body: "Handy when a rep asks about a term you want to double-check first.",
+    },
+    {
+      target: "tour-profile",
+      title: "Your account lives here",
+      body: "Upload a profile photo, and replay this tour anytime you need it.",
     },
   ],
 };

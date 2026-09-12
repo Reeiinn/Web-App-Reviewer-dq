@@ -668,9 +668,12 @@ export function DashboardPage() {
             >
               Exam Tracks
             </button>
+            {/* Tagged here as well as on the panel below: only one of the two
+                is ever on screen, and the tour points at whichever that is. */}
             <button
               role="tab"
               aria-selected={activeTab === "quick"}
+              data-tour="tour-quick"
               onClick={() => setActiveTab("quick")}
               className={`flex-1 rounded-md px-3 py-2 text-sm font-bold transition ${
                 activeTab === "quick"
@@ -712,6 +715,7 @@ export function DashboardPage() {
           </div>
 
           <div
+            data-tour="tour-quick"
             className={activeTab === "quick" ? undefined : "hidden lg:block"}
           >
             <QuickAccess recent={recent} />
