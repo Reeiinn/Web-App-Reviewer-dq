@@ -465,6 +465,25 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Onboarding tour click guard
+
+   Swallows every pointer event on the page while a tour is open, so the only
+   things that answer a press are the tour's own Back / Skip / Next. Without
+   it the highlighted control was still live: a first-timer could press the
+   very button being explained and navigate away mid-tour, leaving the
+   spotlight pointing at a screen that no longer held it.
+
+   It sits below the spotlight (which paints the scrim and the ring, and takes
+   no pointer events of its own) and below the tip, which has to stay
+   pressable. Wheel and touch scrolling still chain through to the page.
+   --------------------------------------------------------------------------- */
+.rv-tour-guard {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+}
+
+/* ---------------------------------------------------------------------------
    Onboarding tour spotlight
 
    The ring around whatever step a role's tour is pointing at. Position, size
