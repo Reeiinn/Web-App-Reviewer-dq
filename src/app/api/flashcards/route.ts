@@ -17,7 +17,9 @@ const getFlashcards = unstable_cache(
           (
             SELECT json_agg(
               json_build_object('id', c.id, 'text', c.text)
-              ORDER BY c.id
+              -- c.id is a random uuid, so ordering on it dealt the options in
+              -- a different order per card. sort_order is the exam's own.
+              ORDER BY c.sort_order
             )
             FROM choices c
             WHERE c.question_id = q.id

@@ -3435,7 +3435,7 @@ FROM new_question,
                 false
             ),
             (
-                'a life insurance agent is not allowed to identify on his letterhead the name of the insurer he represents.',
+                'a life insurance is not allowed to identify on his letterhead the name of the insurer he represents.',
                 false
             ),
             (
@@ -3474,7 +3474,7 @@ FROM new_memo,
                 false
             ),
             (
-                'a life insurance agent is not allowed to identify on his letterhead the name of the insurer he represents.',
+                'a life insurance is not allowed to identify on his letterhead the name of the insurer he represents.',
                 false
             ),
             (

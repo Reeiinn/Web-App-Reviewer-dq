@@ -152,7 +152,7 @@ FROM new_question,
     (
         VALUES (
                 'Company discovers at any time that the policy owner was actually a minor at the time of application',
-                false
+                true
             ),
             (
                 'Insured person intentionally kills himself during the suicide exclusion period specified in the policy',
@@ -164,7 +164,7 @@ FROM new_question,
             ),
             (
                 'Company discovers during the contestable period that the application contains a material statement',
-                true
+                false
             )
     ) AS v(text, is_correct);
 WITH new_question AS (
@@ -511,7 +511,7 @@ WITH new_question AS (
     VALUES (
             'TRADITIONAL_LIFE',
             'General',
-            'An agent who determines a prospect''s complete financial requirements preparatory to offering him a policy using the correct selling approach is known as'
+            'An agent who determines a prospect''s complete financial requirements preparatory to offering him a policy using the correct selling approach knows as'
         )
     RETURNING id
 )
@@ -551,7 +551,7 @@ WITH new_question AS (
     VALUES (
             'TRADITIONAL_LIFE',
             'General',
-            'Notwithstanding various possible legal impediments, if the owner of an endowment at age 65 policy tells you that at maturity of the policy he wants to provide his church with a monthly donation for as long as the church exists, which option do you recommend?'
+            'Notwithstanding various possible legal impediments, if the owner of an endowment at age 65 policy tells you that the maturity of the policy he wants to provide his church with a monthly donation for as long as the church exists, which option do you recommend?'
         )
     RETURNING id
 )
@@ -707,12 +707,12 @@ FROM new_question,
                 false
             ),
             (
-                'Any guaranteed policy values will belong to the policy owner even if premium payments are discontinued',
-                false
+                'Any guaranteed policy values will belong to the policy owner even if premium payments are discounted',
+                true
             ),
             (
                 'The face amount of the policy will remain the same even if the insured''s health becomes impaired',
-                true
+                false
             ),
             (
                 'The premium on the policy will remain the same even when another beneficiary is added to the policy',
@@ -840,7 +840,7 @@ WITH new_question AS (
     VALUES (
             'TRADITIONAL_LIFE',
             'General',
-            'The basic coverage provided by life insurance policies may be supplemented by a separate provision that provides coverage for accidental amounts or of a different nature. Collectively these provisions are known as'
+            'The basic coverage provided by the life insurance policies may be supplemented by a separate provision that provides coverage for accidental amounts or of a different nature. Collectively these provisions are known as'
         )
     RETURNING id
 )
@@ -1137,7 +1137,7 @@ WITH new_question AS (
     VALUES (
             'TRADITIONAL_LIFE',
             'General',
-            'True or False: A policy is still in force for the full face amount and will remain in force for a further period of four years and 118 days, without the payment of any premiums, has availed of the paid up insurance option.'
+            'True or False: A policy is still in force for the full face amount and will remain in force for a further period of four years and 118 days, without the payment of any premiums has availed of paid up insurance option.'
         )
     RETURNING id
 )
@@ -1459,7 +1459,7 @@ WITH new_question AS (
     VALUES (
             'VUL',
             'General',
-            'Which of the following statements about the difference between variable life policies and endowment policies are FALSE? I. The policy values of variable life policies directly reflect the performance of the fund of the life company II. The premiums and benefits of the endowment policies are described at the inception of the policy whereas variable life are flexible as they are account driven III. The benefits and risks of variable life and endowment policies directly accrue to the policyholders'
+            'Which of the following statements about the difference between variable life policies and endowment policies are FALSE? I. The policy values of variable life policies directly reflect the performance of the fund of the life company II. The premiums and benefits of the endowment policies are described at the inception of the policy whereas variable life are flexible as the are account driven III. The benefits and risks of variable life and endowment policies directly accrue to the policyholders'
         )
     RETURNING id
 )
@@ -1541,9 +1541,9 @@ SELECT id,
     v.is_correct
 FROM new_question,
     (
-        VALUES ('I & II', false),
+        VALUES ('I & II', true),
             ('I & III', false),
-            ('I, II & III', true),
+            ('I, II & III', false),
             ('II & III', false)
     ) AS v(text, is_correct);
 WITH new_question AS (
@@ -1813,9 +1813,9 @@ SELECT id,
     v.is_correct
 FROM new_question,
     (
-        VALUES ('I, II & III', true),
+        VALUES ('I, II & III', false),
             ('II & III', false),
-            ('I & II', false),
+            ('I & II', true),
             ('I & III', false)
     ) AS v(text, is_correct);
 WITH new_question AS (
@@ -2201,7 +2201,7 @@ WITH new_question AS (
     VALUES (
             'VUL',
             'General',
-            'The objective of satisfying customers need profitably can be achieved by an agent through I. The giving of freebies to the customers II. Extensive investment training by the company III. The use of sales plan, where sales goals, strategies, and objectives are coordinated with the market analysis, segmentation and training IV. The giving of monetary assistance and discount to the customers'
+            'The objective of satisfying customers need profitably can be achieved by and agent through I. The giving of freebies to the customers II. Extensive investment training by the company III. The use of sales plan, where sales goals, strategies, and objectives are coordinated with the market analysis, segmentation and training IV. The giving of monetary assistance and discount to the customers'
         )
     RETURNING id
 )
@@ -2757,7 +2757,7 @@ INSERT INTO flashcards (exam_type, category, front, back)
 VALUES (
         'TRADITIONAL_LIFE',
         'General',
-        'An agent who determines a prospect''s complete financial requirements preparatory to offering him a policy using the correct selling approach is known as',
+        'An agent who determines a prospect''s complete financial requirements preparatory to offering him a policy using the correct selling approach knows as',
         'Total needs selling'
     );
 INSERT INTO flashcards (exam_type, category, front, back)
@@ -2771,7 +2771,7 @@ INSERT INTO flashcards (exam_type, category, front, back)
 VALUES (
         'TRADITIONAL_LIFE',
         'General',
-        'The basic coverage provided by life insurance policies may be supplemented by a separate provision that provides coverage for accidental amounts or of a different nature. Collectively these provisions are known as',
+        'The basic coverage provided by the life insurance policies may be supplemented by a separate provision that provides coverage for accidental amounts or of a different nature. Collectively these provisions are known as',
         'Riders'
     );
 INSERT INTO flashcards (exam_type, category, front, back)
@@ -2967,7 +2967,7 @@ INSERT INTO flashcards (exam_type, category, front, back)
 VALUES (
         'VUL',
         'General',
-        'Which of the following statements about the difference between variable life policies and endowment policies are FALSE? I. The policy values of variable life policies directly reflect the performance of the fund of the life company II. The premiums and benefits of the endowment policies are described at the inception of the policy whereas variable life are flexible as they are account driven III. The benefits and risks of variable life and endowment policies directly accrue to the policyholders',
+        'Which of the following statements about the difference between variable life policies and endowment policies are FALSE? I. The policy values of variable life policies directly reflect the performance of the fund of the life company II. The premiums and benefits of the endowment policies are described at the inception of the policy whereas variable life are flexible as the are account driven III. The benefits and risks of variable life and endowment policies directly accrue to the policyholders',
         'II & III'
     );
 INSERT INTO flashcards (exam_type, category, front, back)
@@ -3110,7 +3110,7 @@ WITH new_memo AS (
     VALUES (
             'TRADITIONAL_LIFE',
             'General',
-            'True or False: A policy is still in force for the full face amount and will remain in force for a further period of four years and 118 days, without the payment of any premiums, has availed of the paid up insurance option.'
+            'True or False: A policy is still in force for the full face amount and will remain in force for a further period of four years and 118 days, without the payment of any premiums has availed of paid up insurance option.'
         )
     RETURNING id
 )
@@ -3768,7 +3768,7 @@ WITH new_memo AS (
     VALUES (
             'VUL',
             'General',
-            'Which of the following statements about the difference between variable life policies and endowment policies are FALSE? I. The policy values of variable life policies directly reflect the performance of the fund of the life company II. The premiums and benefits of the endowment policies are described at the inception of the policy whereas variable life are flexible as they are account driven III. The benefits and risks of variable life and endowment policies directly accrue to the policyholders'
+            'Which of the following statements about the difference between variable life policies and endowment policies are FALSE? I. The policy values of variable life policies directly reflect the performance of the fund of the life company II. The premiums and benefits of the endowment policies are described at the inception of the policy whereas variable life are flexible as the are account driven III. The benefits and risks of variable life and endowment policies directly accrue to the policyholders'
         )
     RETURNING id
 )
@@ -3857,7 +3857,7 @@ WITH new_memo AS (
     VALUES (
             'VUL',
             'General',
-            'The objective of satisfying customers need profitably can be achieved by an agent through I. The giving of freebies to the customers II. Extensive investment training by the company III. The use of sales plan, where sales goals, strategies, and objectives are coordinated with the market analysis, segmentation and training IV. The giving of monetary assistance and discount to the customers'
+            'The objective of satisfying customers need profitably can be achieved by and agent through I. The giving of freebies to the customers II. Extensive investment training by the company III. The use of sales plan, where sales goals, strategies, and objectives are coordinated with the market analysis, segmentation and training IV. The giving of monetary assistance and discount to the customers'
         )
     RETURNING id
 )
