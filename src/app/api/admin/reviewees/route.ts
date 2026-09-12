@@ -1,7 +1,11 @@
 import { auth } from "@/lib/auth";
 import { touchLastSeen } from "@/app/api/_lib/presence-store";
 import pool from "@/lib/db";
-import { readinessStatus } from "@/lib/helper/readiness";
+import {
+  masteryPercent,
+  readinessStatus,
+  trackReadiness,
+} from "@/lib/helper/readiness";
 import { examTypes, type ExamType } from "@/lib/types/common";
 import {
   PASSES_REQUIRED,
@@ -189,12 +193,11 @@ export async function GET(req: Request) {
 
         return {
           track,
-          readiness: Math.round(
-            (pct(flashcardCounts.mastered, flashcardCounts.total) +
-              pct(memorizationCounts.mastered, memorizationCounts.total) +
-              pct(practiceCounts.mastered, practiceCounts.total)) /
-              3,
-          ),
+          readiness: trackReadiness({
+            flashcards: flashcardCounts,
+            memorization: memorizationCounts,
+            practice: practiceCounts,
+          }),
           flashcards: flashcardCounts,
           memorization: memorizationCounts,
           practice: practiceCounts,
@@ -266,6 +269,21 @@ export async function GET(req: Request) {
           total: sum((row) => row.practice.total),
           mastered: sum((row) => row.practice.mastered),
         },
+        // The per-track figures the row's own columns average away. The
+        // roster's headline number cannot say which exam a reviewee is
+        // actually ready for, so the table hands these to a dialog.
+        byExam: perTrack.map((row) => ({
+          examType: row.track,
+          readiness: row.readiness,
+          flashcards: row.flashcards,
+          memorization: row.memorization,
+          practice: row.practice,
+          percent: {
+            flashcards: masteryPercent(row.flashcards),
+            memorization: masteryPercent(row.memorization),
+            practice: masteryPercent(row.practice),
+          },
+        })),
         practiceExam: {
           taken: sum((row) => row.taken),
           passedTracks: examTracks.filter((row) => row.passed).length,

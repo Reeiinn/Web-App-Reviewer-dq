@@ -64,6 +64,16 @@ type ExamTrackResult = {
   passed: boolean;
 };
 
+/** One reviewee's standing on one track, scored against that track alone. */
+type ExamMastery = {
+  examType: ExamType;
+  /** The track's own readiness: its three study modes weighed equally. */
+  readiness: number;
+  flashcards: { mastered: number; total: number };
+  memorization: { mastered: number; total: number };
+  practice: { mastered: number; total: number };
+};
+
 type Reviewee = {
   id: string;
   name: string;
@@ -75,6 +85,8 @@ type Reviewee = {
   status: ReadinessStatus;
   flashcards: { mastered: number; total: number };
   memorize: { mastered: number; total: number; accuracy: number };
+  /** Per-track figures, so the roster can say which exam they are ready for. */
+  byExam: ExamMastery[];
   practice: { mastered: number; total: number };
   practiceExam: {
     taken: number;
@@ -205,9 +217,99 @@ function ExamResults({ reviewee }: { reviewee: Reviewee }) {
   );
 }
 
-function Meter({ value, tone }: { value: number; tone: string }) {
+/** Meter colour for a track, on the same thresholds as the roster's status. */
+const masteryTone = (readiness: number) =>
+  ({
+    EXAM_READY: "#10B981",
+    ON_TRACK: "#FFD400",
+    AT_RISK: "#E11D48",
+  })[readinessStatus(readiness)];
+
+/**
+ * A reviewee's mastery broken out per exam.
+ *
+ * The roster's headline number averages the four tracks, which cannot answer
+ * the question a manager actually asks — is this candidate ready to sit VUL?
+ * One percentage per track answers it; the counts under each bar say which
+ * study mode the percentage came from.
+ */
+function MasteryByExam({ reviewee }: { reviewee: Reviewee }) {
   return (
-    <div className="mt-1.5 h-1.5 w-28 overflow-hidden rounded-full bg-[#EFEAE0]">
+    <AlertDialog.Root>
+      <AlertDialog.Trigger className="rv-press rv-press-soft rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-[#0B2340] hover:border-[#C9A227] hover:bg-[#FFF8D6]">
+        View
+      </AlertDialog.Trigger>
+
+      <AlertDialog.Portal>
+        <DialogPanel width="32rem" animated>
+          <AlertDialog.Title className="text-lg font-extrabold">
+            Mastery by exam — {reviewee.name}
+          </AlertDialog.Title>
+          <AlertDialog.Description className="mt-1 text-sm text-muted-foreground">
+            Each percentage is that exam&apos;s own mastery — flashcards,
+            memorize and practice questions for that track. Overall:{" "}
+            {reviewee.readiness}%
+          </AlertDialog.Description>
+
+          <ul className="mt-4 flex flex-col gap-2">
+            {reviewee.byExam.map((exam) => (
+              <li
+                key={exam.examType}
+                className="rounded-xl border border-border px-4 py-3"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-bold">{examLabels[exam.examType]}</p>
+                  <div className="flex shrink-0 items-baseline gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {statusLabels[readinessStatus(exam.readiness)]}
+                    </span>
+                    <span className="text-lg font-extrabold">
+                      {exam.readiness}%
+                    </span>
+                  </div>
+                </div>
+
+                <Meter
+                  value={exam.readiness}
+                  tone={masteryTone(exam.readiness)}
+                  full
+                />
+
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Flashcards {exam.flashcards.mastered}/{exam.flashcards.total}{" "}
+                  · Memorize {exam.memorization.mastered}/
+                  {exam.memorization.total} · Practice {exam.practice.mastered}/
+                  {exam.practice.total}
+                </p>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-6 flex justify-end">
+            <AlertDialog.Close className="rounded-lg border border-border px-3 py-2 text-sm font-bold transition hover:border-[#C9A227]">
+              Close
+            </AlertDialog.Close>
+          </div>
+        </DialogPanel>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
+  );
+}
+
+function Meter({
+  value,
+  tone,
+  full = false,
+}: {
+  value: number;
+  tone: string;
+  /** Fills its container instead of the table cell's fixed bar width. */
+  full?: boolean;
+}) {
+  return (
+    <div
+      className={`mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#EFEAE0] ${full ? "w-full" : "w-28"}`}
+    >
       <div
         className="h-full rounded-full"
         style={{ width: `${value}%`, background: tone }}
@@ -943,7 +1045,7 @@ export function AdminPage() {
                       "Reviewee / Candidate",
                       ...(isAdmin ? ["Recruited By"] : []),
                       "Overall Readiness",
-                      "Flashcards Mastery",
+                      "Mastery by Exam",
                       "Memorize Acc.",
                       "Practice Exams",
                       "Activity",
@@ -1022,18 +1124,10 @@ export function AdminPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <p className="font-semibold">
-                          {row.flashcards.mastered} / {row.flashcards.total}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {row.flashcards.total
-                            ? Math.round(
-                                (row.flashcards.mastered /
-                                  row.flashcards.total) *
-                                  100,
-                              )
-                            : 0}
-                          % completed
+                        <MasteryByExam reviewee={row} />
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          {row.byExam.length} exam
+                          {row.byExam.length === 1 ? "" : "s"} tracked
                         </p>
                       </td>
 
