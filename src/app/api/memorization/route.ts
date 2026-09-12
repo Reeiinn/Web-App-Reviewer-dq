@@ -30,6 +30,9 @@ export async function GET(req: Request) {
               'text', c.text,
               'is_correct', c.is_correct
             )
+            -- Same fixed order the exam shows, so a card and its question
+            -- present their options identically.
+            ORDER BY c.sort_order
           ) FILTER (WHERE c.id IS NOT NULL), '[]'
         ) AS choices
       FROM memorization m
