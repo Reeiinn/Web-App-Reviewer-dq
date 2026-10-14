@@ -19,11 +19,20 @@ if (url) {
   });
 }
 
+// Scratch database Prisma rebuilds from prisma/migrations when it diffs or
+// generates a migration. Always local: it is wiped every time.
+const shadowDatabaseUrl = process.env.SHADOW_DATABASE_URL;
+if (shadowDatabaseUrl) {
+  assertLocalDatabase(shadowDatabaseUrl);
+}
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
     seed: "tsx prisma/seed.ts",
   },
-  ...(url ? { datasource: { url } } : {}),
+  ...(url
+    ? { datasource: { url, ...(shadowDatabaseUrl ? { shadowDatabaseUrl } : {}) } }
+    : {}),
 });
