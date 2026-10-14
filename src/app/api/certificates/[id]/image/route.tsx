@@ -1,8 +1,7 @@
 import { CertificateImage, SHEET_HEIGHT, SHEET_WIDTH } from "@/components/ui/certificate-image";
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
+import { findHeldCertificate } from "@/server/data/certificates";
 import { certificateMarks } from "@/lib/helper/certificate-artwork";
-import type { ExamType } from "@/lib/types/common";
 import { ImageResponse } from "next/og";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -49,14 +48,6 @@ const fonts = [
   face("HankenGrotesk-ExtraBold.ttf", 800, "Hanken Grotesk"),
 ];
 
-type CertificateRow = {
-  id: string;
-  exam_type: ExamType;
-  issued_at: Date;
-  certificate_no: string;
-  recipient: string;
-};
-
 /** A certificate number, safe to sit inside a Content-Disposition filename. */
 const asFilename = (certificateNo: string) =>
   certificateNo.replace(/[^A-Za-z0-9._-]/g, "-");
@@ -77,15 +68,7 @@ export async function GET(
   // exist. The name comes from the joined user row rather than from the
   // session, so it is the holder's own name even when a staff view is what
   // asked for it, and it is never a shared default.
-  const result = await pool.query(
-    `SELECT c.id, c.exam_type, c.issued_at, c.certificate_no, u.name AS recipient
-       FROM certificates c
-       JOIN users u ON u.id = c.user_id
-      WHERE c.id = $1 AND c.user_id = $2`,
-    [id, session.user.id],
-  );
-
-  const certificate = result.rows[0] as CertificateRow | undefined;
+  const certificate = await findHeldCertificate(id, session.user.id);
   if (!certificate) {
     return new Response("Not found", { status: 404 });
   }
@@ -95,7 +78,7 @@ export async function GET(
   return new ImageResponse(
     (
       <CertificateImage
-        examType={certificate.exam_type}
+        examType={certificate.examType}
         recipient={certificate.recipient}
         marks={certificateMarks()}
       />
@@ -111,7 +94,7 @@ export async function GET(
         "Cache-Control": "private, max-age=31536000, immutable",
         ...(download
           ? {
-              "Content-Disposition": `attachment; filename="${asFilename(certificate.certificate_no)}.png"`,
+              "Content-Disposition": `attachment; filename="${asFilename(certificate.certificateNo)}.png"`,
             }
           : {}),
       },

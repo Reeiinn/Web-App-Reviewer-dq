@@ -319,3 +319,15 @@ export async function registerWithInvite(input: {
     throw error;
   }
 }
+
+/** Whether userId is an active (not removed) recruit of managerId. */
+export async function isActiveRecruit(
+  userId: string,
+  managerId: string,
+): Promise<boolean> {
+  return (
+    (await prisma.user.count({
+      where: { id: userId, managerId, deletedAt: null },
+    })) > 0
+  );
+}

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "parity": "tsx --conditions=react-server scripts/parity/mastery-parity.ts",
     "parity:content": "tsx --conditions=react-server scripts/parity/content-parity.ts",
+    "parity:exams": "tsx --conditions=react-server scripts/parity/exams-parity.ts",
     "migrate": "prisma migrate deploy"
   },
   "dependencies": {

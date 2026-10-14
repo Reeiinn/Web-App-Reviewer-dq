@@ -1,7 +1,7 @@
 # Prisma migration — design
 
 **Date:** 2026-10-14
-**Status:** approved; Waves 0–2 implemented (see Wave 0, 1 and 2 outcomes)
+**Status:** approved; Waves 0–3 implemented (see Wave 0, 1, 2 and 3 outcomes)
 **Follow-up:** [Focus tracks (backend)](2026-10-14-focus-tracks-backend-design.md) builds on this.
 
 ## Ground rules (from Nelson)
@@ -65,6 +65,9 @@ Out of scope:
   `POST /api/attempts`, which answers 400 instead of a 500. Wave 2 adds the
   four study lists to that 400 rule, deletes six study routes nothing
   called, and puts the glossary's `details` back (see Wave 2 outcome).
+  Wave 3 deletes `GET /api/attempts`, which nothing called, and the
+  practice exam page no longer scores a sitting while an answer is still
+  unsaved (see Wave 3 outcome).
 - Any change to how a user is removed (see Deleting a user).
 - Renaming tables or columns, or any other schema cleanup.
 - The focus-tracks feature (its own spec).
@@ -362,6 +365,74 @@ What implementing Wave 0 found, recorded so later waves start from it:
   useful to carry forward: the cached list routes are now thin wrappers, so
   a future change to a list's shape must also change its `unstable_cache`
   key, or stale entries keep being served.
+- **Production needs nothing for this wave:** no migration, no schema change.
+
+## Wave 3 outcome (2026-10-14)
+
+- **`src/server/data/attempts.ts`** deals, resumes, reads, answers and
+  scores practice-exam sittings, including the `question_progress` and
+  `user_progress` writes a sitting makes. **`certificates.ts`** issues and
+  reads certificates. Routes and pages map their camelCase records back to
+  the old JSON through the pure `src/lib/helper/exam-json.ts`.
+  `_lib/certificates.ts` had no callers left and was deleted.
+- **Deal and number in TypeScript.** `ORDER BY random()` became a
+  Fisher–Yates shuffle, and the SQL-built certificate number became
+  `certificateNumber`, whose year is the UTC year of the same instant
+  stored as `issued_at`. A race to issue is settled by the
+  `(user_id, exam_type)` key: the loser catches P2002 and returns the
+  winner's row. A test fires two at once.
+- **Transactions.** Saving an answer with its question progress, and
+  scoring a sitting with its pass count, are each one transaction now;
+  before, they were separate statements. Prisma ran the compound-key
+  upserts natively, so two identical answers at once leave one row.
+- **Deleted, unused:** `GET /api/attempts` (the list); it now answers 405.
+- **Parity:** `pnpm parity:exams` compares every attempt (138, with 6,807
+  answers), every user's open sitting per track, completed sittings,
+  per-track record and certificates (12) for all 56 users with the old
+  SQL on the production restore: 0 differences. No sitting there lacks a
+  stored order, so that path is covered by the DB test alone.
+- **Not changed, recorded:** answers can still be posted to a completed
+  attempt, and completing one twice counts its pass twice; the frontend
+  does neither. Question mastery still follows the latest answer. Another
+  holder's certificate page renders the 404 page inside a 200 (the route
+  has a `loading.tsx`, so it is already streaming), as before.
+- **Manual pass in `pnpm dev`** against the local restore, with a
+  throwaway account made through the invite and signup flow and its
+  Traditional Life decks seeded as mastered in the local database only.
+  The exam was locked (403) before seeding. After: a reload kept the
+  paper's order and the changed answer (one row); five passing sittings
+  reached 5/5 and issued a certificate, shown on `/certificates` and
+  `/certificates/[id]` with the account's name; the download is named
+  after the number; a sixth sitting returned the same certificate; another
+  holder's certificate showed the 404 page and its image answered 404.
+  Both throwaway accounts were deleted afterwards.
+- **Final review** (fresh reviewer, whole branch): no Critical or
+  Important findings, four minors, all addressed:
+  - A clash on `certificate_no` was caught as the race on
+    `(user_id, exam_type)`, found no row and left the fifth pass without a
+    certificate. `issueCertificate` now draws another number (up to three
+    draws); a test forces the clash.
+  - A failed answer save at submit was ignored and the sitting scored
+    without it. The page now re-sends unsaved answers four at a time
+    (`resendAnswers`, unit-tested) and, if any still fail, keeps the
+    sitting open and asks the learner to submit again. This is the one
+    frontend change in the migration.
+  - "Two clocks" was not a defect: Prisma fills `@default(now())` on the
+    client, so `started_at` already comes from the app clock. A test pins
+    it with a faked clock.
+  - The certificate year: the old SQL took it from `to_char(now(), 'YYYY')`
+    in the database server's own zone, which the `pg` pool never set. The
+    code comment now says so. If Railway's zone is not UTC, a certificate
+    issued in the first hours of 1 January (Manila time) now carries the
+    previous year. A read-only `SHOW TimeZone;` on Railway settles it;
+    Nelson to run it.
+- **Vercel build.** The `dev` deployment failed with
+  `Can't resolve '@/generated/prisma/client'`: Vercel installs with
+  `--ignore-scripts`, so `postinstall` never ran `prisma generate`, and
+  the client is git-ignored. The build script is now
+  `prisma generate && next build`.
+- **Connection budget** unchanged at 2 (`pg`) + 3 (Prisma); only the staff
+  routes (Wave 4) still use `pg`.
 - **Production needs nothing for this wave:** no migration, no schema change.
 
 ## After the waves: API reference for the frontend
