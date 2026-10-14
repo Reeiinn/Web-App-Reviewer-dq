@@ -1,7 +1,7 @@
 // app/api/flashcards/[id]/progress/route.ts
 import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
-import { applyStreak } from "@/app/api/_lib/streak-store";
+import { applyStreak } from "@/server/data/progress";
 import { NextResponse } from "next/server";
 
 export async function POST(
