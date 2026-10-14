@@ -197,6 +197,10 @@ export async function createInvite(input: {
   role: InviteRole;
   email: string | null;
 }): Promise<CreatedInvite> {
+  // Not awaited here: a Prisma query runs only when it is awaited or handed
+  // to $transaction, so an open link runs it on its own and an addressed one
+  // runs it inside the transaction below. Awaiting it first would insert the
+  // invite outside the transaction, before the old one is replaced.
   const create = prisma.registrationInvite.create({
     data: { ...input, expiresAt: new Date(Date.now() + INVITE_TTL_MS) },
     select: { code: true, expiresAt: true, role: true, email: true },

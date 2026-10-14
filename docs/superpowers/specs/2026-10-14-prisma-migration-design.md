@@ -301,4 +301,12 @@ What implementing Wave 0 found, recorded so later waves start from it:
 - **`GET /api/user`** is deleted. A stale `.next/dev/types` left by an
   earlier `pnpm dev` still referenced it and broke `tsc` until it was
   removed; `next dev` regenerates it.
-- **Connection budget** is unchanged at 3 + 2.
+- **Connection budget** is unchanged at 3 + 2. Session refresh (the `jwt`
+  callback, on every `auth()` call) now reads through Prisma, but it is one
+  primary-key lookup per request against several `pg` queries, so `pg` keeps
+  the larger share. Wave 2 moves the study routes, the bulk of the traffic,
+  and flips the split to 2 (`pg`) + 3 (Prisma) in the same change.
+- **Interactive transactions** (register, reset) wait up to 10s for a
+  connection and run for up to 10s, the `pg` pool's
+  `connectionTimeoutMillis`. Prisma's default 2s wait turned a busy moment
+  into a 500 on signup; a test holding both connections pins it.

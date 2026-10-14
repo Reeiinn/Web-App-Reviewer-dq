@@ -14,8 +14,11 @@ declare global {
  * each time.
  *
  * `max: 2` while src/lib/db.ts (max 3) still exists beside it, so the two
- * pools together hold no more than the old pool's 5. Raised as routes move
- * here, and restored to 5 when db.ts is removed.
+ * pools together hold no more than the old pool's 5. Since Wave 1 every
+ * auth() call refreshes the session here (one primary-key read), but each
+ * request still makes more queries through db.ts than through this client,
+ * so the split stays 3 + 2 until the study routes move in Wave 2 and it
+ * becomes 2 + 3. Restored to 5 when db.ts is removed.
  */
 function createClient() {
   const connectionString = process.env.DATABASE_URL ?? "";
