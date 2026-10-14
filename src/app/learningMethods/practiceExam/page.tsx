@@ -1,5 +1,5 @@
 // app/learningMethods/practiceExam/page.tsx
-import { recordVisit } from "@/app/api/_lib/recent-activity-store";
+import { recordVisit } from "@/server/data/progress";
 import { auth } from "@/lib/auth";
 import { isStaff } from "@/lib/helper/roles";
 import { parseExamType } from "@/lib/types/common";

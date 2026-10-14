@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
-import { touchLastSeen } from "@/app/api/_lib/presence-store";
-import pool from "@/lib/db";
+import { listReviewees, touchLastSeen } from "@/server/data/staff";
 import {
   masteryPercent,
   readinessStatus,
@@ -12,20 +11,12 @@ import {
   cappedPasses,
   hasPassedTrack,
 } from "@/lib/helper/practice-exam";
+import { latestActivity } from "@/lib/helper/track-counts";
+import { getTrackCountsFor } from "@/server/data/mastery";
 import { NextResponse } from "next/server";
-
-type Counts = { total: number; mastered: number };
 
 const pct = (part: number, whole: number) =>
   whole > 0 ? Math.round((part / whole) * 100) : 0;
-
-/** Rows keyed by user and track, as (user_id, exam_type) pairs. */
-type TrackRow = { user_id: string; exam_type: ExamType };
-
-const trackKey = (userId: string, examType: string) => `${userId} ${examType}`;
-
-const indexByTrack = <T extends TrackRow>(rows: T[]) =>
-  new Map(rows.map((row) => [trackKey(row.user_id, row.exam_type), row]));
 
 /**
  * Roster for the admin console. ADMIN sees everyone; MANAGER sees only their
@@ -65,149 +56,34 @@ export async function GET(req: Request) {
     // manager_id is set at signup from the invite the reviewee used, so it is
     // the recruiter. An admin sees every reviewee and who recruited them; a
     // manager sees only the reviewees they recruited themselves.
-    const selectReviewees = `
-      SELECT u.id, u.email, u.name, u.role, u.image,
-             m.id    AS manager_id,
-             m.name  AS manager_name,
-             m.email AS manager_email,
-             m.role  AS manager_role,
-             m.image AS manager_image
-        FROM users u
-        LEFT JOIN users m ON m.id = u.manager_id
-       WHERE u.role = 'USER' AND u.deleted_at IS NULL
-    `;
-
-    const usersResult =
-      role === "ADMIN"
-        ? await pool.query(`${selectReviewees} ORDER BY u.name ASC`)
-        : await pool.query(
-            `${selectReviewees} AND u.manager_id = $1 ORDER BY u.name ASC`,
-            [currentUserId],
-          );
-
-    const users = usersResult.rows;
+    const users = await listReviewees(role === "ADMIN" ? null : currentUserId);
     if (users.length === 0) return NextResponse.json([]);
 
     const userIds = users.map((user) => user.id);
 
-    // Progress tables reference content by id and carry no exam_type of their
-    // own, so each one joins its content table to learn which track it is in.
-    const [
-      contentTotals,
-      flashcards,
-      memorization,
-      questions,
-      attempts,
-      streaks,
-    ] = await Promise.all([
-      pool.query(
-        `SELECT exam_type, 'flashcards' AS kind, COUNT(*) AS total
-           FROM flashcards GROUP BY exam_type
-         UNION ALL
-         SELECT exam_type, 'memorization', COUNT(*)
-           FROM memorization GROUP BY exam_type
-         UNION ALL
-         SELECT exam_type, 'questions', COUNT(*)
-           FROM questions GROUP BY exam_type`,
-      ),
-      pool.query(
-        `SELECT fp.user_id, f.exam_type,
-                COUNT(*) FILTER (WHERE fp.mastered) AS mastered
-           FROM flashcard_progress fp
-           JOIN flashcards f ON f.id = fp.flashcard_id
-          WHERE fp.user_id = ANY($1)
-          GROUP BY fp.user_id, f.exam_type`,
-        [userIds],
-      ),
-      pool.query(
-        `SELECT mp.user_id, m.exam_type,
-                COUNT(*) FILTER (WHERE mp.mastered)   AS mastered,
-                COUNT(*)                              AS answered,
-                COUNT(*) FILTER (WHERE mp.is_correct) AS correct
-           FROM memorization_progress mp
-           JOIN memorization m ON m.id = mp.memorization_id
-          WHERE mp.user_id = ANY($1)
-          GROUP BY mp.user_id, m.exam_type`,
-        [userIds],
-      ),
-      pool.query(
-        `SELECT qp.user_id, q.exam_type,
-                COUNT(*) FILTER (WHERE qp.mastered) AS mastered
-           FROM question_progress qp
-           JOIN questions q ON q.id = qp.question_id
-          WHERE qp.user_id = ANY($1)
-          GROUP BY qp.user_id, q.exam_type`,
-        [userIds],
-      ),
-      pool.query(
-        `SELECT user_id, exam_type,
-                COUNT(*)                       AS taken,
-                COUNT(*) FILTER (WHERE passed) AS passed
-           FROM exam_attempts
-          WHERE user_id = ANY($1) AND completed_at IS NOT NULL
-          GROUP BY user_id, exam_type`,
-        [userIds],
-      ),
-      pool.query(
-        // study_streaks is read for its timestamp alone: it is the one table
-        // that records when a learner last answered anything on a track.
-        `SELECT user_id, exam_type, last_answer_at
-           FROM study_streaks WHERE user_id = ANY($1)`,
-        [userIds],
-      ),
-    ]);
-
-    // Content totals per track, so a track scores against its own item count.
-    const totalsByTrack = new Map<string, number>();
-    for (const row of contentTotals.rows) {
-      totalsByTrack.set(`${row.exam_type} ${row.kind}`, Number(row.total));
-    }
-    const totalFor = (track: ExamType, kind: string) =>
-      totalsByTrack.get(`${track} ${kind}`) ?? 0;
-
-    const flashcardsBy = indexByTrack(flashcards.rows);
-    const memorizationBy = indexByTrack(memorization.rows);
-    const questionsBy = indexByTrack(questions.rows);
-    const attemptsBy = indexByTrack(attempts.rows);
-    const streaksBy = indexByTrack(streaks.rows);
+    // Counts per reviewee and track come from the mastery views, the same
+    // ones the dashboard reads, so the two can no longer disagree.
+    const countsByUser = await getTrackCountsFor(userIds, tracks);
 
     const roster = users.map((user) => {
-      const perTrack = tracks.map((track) => {
-        const key = trackKey(user.id, track);
-        const memorizationRow = memorizationBy.get(key);
-        const attemptRow = attemptsBy.get(key);
-        const streakRow = streaksBy.get(key);
-
-        const flashcardCounts: Counts = {
-          total: totalFor(track, "flashcards"),
-          mastered: Number(flashcardsBy.get(key)?.mastered ?? 0),
-        };
-        const memorizationCounts: Counts = {
-          total: totalFor(track, "memorization"),
-          mastered: Number(memorizationRow?.mastered ?? 0),
-        };
-        const practiceCounts: Counts = {
-          total: totalFor(track, "questions"),
-          mastered: Number(questionsBy.get(key)?.mastered ?? 0),
-        };
-
-        return {
-          track,
-          readiness: trackReadiness({
-            flashcards: flashcardCounts,
-            memorization: memorizationCounts,
-            practice: practiceCounts,
-          }),
-          flashcards: flashcardCounts,
-          memorization: memorizationCounts,
-          practice: practiceCounts,
-          answered: Number(memorizationRow?.answered ?? 0),
-          correct: Number(memorizationRow?.correct ?? 0),
-          taken: Number(attemptRow?.taken ?? 0),
-          passes: cappedPasses(Number(attemptRow?.passed ?? 0)),
-          lastActivity: (streakRow?.last_answer_at as string | null) ?? null,
-        };
-      });
+      const perTrack = (countsByUser.get(user.id) ?? []).map((t) => ({
+        track: t.examType,
+        readiness: trackReadiness({
+          flashcards: t.flashcards,
+          memorization: t.memorization,
+          practice: t.practice,
+        }),
+        flashcards: t.flashcards,
+        memorization: t.memorization,
+        practice: t.practice,
+        answered: t.memorizationAnswered,
+        correct: t.memorizationCorrect,
+        taken: t.attemptsTaken,
+        passes: cappedPasses(t.passingAttempts),
+        // study_streaks is the one table that records when a learner last
+        // answered anything on a track.
+        lastActivity: t.lastAnswerAt,
+      }));
 
       const sum = (pick: (row: (typeof perTrack)[number]) => number) =>
         perTrack.reduce((running, row) => running + pick(row), 0);
@@ -229,12 +105,9 @@ export async function GET(req: Request) {
       }));
 
       const answered = sum((row) => row.answered);
-      const lastActivity =
-        perTrack
-          .map((row) => row.lastActivity)
-          .filter((value): value is string => Boolean(value))
-          .sort()
-          .at(-1) ?? null;
+      const lastActivity = latestActivity(
+        perTrack.map((row) => row.lastActivity),
+      );
 
       return {
         id: user.id,
@@ -242,13 +115,13 @@ export async function GET(req: Request) {
         email: user.email,
         image: user.image ?? null,
         // Null when the account predates invite-only signup.
-        manager: user.manager_id
+        manager: user.manager
           ? {
-              id: user.manager_id,
-              name: user.manager_name,
-              email: user.manager_email,
-              role: user.manager_role as "ADMIN" | "MANAGER",
-              image: user.manager_image ?? null,
+              id: user.manager.id,
+              name: user.manager.name,
+              email: user.manager.email,
+              role: user.manager.role as "ADMIN" | "MANAGER",
+              image: user.manager.image ?? null,
             }
           : null,
         readiness,

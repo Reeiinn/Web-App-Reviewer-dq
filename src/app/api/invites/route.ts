@@ -1,8 +1,7 @@
 import { randomBytes } from "crypto";
 import { auth } from "@/lib/auth";
 import { appUrl } from "@/lib/helper/app-url";
-import { touchLastSeen } from "@/app/api/_lib/presence-store";
-import pool from "@/lib/db";
+import { touchLastSeen } from "@/server/data/staff";
 import {
   canInvite,
   isInviteRole,
@@ -11,6 +10,7 @@ import {
 } from "@/lib/helper/invites";
 import { staffTitleFor } from "@/lib/helper/roles";
 import { mailerConfigured, sendMail } from "@/lib/mailer";
+import { createInvite, emailHasAccount } from "@/server/data/users";
 import { NextResponse } from "next/server";
 
 /**
@@ -70,35 +70,28 @@ export async function POST(req: Request) {
   await touchLastSeen(currentUserId);
 
   try {
-    if (email) {
-      const taken = await pool.query(`SELECT id FROM users WHERE email = $1`, [
-        email,
-      ]);
-
-      if (taken.rowCount) {
-        return NextResponse.json(
-          { error: "That email already has an account." },
-          { status: 409 },
-        );
-      }
-
-      // A second invite to the same person replaces the first, so an address
-      // never ends up holding two live links to spend.
-      await pool.query(
-        `UPDATE registration_invites SET used_at = now()
-          WHERE email = $1 AND used_at IS NULL`,
-        [email],
+    if (email && (await emailHasAccount(email))) {
+      return NextResponse.json(
+        { error: "That email already has an account." },
+        { status: 409 },
       );
     }
 
-    const result = await pool.query(
-      `INSERT INTO registration_invites (code, created_by, role, email, expires_at)
-       VALUES ($1, $2, $3, $4, now() + INTERVAL '7 days')
-       RETURNING code, expires_at, role, email`,
-      [randomBytes(16).toString("base64url"), currentUserId, role, email],
-    );
+    // A second invite to the same person replaces the first, so an address
+    // never ends up holding two live links to spend.
+    const created = await createInvite({
+      code: randomBytes(16).toString("base64url"),
+      createdBy: currentUserId,
+      role,
+      email,
+    });
 
-    const invite = result.rows[0];
+    const invite = {
+      code: created.code,
+      expires_at: created.expiresAt,
+      role: created.role,
+      email: created.email,
+    };
     // Built on the app's own address, not on the host this request arrived at:
     // an invite is pasted into a chat or an inbox and opened elsewhere.
     const link = appUrl(req, `/signup?code=${encodeURIComponent(invite.code)}`);

@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { fetchRecent } from "@/app/api/_lib/recent-activity-store";
+import { fetchRecent } from "@/server/data/progress";
 import { NextResponse } from "next/server";
 
 const QUICK_ACCESS_LIMIT = 3;

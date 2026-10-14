@@ -35,8 +35,8 @@ export function Avatar({
       className={`flex ${size} shrink-0 items-center justify-center overflow-hidden rounded-full border text-[11px] font-bold ${className}`}
     >
       {image ? (
-        // eslint-disable-next-line @next/next/no-img-element -- a data URL has
-        // nothing for the image loader to optimise.
+        // A data URL has nothing for the image loader to optimise.
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={image}
           alt=""

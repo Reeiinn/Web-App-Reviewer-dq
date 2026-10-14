@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
+import { markTourSeen } from "@/server/data/users";
 import { NextResponse } from "next/server";
 
 /**
@@ -14,12 +14,7 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  await pool.query(
-    `UPDATE users
-        SET onboarding_tours_seen = array_append(onboarding_tours_seen, $2)
-      WHERE id = $1 AND NOT ($2 = ANY(onboarding_tours_seen))`,
-    [session.user.id, session.user.role],
-  );
+  await markTourSeen(session.user.id, session.user.role);
 
   return NextResponse.json({ ok: true });
 }

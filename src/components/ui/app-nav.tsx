@@ -187,8 +187,8 @@ function UserMenu() {
         className="flex size-9 items-center justify-center overflow-hidden rounded-full border border-border bg-[#0B2340] text-xs font-bold text-white transition hover:border-[#0B2340]"
       >
         {image ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a data URL has
-          // nothing for the image loader to optimise.
+          // A data URL has nothing for the image loader to optimise.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={image}
             alt=""
@@ -211,8 +211,8 @@ function UserMenu() {
             <div className="flex items-start gap-3">
               <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-[#0B2340] text-sm font-bold text-white">
                 {image ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- a data
-                  // URL has nothing for the image loader to optimise.
+                  // A data URL has nothing for the image loader to optimise.
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={image}
                     alt={`${name}'s profile photo`}

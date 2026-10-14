@@ -1,5 +1,10 @@
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
+import { examAnswerJson } from "@/lib/helper/exam-json";
+import {
+  choiceCorrectness,
+  findAttemptOwner,
+  recordExamAnswer,
+} from "@/server/data/attempts";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -15,16 +20,11 @@ export async function POST(
 
   try {
     // check ownership before writing anything
-    const attempt = await pool.query(
-      `SELECT user_id FROM exam_attempts WHERE id = $1`,
-      [attemptId],
-    );
+    const userId = await findAttemptOwner(attemptId);
 
-    if (attempt.rows.length === 0) {
+    if (!userId) {
       return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
     }
-
-    const userId = attempt.rows[0].user_id;
 
     if (userId !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -40,51 +40,24 @@ export async function POST(
       );
     }
 
-    const choiceResult = await pool.query(
-      `SELECT is_correct FROM choices WHERE id = $1 AND question_id = $2`,
-      [selected_choice_id, question_id],
-    );
+    const isCorrect = await choiceCorrectness(selected_choice_id, question_id);
 
-    if (choiceResult.rows.length === 0) {
+    if (isCorrect === null) {
       return NextResponse.json(
         { error: "Choice not found for this question" },
         { status: 404 },
       );
     }
 
-    const isCorrect = choiceResult.rows[0].is_correct;
+    const saved = await recordExamAnswer({
+      attemptId,
+      userId,
+      questionId: question_id,
+      selectedChoiceId: selected_choice_id,
+      isCorrect,
+    });
 
-    // Answers are saved as they are picked, so the same question arrives again
-    // whenever the learner changes their mind. The row is replaced rather than
-    // added to: two rows for one question would both count toward the score.
-    const result = await pool.query(
-      `INSERT INTO exam_attempt_answers
-        (attempt_id, question_id, selected_choice_id, is_correct)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (attempt_id, question_id)
-       DO UPDATE SET
-         selected_choice_id = EXCLUDED.selected_choice_id,
-         is_correct = EXCLUDED.is_correct
-       RETURNING *`,
-      [attemptId, question_id, selected_choice_id, isCorrect],
-    );
-
-    await pool.query(
-      `INSERT INTO question_progress 
-        (user_id, question_id, selected_choice_id, is_correct, times_seen, times_correct, mastered, last_reviewed_at)
-       VALUES ($1, $2, $3, $4, 1, $5, $4, now())
-       ON CONFLICT (user_id, question_id)
-       DO UPDATE SET
-         selected_choice_id = EXCLUDED.selected_choice_id,
-         is_correct = EXCLUDED.is_correct,
-         times_seen = question_progress.times_seen + 1,
-         times_correct = question_progress.times_correct + EXCLUDED.times_correct,
-         mastered = EXCLUDED.is_correct,
-         last_reviewed_at = now()`,
-      [userId, question_id, selected_choice_id, isCorrect, isCorrect ? 1 : 0],
-    );
-
-    return NextResponse.json(result.rows[0], { status: 201 });
+    return NextResponse.json(examAnswerJson(saved), { status: 201 });
   } catch (error) {
     console.error("Error submitting answer:", error);
     return NextResponse.json(

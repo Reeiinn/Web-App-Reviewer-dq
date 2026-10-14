@@ -1,17 +1,15 @@
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
 import { trackRecord, type Sitting } from "@/lib/helper/certificate-record";
 import { isStaff } from "@/lib/helper/roles";
-import type { Certificate as CertificateRow } from "@/lib/types/attempt";
 import { examTypes, type ExamType } from "@/lib/types/common";
+import { listCompletedSittings } from "@/server/data/attempts";
+import { listCertificates } from "@/server/data/certificates";
 import { redirect } from "next/navigation";
 import { CertificatesPage, type TrackStanding } from "./CertificatesPage";
 
 export const metadata = {
   title: "Certificates — INSURE",
 };
-
-type SittingRow = Sitting & { exam_type: ExamType };
 
 export default async function Page() {
   const session = await auth();
@@ -27,42 +25,28 @@ export default async function Page() {
 
   // The certificates say which tracks were cleared; the sittings say what each
   // one cost. Both are read here so the two can never be a page apart.
-  const [certificateResult, sittingResult] = await Promise.all([
-    pool.query(
-      `SELECT id, exam_type, issued_at, certificate_no
-         FROM certificates
-        WHERE user_id = $1
-        ORDER BY issued_at DESC`,
-      [session.user.id],
-    ),
-    pool.query(
-      `SELECT exam_type, passed, score, total_items, completed_at
-         FROM exam_attempts
-        WHERE user_id = $1 AND completed_at IS NOT NULL
-        ORDER BY completed_at ASC`,
-      [session.user.id],
-    ),
+  const [held, completed] = await Promise.all([
+    listCertificates(session.user.id),
+    listCompletedSittings(session.user.id),
   ]);
 
-  const certificates = (certificateResult.rows as CertificateRow[]).map(
-    (row) => ({
-      id: row.id,
-      exam_type: row.exam_type,
-      certificate_no: row.certificate_no,
-      issued_at: new Date(row.issued_at).toISOString(),
-    }),
-  );
+  const certificates = held.map((row) => ({
+    id: row.id,
+    exam_type: row.examType,
+    certificate_no: row.certificateNo,
+    issued_at: row.issuedAt.toISOString(),
+  }));
 
   const sittings = new Map<ExamType, Sitting[]>();
-  for (const row of sittingResult.rows as SittingRow[]) {
-    const track = sittings.get(row.exam_type) ?? [];
+  for (const row of completed) {
+    const track = sittings.get(row.examType) ?? [];
     track.push({
       passed: row.passed,
       score: row.score,
-      total_items: row.total_items,
-      completed_at: new Date(row.completed_at).toISOString(),
+      total_items: row.totalItems,
+      completed_at: row.completedAt.toISOString(),
     });
-    sittings.set(row.exam_type, track);
+    sittings.set(row.examType, track);
   }
 
   const standings: TrackStanding[] = examTypes.map((examType) => ({

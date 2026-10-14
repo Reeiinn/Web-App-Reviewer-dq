@@ -24,3 +24,8 @@ export const examLabels: Record<ExamType, string> = {
 export function parseExamType(value: string | null | undefined): ExamType {
   return examTypes.includes(value as ExamType) ? (value as ExamType) : "VUL";
 }
+
+/** Whether a value names one of the four tracks, for validating input. */
+export function isExamType(value: unknown): value is ExamType {
+  return examTypes.includes(value as ExamType);
+}

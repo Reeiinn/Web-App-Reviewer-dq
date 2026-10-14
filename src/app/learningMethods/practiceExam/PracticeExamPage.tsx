@@ -17,9 +17,16 @@ import type { Question } from "@/lib/types/questions";
 import { Award, Lock } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { PracticeExamBodySkeleton } from "./PracticeExamSkeleton";
 import { fresh } from "@/lib/helper/fetch-fresh";
+import { resendAnswers } from "@/lib/helper/exam-submit";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
@@ -199,9 +206,12 @@ function PracticeExamContent() {
 
   /** Questions whose save has not come back yet, re-sent at submit. */
   const unsaved = useRef<Set<string>>(new Set());
-  /** The current answers, readable inside a fetch callback. */
+  /** The current answers, readable inside a fetch callback. Updated in the
+      same commit as the render, before any response can come back. */
   const answersRef = useRef(answers);
-  answersRef.current = answers;
+  useLayoutEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   useEffect(() => {
     let active = true;
@@ -386,24 +396,31 @@ function PracticeExamContent() {
       // Most answers were saved as they were picked; only the ones whose write
       // has not come back go again here, so a dropped request cannot cost a
       // question at the moment it is scored.
-      const pending = questions.filter((question) =>
-        unsaved.current.has(question.id),
-      );
+      const pending = questions
+        .filter((question) => unsaved.current.has(question.id))
+        .map((question) => question.id);
 
-      await Promise.all(
-        pending.map((question) =>
-          fetch(`/api/attempts/${attemptId}/answers`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              question_id: question.id,
-              selected_choice_id: answers[question.id],
-            }),
-          }).then((response) => {
-            if (response.ok) unsaved.current.delete(question.id);
+      const stillUnsaved = await resendAnswers(pending, async (questionId) => {
+        const response = await fetch(`/api/attempts/${attemptId}/answers`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question_id: questionId,
+            selected_choice_id: answers[questionId],
           }),
-        ),
-      );
+        });
+        if (response.ok) unsaved.current.delete(questionId);
+        return response.ok;
+      });
+
+      // Scoring now would count these as blank, so the sitting stays open
+      // and the learner is asked to submit again.
+      if (stillUnsaved.length) {
+        setError(
+          "Some of your answers did not save. Check your connection and submit again.",
+        );
+        return;
+      }
 
       const completed = (await fetch(`/api/attempts/${attemptId}/complete`, {
         method: "POST",
