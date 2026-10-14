@@ -1,8 +1,8 @@
-import pool from "@/lib/db";
 import { appUrl } from "@/lib/helper/app-url";
 import { createResetToken } from "@/lib/helper/reset-token";
 import { mailerConfigured, sendMail } from "@/lib/mailer";
 import { forgotPasswordSchema } from "@/lib/validation/auth.validation";
+import { findActiveUserId, issueResetToken } from "@/server/data/users";
 import { NextResponse } from "next/server";
 
 /**
@@ -26,31 +26,17 @@ export async function POST(req: Request) {
     }
 
     const email = parsed.data.email.trim().toLowerCase();
-    const user = await pool.query(
-      `SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL`,
-      [email],
-    );
+    const userId = await findActiveUserId(email);
 
-    if (user.rowCount === 0) {
+    if (!userId) {
       return NextResponse.json({ message: GENERIC_MESSAGE });
     }
 
-    const userId = user.rows[0].id;
     const { token, tokenHash, expiresAt } = createResetToken();
 
     // Any earlier link for this account stops working the moment a new one is
     // issued, so a forwarded old email cannot be replayed.
-    await pool.query(
-      `UPDATE password_reset_tokens SET used_at = now()
-       WHERE user_id = $1 AND used_at IS NULL`,
-      [userId],
-    );
-
-    await pool.query(
-      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
-       VALUES ($1, $2, $3)`,
-      [userId, tokenHash, expiresAt],
-    );
+    await issueResetToken(userId, tokenHash, expiresAt);
 
     // The app's own address: a reset link is opened from an inbox, not from
     // the host this request arrived at.

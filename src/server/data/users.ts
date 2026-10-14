@@ -85,3 +85,74 @@ export async function markTourSeen(userId: string, role: Role): Promise<void> {
     data: { onboardingToursSeen: { push: role } },
   });
 }
+
+/** The id of the active account with this (normalised) address. */
+export async function findActiveUserId(email: string): Promise<string | null> {
+  const row = await prisma.user.findFirst({
+    where: { email, deletedAt: null },
+    select: { id: true },
+  });
+  return row?.id ?? null;
+}
+
+/**
+ * Records a new reset link. Every earlier link for the account stops working
+ * in the same transaction, so a forwarded old email cannot be replayed.
+ */
+export async function issueResetToken(
+  userId: string,
+  tokenHash: string,
+  expiresAt: Date,
+): Promise<void> {
+  await prisma.$transaction([
+    prisma.passwordResetToken.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    }),
+    prisma.passwordResetToken.create({
+      data: { userId, tokenHash, expiresAt },
+    }),
+  ]);
+}
+
+export type ResetTokenRecord = {
+  id: string;
+  userId: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+};
+
+export async function findResetToken(
+  tokenHash: string,
+): Promise<ResetTokenRecord | null> {
+  return prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+    select: { id: true, userId: true, expiresAt: true, usedAt: true },
+  });
+}
+
+/**
+ * Spends the link and sets the password, both or neither. The link is spent
+ * conditionally, so two submissions of the same one cannot both succeed:
+ * false means it was already used or has expired, and nothing changed.
+ */
+export async function resetPassword(
+  tokenId: string,
+  userId: string,
+  passwordHash: string,
+): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    const now = new Date();
+    const spent = await tx.passwordResetToken.updateMany({
+      where: { id: tokenId, usedAt: null, expiresAt: { gt: now } },
+      data: { usedAt: now },
+    });
+    if (spent.count === 0) return false;
+
+    await tx.user.updateMany({
+      where: { id: userId },
+      data: { password: passwordHash },
+    });
+    return true;
+  });
+}

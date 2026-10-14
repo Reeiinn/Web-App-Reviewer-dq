@@ -1,6 +1,6 @@
-import pool from "@/lib/db";
 import { hashResetToken, isTokenUsable } from "@/lib/helper/reset-token";
 import { resetPasswordSchema } from "@/lib/validation/auth.validation";
+import { findResetToken, resetPassword } from "@/server/data/users";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
@@ -23,54 +23,20 @@ export async function POST(req: Request) {
     const { token, password } = parsed.data;
     const tokenHash = hashResetToken(token);
 
-    const found = await pool.query(
-      `SELECT id, user_id, expires_at, used_at
-       FROM password_reset_tokens WHERE token_hash = $1`,
-      [tokenHash],
-    );
+    const record = await findResetToken(tokenHash);
 
-    const record = found.rows[0];
-
-    if (
-      !record ||
-      !isTokenUsable({
-        expiresAt: new Date(record.expires_at),
-        usedAt: record.used_at ? new Date(record.used_at) : null,
-      })
-    ) {
+    if (!record || !isTokenUsable(record)) {
       return NextResponse.json({ error: INVALID_TOKEN }, { status: 400 });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const client = await pool.connect();
 
-    try {
-      await client.query("BEGIN");
+    // Spending the token conditionally means two submissions of the same link
+    // cannot both succeed.
+    const reset = await resetPassword(record.id, record.userId, hashedPassword);
 
-      // Spending the token conditionally means two submissions of the same link
-      // cannot both succeed.
-      const spent = await client.query(
-        `UPDATE password_reset_tokens SET used_at = now()
-         WHERE id = $1 AND used_at IS NULL AND expires_at > now()`,
-        [record.id],
-      );
-
-      if (spent.rowCount === 0) {
-        await client.query("ROLLBACK");
-        return NextResponse.json({ error: INVALID_TOKEN }, { status: 400 });
-      }
-
-      await client.query(
-        `UPDATE users SET password = $1, updated_at = now() WHERE id = $2`,
-        [hashedPassword, record.user_id],
-      );
-
-      await client.query("COMMIT");
-    } catch (dbError) {
-      await client.query("ROLLBACK").catch(() => {});
-      throw dbError;
-    } finally {
-      client.release();
+    if (!reset) {
+      return NextResponse.json({ error: INVALID_TOKEN }, { status: 400 });
     }
 
     return NextResponse.json({

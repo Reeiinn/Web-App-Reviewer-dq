@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { query, sendMail, mailerConfigured } = vi.hoisted(() => ({
-  query: vi.fn(),
-  sendMail: vi.fn(),
-  mailerConfigured: vi.fn(),
-}));
+const { findActiveUserId, issueResetToken, sendMail, mailerConfigured } =
+  vi.hoisted(() => ({
+    findActiveUserId: vi.fn(),
+    issueResetToken: vi.fn(),
+    sendMail: vi.fn(),
+    mailerConfigured: vi.fn(),
+  }));
 
-vi.mock("@/lib/db", () => ({ default: { query } }));
+vi.mock("@/server/data/users", () => ({ findActiveUserId, issueResetToken }));
 vi.mock("@/lib/mailer", () => ({ sendMail, mailerConfigured }));
 
 import { POST } from "./route";
@@ -25,14 +27,10 @@ beforeEach(() => {
   vi.stubEnv("APP_URL", "https://insure.example.com");
   mailerConfigured.mockReturnValue(true);
   sendMail.mockResolvedValue({ sent: true });
-  query.mockImplementation((sql: string, values: unknown[]) => {
-    if (sql.includes("FROM users")) {
-      return values[0] === KNOWN
-        ? Promise.resolve({ rowCount: 1, rows: [{ id: 7 }] })
-        : Promise.resolve({ rowCount: 0, rows: [] });
-    }
-    return Promise.resolve({ rowCount: 1, rows: [] });
-  });
+  findActiveUserId.mockImplementation((email: string) =>
+    Promise.resolve(email === KNOWN ? "7" : null),
+  );
+  issueResetToken.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -49,6 +47,11 @@ describe("POST /api/auth/forgot-password", () => {
 
     expect(response.status).toBe(200);
     expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(issueResetToken).toHaveBeenCalledWith(
+      "7",
+      expect.any(String),
+      expect.any(Date),
+    );
 
     const mail = sendMail.mock.calls[0][0];
     expect(mail.to).toBe(KNOWN);
@@ -68,6 +71,7 @@ describe("POST /api/auth/forgot-password", () => {
     const body = await response.json();
 
     expect(sendMail).not.toHaveBeenCalled();
+    expect(issueResetToken).not.toHaveBeenCalled();
     expect(body.message).toContain("If that email is registered");
   });
 
