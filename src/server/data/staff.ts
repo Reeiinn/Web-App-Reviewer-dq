@@ -178,3 +178,86 @@ export async function removeReviewee(id: string): Promise<boolean> {
   });
   return count === 1;
 }
+
+export type NudgeRecord = {
+  id: string;
+  senderId: string | null;
+  senderName: string;
+  message: string;
+  createdAt: Date;
+  readAt: Date | null;
+};
+
+const nudgeSelect = {
+  id: true,
+  senderId: true,
+  senderName: true,
+  message: true,
+  createdAt: true,
+  readAt: true,
+} as const;
+
+/** When this sender last reminded this reviewee, for the cooldown. */
+export async function lastNudgeSentAt(
+  userId: string,
+  senderId: string,
+): Promise<Date | null> {
+  const last = await prisma.nudge.findFirst({
+    where: { userId, senderId },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  return last?.createdAt ?? null;
+}
+
+/** Writes one reminder. The row is the record that it was sent. */
+export async function sendNudge(input: {
+  userId: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+}): Promise<NudgeRecord> {
+  return prisma.nudge.create({ data: input, select: nudgeSelect });
+}
+
+/** A reviewee's reminders, newest first. */
+export async function listNudges(userId: string, limit: number): Promise<NudgeRecord[]> {
+  return prisma.nudge.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: nudgeSelect,
+  });
+}
+
+/** One reminder, only if it was sent to userId. */
+export async function findNudge(
+  id: string,
+  userId: string,
+): Promise<{ id: string; senderId: string | null } | null> {
+  return prisma.nudge.findFirst({
+    where: { id, userId },
+    select: { id: true, senderId: true },
+  });
+}
+
+/** Takes a reminder back. Already gone is not an error. */
+export async function deleteNudge(id: string): Promise<void> {
+  await prisma.nudge.deleteMany({ where: { id } });
+}
+
+/** Unread reminders across every row, not just the ones a list returns. */
+export async function unreadNudgeCount(userId: string): Promise<number> {
+  return prisma.nudge.count({ where: { userId, readAt: null } });
+}
+
+/**
+ * Marks reminders read: the one named, or all of them. Matched only inside
+ * userId's own unread rows, so naming somebody else's touches nothing.
+ */
+export async function markNudgesRead(userId: string, id: string | null): Promise<void> {
+  await prisma.nudge.updateMany({
+    where: { userId, readAt: null, ...(id === null ? {} : { id }) },
+    data: { readAt: new Date() },
+  });
+}

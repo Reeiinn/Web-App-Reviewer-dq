@@ -3,12 +3,19 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 import prisma from "@/server/db/prisma";
 import { createUser, deleteUsers } from "@/test/db-fixtures";
 import {
+  deleteNudge,
   findActiveAccount,
+  findNudge,
+  lastNudgeSentAt,
   listManagers,
+  listNudges,
   listReviewees,
+  markNudgesRead,
   recordAdminAction,
   removeReviewee,
+  sendNudge,
   touchLastSeen,
+  unreadNudgeCount,
 } from "./staff";
 
 const made: string[] = [];
@@ -244,5 +251,87 @@ describe("removeReviewee", () => {
     await prisma.studyStreak.create({ data: { userId: me.id, examType: "VUL" } });
     await removeReviewee(me.id);
     expect(await prisma.studyStreak.count({ where: { userId: me.id } })).toBe(1);
+  });
+});
+
+describe("nudges", () => {
+  async function pair() {
+    const boss = await user({ role: "MANAGER" });
+    const me = await user({ managerId: boss.id });
+    return { boss, me };
+  }
+
+  const nudge = (userId: string, senderId: string, createdAt: Date, message = "Keep going") =>
+    prisma.nudge.create({
+      data: { userId, senderId, senderName: "Boss", message, createdAt },
+      select: { id: true },
+    });
+
+  it("sends one and reads it back as sent", async () => {
+    const { boss, me } = await pair();
+    const before = Date.now();
+
+    const sent = await sendNudge({ userId: me.id, senderId: boss.id, senderName: "Boss", message: "Keep going" });
+
+    expect(sent).toMatchObject({ senderId: boss.id, senderName: "Boss", message: "Keep going", readAt: null });
+    expect(sent.createdAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(await lastNudgeSentAt(me.id, boss.id)).toEqual(sent.createdAt);
+  });
+
+  it("times the cooldown per sender", async () => {
+    const { boss, me } = await pair();
+    const other = await user({ role: "ADMIN" });
+    await nudge(me.id, boss.id, new Date("2026-10-01T00:00:00Z"));
+    await nudge(me.id, boss.id, new Date("2026-10-02T00:00:00Z"));
+    await nudge(me.id, other.id, new Date("2026-10-03T00:00:00Z"));
+
+    expect(await lastNudgeSentAt(me.id, boss.id)).toEqual(new Date("2026-10-02T00:00:00Z"));
+    expect(await lastNudgeSentAt(boss.id, me.id)).toBeNull();
+  });
+
+  it("lists newest first, capped", async () => {
+    const { boss, me } = await pair();
+    const old = await nudge(me.id, boss.id, new Date("2026-10-01T00:00:00Z"));
+    const mid = await nudge(me.id, boss.id, new Date("2026-10-02T00:00:00Z"));
+    const recent = await nudge(me.id, boss.id, new Date("2026-10-03T00:00:00Z"));
+
+    expect((await listNudges(me.id, 2)).map((n) => n.id)).toEqual([recent.id, mid.id]);
+    expect((await listNudges(me.id, 20)).map((n) => n.id)).toEqual([recent.id, mid.id, old.id]);
+  });
+
+  it("finds a nudge only under its own reviewee, and deletes it once", async () => {
+    const { boss, me } = await pair();
+    const stranger = await user();
+    const sent = await nudge(me.id, boss.id, new Date());
+
+    expect(await findNudge(sent.id, me.id)).toEqual({ id: sent.id, senderId: boss.id });
+    expect(await findNudge(sent.id, stranger.id)).toBeNull();
+
+    await deleteNudge(sent.id);
+    await expect(deleteNudge(sent.id)).resolves.toBeUndefined();
+    expect(await findNudge(sent.id, me.id)).toBeNull();
+  });
+
+  it("marks one read, then the rest, and never another account's", async () => {
+    const { boss, me } = await pair();
+    const neighbour = await user({ managerId: boss.id });
+    const a = await nudge(me.id, boss.id, new Date("2026-10-01T00:00:00Z"));
+    await nudge(me.id, boss.id, new Date("2026-10-02T00:00:00Z"));
+    const theirs = await nudge(neighbour.id, boss.id, new Date());
+
+    expect(await unreadNudgeCount(me.id)).toBe(2);
+
+    await markNudgesRead(me.id, a.id);
+    expect(await unreadNudgeCount(me.id)).toBe(1);
+    const { readAt: firstRead } = await prisma.nudge.findUniqueOrThrow({ where: { id: a.id } });
+
+    await markNudgesRead(me.id, theirs.id);
+    expect(await unreadNudgeCount(neighbour.id)).toBe(1);
+
+    await markNudgesRead(me.id, null);
+    expect(await unreadNudgeCount(me.id)).toBe(0);
+    // Already-read rows keep the time they were first read.
+    const { readAt } = await prisma.nudge.findUniqueOrThrow({ where: { id: a.id } });
+    expect(readAt).toEqual(firstRead);
   });
 });

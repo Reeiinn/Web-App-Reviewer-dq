@@ -1,6 +1,4 @@
 import { auth } from "@/lib/auth";
-import { touchLastSeen } from "@/server/data/staff";
-import pool from "@/lib/db";
 import {
   canDeleteNudge,
   canNudge,
@@ -8,6 +6,16 @@ import {
   nudgeCooldownMessage,
   resolveNudge,
 } from "@/lib/helper/nudges";
+import {
+  deleteNudge,
+  findActiveAccount,
+  findNudge,
+  lastNudgeSentAt,
+  listNudges,
+  sendNudge,
+  touchLastSeen,
+  type NudgeRecord,
+} from "@/server/data/staff";
 import { NextResponse } from "next/server";
 
 /**
@@ -32,13 +40,7 @@ async function reachReviewee(revieweeId: string) {
 
   await touchLastSeen(currentUserId);
 
-  const target = await pool.query(
-    `SELECT id, name, role, manager_id FROM users
-      WHERE id = $1 AND deleted_at IS NULL`,
-    [revieweeId],
-  );
-
-  const reviewee = target.rows[0];
+  const reviewee = await findActiveAccount(revieweeId);
   if (!reviewee) {
     return {
       error: NextResponse.json(
@@ -48,7 +50,10 @@ async function reachReviewee(revieweeId: string) {
     };
   }
 
-  const allowed = canNudge({ role, id: currentUserId }, reviewee);
+  const allowed = canNudge(
+    { role, id: currentUserId },
+    { role: reviewee.role, manager_id: reviewee.managerId },
+  );
   if (!allowed.ok) {
     return {
       error: NextResponse.json({ error: allowed.error }, { status: 403 }),
@@ -94,19 +99,8 @@ export async function POST(
 
     // One sender, one reviewee, one reminder per cooldown. Enforced here rather
     // than in the dialog: the dialog is a courtesy, this is the rule.
-    const last = await pool.query(
-      `SELECT created_at FROM nudges
-        WHERE user_id = $1 AND sender_id = $2
-        ORDER BY created_at DESC
-        LIMIT 1`,
-      [id, sender.id],
-    );
-
-    const lastSentAt = last.rows[0]?.created_at
-      ? new Date(last.rows[0].created_at).getTime()
-      : null;
-
-    const msSinceLast = lastSentAt === null ? null : Date.now() - lastSentAt;
+    const lastSent = await lastNudgeSentAt(id, sender.id);
+    const msSinceLast = lastSent === null ? null : Date.now() - lastSent.getTime();
 
     if (!nudgeAllowedAfter(msSinceLast)) {
       return NextResponse.json(
@@ -115,16 +109,16 @@ export async function POST(
       );
     }
 
-    const inserted = await pool.query(
-      `INSERT INTO nudges (user_id, sender_id, sender_name, message)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, sender_id, sender_name, message, created_at, read_at`,
-      [id, sender.id, sender.name ?? "Your manager", resolved.message],
-    );
+    const sent = await sendNudge({
+      userId: id,
+      senderId: sender.id,
+      senderName: sender.name ?? "Your manager",
+      message: resolved.message,
+    });
 
     return NextResponse.json({
       message: `Reminder sent to ${reviewee.name}.`,
-      nudge: asSentNudge(inserted.rows[0]),
+      nudge: asSentNudge(sent),
     });
   } catch (error) {
     console.error("Error sending nudge:", error);
@@ -135,22 +129,13 @@ export async function POST(
   }
 }
 
-type NudgeRow = {
-  id: string;
-  sender_id: string | null;
-  sender_name: string;
-  message: string;
-  created_at: string;
-  read_at: string | null;
-};
-
-const asSentNudge = (row: NudgeRow) => ({
+const asSentNudge = (row: NudgeRecord) => ({
   id: row.id,
-  senderId: row.sender_id,
-  sender: row.sender_name,
+  senderId: row.senderId,
+  sender: row.senderName,
   message: row.message,
-  createdAt: row.created_at,
-  read: row.read_at !== null,
+  createdAt: row.createdAt,
+  read: row.readAt !== null,
 });
 
 /**
@@ -167,14 +152,7 @@ export async function GET(
     const reach = await reachReviewee(id);
     if (reach.error) return reach.error;
 
-    const { rows } = await pool.query(
-      `SELECT id, sender_id, sender_name, message, created_at, read_at
-         FROM nudges
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT 20`,
-      [id],
-    );
+    const rows = await listNudges(id, 20);
 
     return NextResponse.json({
       nudges: rows.map(asSentNudge),
@@ -212,12 +190,7 @@ export async function DELETE(
     const reach = await reachReviewee(id);
     if (reach.error) return reach.error;
 
-    const found = await pool.query(
-      `SELECT id, sender_id FROM nudges WHERE id = $1 AND user_id = $2`,
-      [nudgeId, id],
-    );
-
-    const nudge = found.rows[0];
+    const nudge = await findNudge(nudgeId, id);
     if (!nudge) {
       return NextResponse.json(
         { error: "That reminder is already gone." },
@@ -225,12 +198,12 @@ export async function DELETE(
       );
     }
 
-    const allowed = canDeleteNudge(reach.sender, nudge);
+    const allowed = canDeleteNudge(reach.sender, { sender_id: nudge.senderId });
     if (!allowed.ok) {
       return NextResponse.json({ error: allowed.error }, { status: 403 });
     }
 
-    await pool.query(`DELETE FROM nudges WHERE id = $1`, [nudgeId]);
+    await deleteNudge(nudgeId);
 
     return NextResponse.json({ message: "Reminder deleted.", id: nudgeId });
   } catch (error) {
