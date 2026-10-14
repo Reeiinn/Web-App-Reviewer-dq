@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import prisma from "@/server/db/prisma";
+import prisma, { POOL_MAX } from "@/server/db/prisma";
 import { createUser, deleteUsers, uniqueSuffix } from "@/test/db-fixtures";
 import {
   createInvite,
@@ -327,7 +327,7 @@ describe("a busy pool", () => {
     const c = `code-${uniqueSuffix()}`;
     await createInvite({ code: c, createdBy: admin.id, role: "USER", email: null });
 
-    // Hold all three of Prisma's connections for three seconds — longer
+    // Hold every one of Prisma's connections for three seconds — longer
     // than Prisma's default two-second wait to start a transaction.
     const hold = () =>
       prisma.$transaction(
@@ -337,7 +337,7 @@ describe("a busy pool", () => {
         },
         { timeout: 10_000 },
       );
-    const holding = Promise.all([hold(), hold(), hold()]);
+    const holding = Promise.all(Array.from({ length: POOL_MAX }, hold));
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     const outcome = await registerWithInvite({
