@@ -504,9 +504,20 @@ What implementing Wave 0 found, recorded so later waves start from it:
 - **Certificate year settled.** Railway's `SHOW TimeZone;` reads
   `Etc/UTC`, so the old SQL's `to_char(now(), 'YYYY')` was already the UTC
   year: `certificateNumber` changes nothing.
-- **Left for a decision:** `GET /api/flashcards/eligibility` and
-  `GET /api/streaks` have no caller in the frontend. The focus-tracks spec
-  scopes `/api/streaks`, so neither was deleted.
+- **Deleted, unused:** `GET /api/flashcards/eligibility`. `GET /api/streaks`
+  has no caller either, but the focus-tracks spec scopes it, so it stays.
+- **Dead frontend code removed:** `presenceStyles`, `modeLabels`,
+  `AnswerFeedback`, `SkeletonText`.
+- **Lint: 23 warnings to 4.** The `<img>` exemptions now sit where ESLint
+  reads them, and refs and the clock are no longer read during render
+  (fit-text boxes, the practice exam's answer ref, the cropper's cover
+  scale, the memorization clock), with the same values as before. The four
+  left set state from an effect on purpose; see `eslint.config.mjs`.
+  Checked in `pnpm dev` with a throwaway account (since deleted): cards
+  fit front and back, the memorization timer counts from load, a quick
+  change of answer then submit scores without a resubmit, and the cropper
+  covers, zooms, drags and saves.
+- **Focus-tracks plan** updated to the Prisma data layer (Tasks 6 and 8).
 - **Production needs nothing for this wave:** no migration, no schema change.
 
 ## After the waves: API reference for the frontend
