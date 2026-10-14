@@ -43,10 +43,9 @@ export function PhotoCropper({
   useEffect(() => setMounted(true), []);
 
   // The scale at which the shorter side just fills the square: zoom multiplies
-  // it, so zoom 1 is always a full frame rather than a fixed pixel size.
-  const coverScale = bitmap.current
-    ? SIDE / Math.min(bitmap.current.width, bitmap.current.height)
-    : 1;
+  // it, so zoom 1 is always a full frame rather than a fixed pixel size. Set
+  // with the bitmap it describes; nothing reads it while there is none.
+  const [coverScale, setCoverScale] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -58,6 +57,7 @@ export function PhotoCropper({
           return;
         }
         bitmap.current = loaded;
+        setCoverScale(SIDE / Math.min(loaded.width, loaded.height));
         setZoom(1);
         setOffset({ x: 0, y: 0 });
         setReady(true);

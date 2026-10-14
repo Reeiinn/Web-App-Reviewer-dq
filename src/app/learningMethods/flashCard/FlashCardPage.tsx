@@ -531,7 +531,7 @@ function FlashCardContent() {
  * `card-text.tsx`'s alone.
  */
 function FitBox({
-  fit,
+  fit: { boxRef, contentRef, fontSize },
   children,
 }: {
   fit: FitText<HTMLSpanElement, HTMLSpanElement>;
@@ -539,12 +539,12 @@ function FitBox({
 }) {
   return (
     <span
-      ref={fit.boxRef}
+      ref={boxRef}
       className="flex min-h-0 w-full flex-1 items-center overflow-y-auto overscroll-contain"
     >
       <span
-        ref={fit.contentRef}
-        style={{ fontSize: `${fit.fontSize}px` }}
+        ref={contentRef}
+        style={{ fontSize: `${fontSize}px` }}
         className="block w-full"
       >
         {children}
