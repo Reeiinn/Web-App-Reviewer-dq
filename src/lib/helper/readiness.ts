@@ -21,3 +21,29 @@ export function readinessStatus(readiness: number): ReadinessStatus {
   if (readiness >= ON_TRACK_THRESHOLD) return "ON_TRACK";
   return "AT_RISK";
 }
+
+/** How much of one set of study items a reviewee has mastered. */
+export type MasteryCounts = { mastered: number; total: number };
+
+/** Share of a set mastered, nought for a set that holds nothing yet. */
+export const masteryPercent = ({ mastered, total }: MasteryCounts) =>
+  total > 0 ? Math.round((mastered / total) * 100) : 0;
+
+/**
+ * One track's own readiness: its three study modes weighed equally.
+ *
+ * Scoring a track against its own item count is what lets the roster show a
+ * reviewee 80% ready on VUL and 10% on IIAP rather than one blended number
+ * that hides which exam they are actually prepared for.
+ */
+export const trackReadiness = (counts: {
+  flashcards: MasteryCounts;
+  memorization: MasteryCounts;
+  practice: MasteryCounts;
+}) =>
+  Math.round(
+    (masteryPercent(counts.flashcards) +
+      masteryPercent(counts.memorization) +
+      masteryPercent(counts.practice)) /
+      3,
+  );

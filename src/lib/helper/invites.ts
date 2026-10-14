@@ -45,7 +45,7 @@ export function claimantMatches(
 /**
  * Whether this account may hand out an invite for that role.
  *
- * A Field Manager cannot mint peers: staff are appointed from above, and a
+ * A Unit Manager cannot mint peers: staff are appointed from above, and a
  * console that let one manager create another would put the shape of the
  * hierarchy in the hands of everyone in it.
  */
@@ -60,7 +60,7 @@ export function canInvite(
   if (role === "MANAGER" && senderRole !== "ADMIN") {
     return {
       ok: false,
-      error: "Only the Sales Manager can invite a Field Manager.",
+      error: "Only the Sales Manager can invite a Unit Manager.",
     };
   }
 
@@ -71,7 +71,7 @@ export function canInvite(
  * Who the new account reports to.
  *
  * A reviewee belongs to whoever recruited them — that link is the roster. A
- * Field Manager stands alone, like every other staff row, so the console reads
+ * Unit Manager stands alone, like every other staff row, so the console reads
  * them as a peer of the Sales Manager rather than a report.
  */
 export const managerForInvite = (role: InviteRole, invitedBy: string) =>

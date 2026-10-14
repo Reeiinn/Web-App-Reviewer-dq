@@ -74,7 +74,7 @@ export function TermsPage({ signedIn }: { signedIn: boolean }) {
         <p>
           You must be at least 18 and preparing for, or supporting someone
           preparing for, an insurance licensing examination. Reviewee accounts
-          are created by registering. Field Manager accounts exist only by
+          are created by registering. Unit Manager accounts exist only by
           invitation from the Sales Manager, and an invitation is for the person
           it was addressed to.
         </p>
@@ -97,7 +97,7 @@ export function TermsPage({ signedIn }: { signedIn: boolean }) {
 
       <InfoSection title="Your manager can see how you are doing">
         <p>
-          If a Field Manager is assigned to you, they can see your progress on
+          If a Unit Manager is assigned to you, they can see your progress on
           each track, when you were last active, and whether you have stalled,
           and they can send you a reminder. The Sales Manager can see the same
           across everyone. This is how the review programme is meant to work,

@@ -98,7 +98,7 @@ export type NudgeSender = { role: string; id: string };
  *
  * Staff receive no nudges — there is no bell on their navigation — so a nudge
  * aimed at one is refused rather than written to a row nobody will read. A
- * field manager reaches only their own reports, matching the roster they are
+ * unit manager reaches only their own reports, matching the roster they are
  * shown and the delete they are allowed.
  */
 export function canNudge(
@@ -185,7 +185,7 @@ export type SentNudge = { sender_id: string | null };
 /**
  * Whether this account may take back a reminder it can see.
  *
- * A field manager unsends their own only: two managers can share a reviewee
+ * A unit manager unsends their own only: two managers can share a reviewee
  * through a recruit and a reassignment, and one deleting the other's reminder
  * would be editing a conversation that is not theirs. The Sales Manager owns
  * the console outright and can clear any of them.

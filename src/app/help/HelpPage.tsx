@@ -44,14 +44,14 @@ const faqs = [
       "Open the menu behind your avatar in the top-right corner and choose 'Upload photo'. You can frame the crop before anything is saved.",
   },
   {
-    question: "I'm a Field Manager — where are my reviewees?",
+    question: "I'm a Unit Manager — where are my reviewees?",
     answer:
       "Staff accounts land on the Admin Console instead of a dashboard. Your reviewees, their progress, and the nudge you can send someone who has stalled all live there. Analytics is not shown to staff because it charts your own study, and staff accounts do not study.",
   },
   {
-    question: "How do I add a Field Manager?",
+    question: "How do I add a Unit Manager?",
     answer:
-      "Only the Sales Manager can. From Field Managers in the top nav, invite one by email address. If outbound mail is not configured, the invitation is still created and the link is handed back for you to send by hand.",
+      "Only the Sales Manager can. From Unit Managers in the top nav, invite one by email address. If outbound mail is not configured, the invitation is still created and the link is handed back for you to send by hand.",
   },
 ];
 
@@ -115,7 +115,7 @@ export function HelpPage({ signedIn }: { signedIn: boolean }) {
           ) : (
             <p className="mt-3 text-sm leading-6">
               A support address is being set up and will appear here. In the
-              meantime, reach out to your Field Manager — they can see your
+              meantime, reach out to your Unit Manager — they can see your
               progress and escalate anything the app is getting wrong.
             </p>
           )}

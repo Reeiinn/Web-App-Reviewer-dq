@@ -32,16 +32,16 @@ describe("claimantMatches", () => {
 });
 
 describe("canInvite", () => {
-  it("lets the Sales Manager invite a Field Manager", () => {
+  it("lets the Sales Manager invite a Unit Manager", () => {
     expect(canInvite("ADMIN", "MANAGER").ok).toBe(true);
   });
 
   // Staff are appointed from above, never sideways.
-  it("refuses a Field Manager inviting a peer", () => {
+  it("refuses a Unit Manager inviting a peer", () => {
     expect(canInvite("MANAGER", "MANAGER").ok).toBe(false);
   });
 
-  it("lets a Field Manager invite a reviewee", () => {
+  it("lets a Unit Manager invite a reviewee", () => {
     expect(canInvite("MANAGER", "USER").ok).toBe(true);
   });
 
@@ -72,7 +72,7 @@ describe("managerForInvite", () => {
     expect(managerForInvite("USER", "admin-1")).toBe("admin-1");
   });
 
-  it("leaves a Field Manager standing alone", () => {
+  it("leaves a Unit Manager standing alone", () => {
     expect(managerForInvite("MANAGER", "admin-1")).toBeNull();
   });
 });

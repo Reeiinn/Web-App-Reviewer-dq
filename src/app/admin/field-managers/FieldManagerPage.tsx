@@ -233,9 +233,9 @@ function ManagerCard({
         >
           {dormant && <AlertTriangle className="size-3" />}
           {leader
-            ? "Top field manager"
+            ? "Top unit manager"
             : dormant
-              ? "Dormant field manager"
+              ? "Dormant unit manager"
               : staffTitleFor("MANAGER")}
         </p>
 
@@ -426,9 +426,9 @@ export function FieldManagerPage() {
       <main className="mx-auto w-full max-w-[1500px] px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-extrabold">Field Manager Console</h1>
+            <h1 className="text-3xl font-extrabold">Unit Manager Console</h1>
             <span className="rounded-full bg-[#0B2340] px-3 py-1 text-xs font-bold text-[#FFD400]">
-              {counts.total} Field Managers
+              {counts.total} Unit Managers
             </span>
           </div>
 
@@ -437,7 +437,7 @@ export function FieldManagerPage() {
           <InviteFieldManager />
         </div>
         <p className="mt-1.5 max-w-[72ch] text-sm text-muted-foreground">
-          Every field manager ranked by how many reviewees they have recruited,
+          Every unit manager ranked by how many reviewees they have recruited,
           with their activity alongside so a quiet week is visible next to the
           count.
         </p>
@@ -445,7 +445,7 @@ export function FieldManagerPage() {
         {loading ? (
           <SummaryTilesSkeleton
             tiles={[
-              { label: "Field Managers", tone: "bg-muted" },
+              { label: "Unit Managers", tone: "bg-muted" },
               { label: "Active Today", tone: "bg-emerald-50" },
               { label: "Total Recruits", tone: "bg-[#FFF8D6]" },
               { label: "Inactive", tone: "bg-rose-50" },
@@ -454,7 +454,7 @@ export function FieldManagerPage() {
         ) : (
         <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryTile
-            label="Field Managers"
+            label="Unit Managers"
             value={counts.total}
             icon={Users}
             tone="bg-muted text-[#0B2340]"
@@ -506,7 +506,7 @@ export function FieldManagerPage() {
           />
 
           <label className="ml-auto text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            Search Field Manager
+            Search Unit Manager
             <div className="relative mt-1.5">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -529,10 +529,10 @@ export function FieldManagerPage() {
           <p className="mt-8 text-sm font-semibold text-destructive">{error}</p>
         ) : rows.length === 0 ? (
           <div className="rv-card mt-6 p-10 text-center">
-            <p className="font-bold">No field managers match these filters.</p>
+            <p className="font-bold">No unit managers match these filters.</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {managers.length === 0
-                ? "No field manager accounts have been created yet."
+                ? "No unit manager accounts have been created yet."
                 : deferredSearch.trim()
                   ? `Nothing matches "${deferredSearch.trim()}". Try a different name or email.`
                   : "Try clearing the activity filter."}
@@ -554,7 +554,7 @@ export function FieldManagerPage() {
               <p className="text-muted-foreground">
                 Showing {(currentPage - 1) * PAGE_SIZE + 1} to{" "}
                 {Math.min(currentPage * PAGE_SIZE, visible.length)} of{" "}
-                {visible.length} field managers
+                {visible.length} unit managers
               </p>
 
               <div className="flex items-center gap-2">

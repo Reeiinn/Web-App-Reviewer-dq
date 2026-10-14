@@ -14,7 +14,7 @@ export function RosterTableSkeleton({ isAdmin }: { isAdmin: boolean }) {
     "Reviewee / Candidate",
     ...(isAdmin ? ["Recruited By"] : []),
     "Overall Readiness",
-    "Flashcards Mastery",
+    "Mastery by Exam",
     "Memorize Acc.",
     "Practice Exams",
     "Activity",

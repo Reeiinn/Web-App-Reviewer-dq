@@ -176,7 +176,9 @@
   @media (hover: hover) {
     &:hover {
       translate: 0 -1px;
-      box-shadow: 0 4px 12px -4px rgb(11 35 64 / 0.45);
+      /* Read through a fallback rather than declared as a default, so
+         rv-press-soft can set it without the two racing on source order. */
+      box-shadow: var(--press-shadow, 0 4px 12px -4px rgb(11 35 64 / 0.45));
     }
   }
 
@@ -194,6 +196,13 @@
       scale: 1;
     }
   }
+}
+
+/* The same press, with the shadow scaled for a pale outline control instead of
+   a filled navy one. Under a chip the size of a table-row button, the default
+   45% reads as a smudge rather than a lift. */
+@utility rv-press-soft {
+  --press-shadow: 0 2px 6px -2px rgb(11 35 64 / 0.22);
 }
 
 /* ---------------------------------------------------------------------------
@@ -453,6 +462,53 @@
 
 .rv-pop-in {
   animation: rv-pop-in 220ms ease-out both;
+}
+
+/* ---------------------------------------------------------------------------
+   Onboarding tour click guard
+
+   Swallows every pointer event on the page while a tour is open, so the only
+   things that answer a press are the tour's own Back / Skip / Next. Without
+   it the highlighted control was still live: a first-timer could press the
+   very button being explained and navigate away mid-tour, leaving the
+   spotlight pointing at a screen that no longer held it.
+
+   It sits below the spotlight (which paints the scrim and the ring, and takes
+   no pointer events of its own) and below the tip, which has to stay
+   pressable. Wheel and touch scrolling still chain through to the page.
+   --------------------------------------------------------------------------- */
+.rv-tour-guard {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+}
+
+/* ---------------------------------------------------------------------------
+   Onboarding tour spotlight
+
+   The ring around whatever step a role's tour is pointing at. Position, size
+   and darkness are all one element: a huge box-shadow spread doubles as the
+   scrim over the rest of the page, so there is nothing separate to keep
+   aligned with the ring as the target moves between steps.
+   --------------------------------------------------------------------------- */
+.rv-tour-scrim {
+  position: fixed;
+  z-index: 55;
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+  box-shadow:
+    0 0 0 4000px rgb(11 35 64 / 55%),
+    0 0 0 3px #ffd400,
+    0 0 20px 2px rgb(255 212 0 / 55%);
+  transition:
+    top 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    left 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    width 320ms cubic-bezier(0.4, 0, 0.2, 1),
+    height 320ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
 @keyframes rv-streak-pulse {

@@ -18,8 +18,8 @@ Three roles, from one `users.role` column. The word on screen is not the enum:
 | Role      | Called        | Lands on     | Does                                              |
 | --------- | ------------- | ------------ | ------------------------------------------------- |
 | `USER`    | Reviewee      | `/dashboard` | Studies, sits practice exams, earns a certificate |
-| `MANAGER` | Field Manager | `/admin`     | Watches their own recruits, sends reminders       |
-| `ADMIN`   | Sales Manager | `/admin`     | Watches everybody, invites Field Managers         |
+| `MANAGER` | Unit Manager  | `/admin`     | Watches their own recruits, sends reminders       |
+| `ADMIN`   | Sales Manager | `/admin`     | Watches everybody, invites Unit Managers          |
 
 Staff accounts oversee rather than study: the roster only lists `USER` rows, so
 a manager working through a deck would build a learner record nobody can see.
@@ -52,10 +52,10 @@ a manager working through a deck would build a learner record nobody can see.
 
 - **Roster** (`/admin`) — readiness per reviewee, status filters, search,
   per-track practice exam results, and removal behind a typed confirmation
-- **Field Managers** (`/admin/field-managers`) — a ranked console of recruiters,
+- **Unit Managers** (`/admin/field-managers`) — a ranked console of recruiters,
   their intake, and how recently each was active
 - **Invitations** — a signup link a reviewee can be handed, or an addressed
-  invite emailed to a new Field Manager. Each link works once and expires in
+  invite emailed to a new Unit Manager. Each link works once and expires in
   seven days.
 - **Nudges** — a reminder sent to a reviewee's in-app notification bell, from a
   preset or written by hand
@@ -103,7 +103,7 @@ Create `.env.local`:
     UPSTASH_REDIS_REST_URL="https://....upstash.io"
     UPSTASH_REDIS_REST_TOKEN="..."
 
-    # Optional. Outbound mail, used for Field Manager invitations and password
+    # Optional. Outbound mail, used for Unit Manager invitations and password
     # resets. Without both, an invitation is still created and the link is
     # handed back in the dialog to send by hand.
     RESEND_API_KEY="re_..."
@@ -186,7 +186,7 @@ Everything else from `.env.local` belongs in the production environment too.
     src/
       app/
         (auth)/           → signup, forgot-password, reset-password
-        admin/            → staff roster and the Field Manager console
+        admin/            → staff roster and the Unit Manager console
         analytics/        → a reviewee's own progress across tracks
         certificates/     → issued certificates, and one certificate's page
         dashboard/        → track cards, study modes, quick access

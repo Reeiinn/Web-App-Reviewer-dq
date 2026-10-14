@@ -24,7 +24,7 @@ export async function GET() {
   // Every screen renders AppNav, and AppNav asks for this photo once per
   // visit, so this is the one request every signed-in account makes whatever
   // they came to do. Stamping here is what lets last_seen_at mean "opened the
-  // app" rather than "opened the console": a field manager who spends their
+  // app" rather than "opened the console": a unit manager who spends their
   // session in the glossary now reads as present, where before only loading
   // the roster counted.
   await touchLastSeen(session.user.id);

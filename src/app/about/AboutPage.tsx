@@ -35,14 +35,14 @@ const roles = [
       "The person studying. Works through the tracks, builds mastery, and sits practice exams.",
   },
   {
-    name: "Field Manager",
+    name: "Unit Manager",
     description:
       "Oversees a group of reviewees from the console: who is progressing, who has stalled, and a nudge to send when someone needs one.",
   },
   {
     name: "Sales Manager",
     description:
-      "Sees the whole organisation, appoints Field Managers by email invitation, and compares how each manager's group is doing.",
+      "Sees the whole organisation, appoints Unit Managers by email invitation, and compares how each manager's group is doing.",
   },
 ];
 

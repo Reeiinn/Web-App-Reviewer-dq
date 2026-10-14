@@ -1,5 +1,10 @@
 -- Remove exactly-duplicated questions.
 --
+-- SUPERSEDED for Traditional Life: 20.sql puts the removed copy back, because
+-- the source exam prints that question twice and the paper is meant to read as
+-- 50 items. Do not re-run this file against a database 20.sql has been applied
+-- to - it would take the 50th question away again.
+--
 -- Traditional Life carried 50 question rows against 49 flashcards and 49
 -- memorization items, because one question was inserted twice: same text, same
 -- four choices, same correct answer. /api/questions returns every row, so a

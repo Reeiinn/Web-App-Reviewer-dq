@@ -22,6 +22,10 @@ const getQuestions = unstable_cache(
               'text', c.text,
               'is_correct', c.is_correct
             )
+            -- The order the source exam prints the options in. Without it the
+            -- options come back in whatever order the planner produced, so the
+            -- A/B/C/D the exam page stamps on them moved between page loads.
+            ORDER BY c.sort_order
           ) FILTER (WHERE c.id IS NOT NULL), '[]'
         ) AS choices
       FROM questions q

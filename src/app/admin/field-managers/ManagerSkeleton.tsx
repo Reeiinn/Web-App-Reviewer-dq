@@ -1,7 +1,7 @@
 import { LoadingRegion, Skeleton } from "@/components/ui/skeleton";
 
 /**
- * A field manager card, still loading.
+ * A unit manager card, still loading.
  *
  * These cards are dark navy, so the placeholders are a white wash rather than
  * the paper-toned `bg-muted` every other skeleton uses — that fill would sit
@@ -40,7 +40,7 @@ function ManagerCardSkeleton() {
 export function ManagerGridSkeleton() {
   return (
     <LoadingRegion
-      label="Loading field managers"
+      label="Loading unit managers"
       className="mt-6 grid gap-4 xl:grid-cols-2"
     >
       {Array.from({ length: 4 }, (_, card) => (

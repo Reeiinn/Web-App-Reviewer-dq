@@ -18,7 +18,7 @@ export function Avatar({
   size?: string;
   /**
    * Border and fill. The default is the navy circle the reviewee table draws;
-   * the field manager cards pass their own so the ring can carry that
+   * the unit manager cards pass their own so the ring can carry that
    * account's activity.
    */
   className?: string;

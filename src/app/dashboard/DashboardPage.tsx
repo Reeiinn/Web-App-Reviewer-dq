@@ -11,6 +11,7 @@ import {
   passesLabel,
 } from "@/lib/helper/practice-exam";
 import { pickActiveTrack, type TrackActivity } from "@/lib/helper/active-track";
+import { OnboardingTour } from "@/components/ui/onboarding-tour";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import type { StudyMode } from "@/lib/types/study";
 import {
@@ -636,6 +637,8 @@ export function DashboardPage() {
         <AppNav />
       </div>
 
+      <OnboardingTour />
+
       <main className="rv-shell min-h-0 flex-1 overflow-clip py-4 sm:py-6">
         <h1 className="text-xl font-extrabold sm:text-2xl md:text-3xl">
           Welcome back, {firstName}.
@@ -665,9 +668,12 @@ export function DashboardPage() {
             >
               Exam Tracks
             </button>
+            {/* Tagged here as well as on the panel below: only one of the two
+                is ever on screen, and the tour points at whichever that is. */}
             <button
               role="tab"
               aria-selected={activeTab === "quick"}
+              data-tour="tour-quick"
               onClick={() => setActiveTab("quick")}
               className={`flex-1 rounded-md px-3 py-2 text-sm font-bold transition ${
                 activeTab === "quick"
@@ -692,6 +698,7 @@ export function DashboardPage() {
             `lg:hidden` no longer reaches it. */
         <div className="mt-4 lg:grid lg:grid-cols-[1.8fr_1fr] lg:gap-6">
           <div
+            data-tour="tour-tracks"
             className={activeTab === "tracks" ? undefined : "hidden lg:block"}
           >
             <ExamTracks
@@ -708,6 +715,7 @@ export function DashboardPage() {
           </div>
 
           <div
+            data-tour="tour-quick"
             className={activeTab === "quick" ? undefined : "hidden lg:block"}
           >
             <QuickAccess recent={recent} />

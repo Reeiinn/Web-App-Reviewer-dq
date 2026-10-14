@@ -7,7 +7,7 @@ import { Check, Copy, UserPlus } from "lucide-react";
 import { useState } from "react";
 
 /**
- * Appoints a Field Manager by email.
+ * Appoints a Unit Manager by email.
  *
  * The invite is bound to the address it is sent to, so the link cannot be
  * forwarded into a promotion. Only the Sales Manager sees this button, and the
@@ -87,16 +87,16 @@ export function InviteFieldManager({ onInvited }: { onInvited?: () => void }) {
     <AlertDialog.Root open={open} onOpenChange={close}>
       <AlertDialog.Trigger className="rv-press flex items-center gap-2 rounded-lg bg-[#0B2340] px-3 py-2 text-sm font-bold text-white hover:bg-[#0F2E4D]">
         <UserPlus className="size-4" />
-        Add Field Manager
+        Add Unit Manager
       </AlertDialog.Trigger>
 
       <AlertDialog.Portal>
         <DialogPanel animated>
           <AlertDialog.Title className="text-lg font-extrabold">
-            Add a Field Manager
+            Add a Unit Manager
           </AlertDialog.Title>
           <AlertDialog.Description className="mt-1 text-sm text-muted-foreground">
-            They get a signup link for a Field Manager account. It works once,
+            They get a signup link for a Unit Manager account. It works once,
             only from this address, and expires in 7 days.
           </AlertDialog.Description>
 

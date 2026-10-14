@@ -3,6 +3,7 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { DialogPanel } from "@/components/ui/dialog-panel";
 import { AppNav } from "@/components/ui/app-nav";
+import { OnboardingTour } from "@/components/ui/onboarding-tour";
 import { Avatar } from "@/components/ui/avatar";
 import {
   ButtonHoldAndRelease,
@@ -63,6 +64,16 @@ type ExamTrackResult = {
   passed: boolean;
 };
 
+/** One reviewee's standing on one track, scored against that track alone. */
+type ExamMastery = {
+  examType: ExamType;
+  /** The track's own readiness: its three study modes weighed equally. */
+  readiness: number;
+  flashcards: { mastered: number; total: number };
+  memorization: { mastered: number; total: number };
+  practice: { mastered: number; total: number };
+};
+
 type Reviewee = {
   id: string;
   name: string;
@@ -74,6 +85,8 @@ type Reviewee = {
   status: ReadinessStatus;
   flashcards: { mastered: number; total: number };
   memorize: { mastered: number; total: number; accuracy: number };
+  /** Per-track figures, so the roster can say which exam they are ready for. */
+  byExam: ExamMastery[];
   practice: { mastered: number; total: number };
   practiceExam: {
     taken: number;
@@ -151,12 +164,12 @@ function ExamResults({ reviewee }: { reviewee: Reviewee }) {
 
   return (
     <AlertDialog.Root>
-      <AlertDialog.Trigger className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-[#0B2340] transition hover:border-[#C9A227] hover:bg-[#FFF8D6]">
+      <AlertDialog.Trigger className="rv-press rv-press-soft rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-[#0B2340] hover:border-[#C9A227] hover:bg-[#FFF8D6]">
         View
       </AlertDialog.Trigger>
 
       <AlertDialog.Portal>
-        <DialogPanel width="30rem">
+        <DialogPanel width="30rem" animated>
           <AlertDialog.Title className="text-lg font-extrabold">
             Practice exams — {reviewee.name}
           </AlertDialog.Title>
@@ -204,9 +217,99 @@ function ExamResults({ reviewee }: { reviewee: Reviewee }) {
   );
 }
 
-function Meter({ value, tone }: { value: number; tone: string }) {
+/** Meter colour for a track, on the same thresholds as the roster's status. */
+const masteryTone = (readiness: number) =>
+  ({
+    EXAM_READY: "#10B981",
+    ON_TRACK: "#FFD400",
+    AT_RISK: "#E11D48",
+  })[readinessStatus(readiness)];
+
+/**
+ * A reviewee's mastery broken out per exam.
+ *
+ * The roster's headline number averages the four tracks, which cannot answer
+ * the question a manager actually asks — is this candidate ready to sit VUL?
+ * One percentage per track answers it; the counts under each bar say which
+ * study mode the percentage came from.
+ */
+function MasteryByExam({ reviewee }: { reviewee: Reviewee }) {
   return (
-    <div className="mt-1.5 h-1.5 w-28 overflow-hidden rounded-full bg-[#EFEAE0]">
+    <AlertDialog.Root>
+      <AlertDialog.Trigger className="rv-press rv-press-soft rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-[#0B2340] hover:border-[#C9A227] hover:bg-[#FFF8D6]">
+        View
+      </AlertDialog.Trigger>
+
+      <AlertDialog.Portal>
+        <DialogPanel width="32rem" animated>
+          <AlertDialog.Title className="text-lg font-extrabold">
+            Mastery by exam — {reviewee.name}
+          </AlertDialog.Title>
+          <AlertDialog.Description className="mt-1 text-sm text-muted-foreground">
+            Each percentage is that exam&apos;s own mastery — flashcards,
+            memorize and practice questions for that track. Overall:{" "}
+            {reviewee.readiness}%
+          </AlertDialog.Description>
+
+          <ul className="mt-4 flex flex-col gap-2">
+            {reviewee.byExam.map((exam) => (
+              <li
+                key={exam.examType}
+                className="rounded-xl border border-border px-4 py-3"
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-bold">{examLabels[exam.examType]}</p>
+                  <div className="flex shrink-0 items-baseline gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {statusLabels[readinessStatus(exam.readiness)]}
+                    </span>
+                    <span className="text-lg font-extrabold">
+                      {exam.readiness}%
+                    </span>
+                  </div>
+                </div>
+
+                <Meter
+                  value={exam.readiness}
+                  tone={masteryTone(exam.readiness)}
+                  full
+                />
+
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Flashcards {exam.flashcards.mastered}/{exam.flashcards.total}{" "}
+                  · Memorize {exam.memorization.mastered}/
+                  {exam.memorization.total} · Practice {exam.practice.mastered}/
+                  {exam.practice.total}
+                </p>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-6 flex justify-end">
+            <AlertDialog.Close className="rounded-lg border border-border px-3 py-2 text-sm font-bold transition hover:border-[#C9A227]">
+              Close
+            </AlertDialog.Close>
+          </div>
+        </DialogPanel>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
+  );
+}
+
+function Meter({
+  value,
+  tone,
+  full = false,
+}: {
+  value: number;
+  tone: string;
+  /** Fills its container instead of the table cell's fixed bar width. */
+  full?: boolean;
+}) {
+  return (
+    <div
+      className={`mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#EFEAE0] ${full ? "w-full" : "w-28"}`}
+    >
       <div
         className="h-full rounded-full"
         style={{ width: `${value}%`, background: tone }}
@@ -249,9 +352,12 @@ const samePhrase = (a: string, b: string) => tidy(a) === tidy(b);
 function NudgeReviewee({
   reviewee,
   onSent,
+  tourTarget = false,
 }: {
   reviewee: Reviewee;
   onSent: (message: string) => void;
+  /** Marks this row's trigger as the onboarding tour's "Nudge" stop. */
+  tourTarget?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -353,6 +459,7 @@ function NudgeReviewee({
     <AlertDialog.Root open={open} onOpenChange={close}>
       <AlertDialog.Trigger
         aria-label={`Send ${reviewee.name} a reminder`}
+        data-tour={tourTarget ? "tour-nudge" : undefined}
         className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-[#C9A227] hover:bg-[#FFF8D6] hover:text-[#0B2340]"
       >
         <Bell className="size-3.5" />
@@ -425,7 +532,7 @@ function NudgeReviewee({
                   and the composer off the screen. */}
               <ul className="mt-2 flex max-h-42 flex-col gap-2 overflow-y-auto overscroll-contain">
                 {sent.map((nudge) => {
-                  // A field manager unsends their own only; the Sales Manager
+                  // A unit manager unsends their own only; the Sales Manager
                   // owns the console and can clear any of them.
                   const mine =
                     viewer?.role === "ADMIN" || nudge.senderId === viewer?.id;
@@ -665,7 +772,7 @@ export function AdminPage() {
   // needs the column saying whose they are.
   const isAdmin = session?.user?.role === "ADMIN";
 
-  // "View recruits" on a field manager's card lands here carrying that
+  // "View recruits" on a unit manager's card lands here carrying that
   // manager's email. The roster already searches the recruiter's address for an
   // admin, so the link only has to seed the box the admin could have typed into
   // themselves — which leaves the filter visible, and clearable, rather than
@@ -764,6 +871,7 @@ export function AdminPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AppNav />
+      <OnboardingTour />
 
       <main className="mx-auto w-full max-w-[1500px] px-6 py-8">
         <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] lg:items-start">
@@ -886,7 +994,7 @@ export function AdminPage() {
           </div>
 
           <label className="ml-auto text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            {isAdmin ? "Search Reviewee or Field Manager" : "Search Reviewee"}
+            {isAdmin ? "Search Reviewee or Unit Manager" : "Search Reviewee"}
             <div className="relative mt-1.5">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -897,7 +1005,7 @@ export function AdminPage() {
                   setPage(1);
                 }}
                 placeholder={
-                  isAdmin ? "Name, email or field manager" : "Name or email"
+                  isAdmin ? "Name, email or unit manager" : "Name or email"
                 }
                 className="w-72 rounded-lg border border-border bg-card py-2 pl-9 pr-3 text-sm font-semibold text-foreground outline-none focus:border-[#0B2340]"
               />
@@ -923,7 +1031,7 @@ export function AdminPage() {
             </p>
           </div>
         ) : (
-          <div className="rv-card mt-6 overflow-hidden">
+          <div data-tour="tour-roster" className="rv-card mt-6 overflow-hidden">
             <div className="overflow-x-auto">
               {/* The Sales Manager's table carries an extra Recruited By
                   column, so it needs the wider floor before the cells start
@@ -937,7 +1045,7 @@ export function AdminPage() {
                       "Reviewee / Candidate",
                       ...(isAdmin ? ["Recruited By"] : []),
                       "Overall Readiness",
-                      "Flashcards Mastery",
+                      "Mastery by Exam",
                       "Memorize Acc.",
                       "Practice Exams",
                       "Activity",
@@ -956,7 +1064,7 @@ export function AdminPage() {
                 </thead>
 
                 <tbody>
-                  {rows.map((row) => (
+                  {rows.map((row, rowIndex) => (
                     <tr
                       key={row.id}
                       className="border-t border-border align-top"
@@ -1016,18 +1124,10 @@ export function AdminPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <p className="font-semibold">
-                          {row.flashcards.mastered} / {row.flashcards.total}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {row.flashcards.total
-                            ? Math.round(
-                                (row.flashcards.mastered /
-                                  row.flashcards.total) *
-                                  100,
-                              )
-                            : 0}
-                          % completed
+                        <MasteryByExam reviewee={row} />
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          {row.byExam.length} exam
+                          {row.byExam.length === 1 ? "" : "s"} tracked
                         </p>
                       </td>
 
@@ -1059,6 +1159,7 @@ export function AdminPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <NudgeReviewee
                             reviewee={row}
+                            tourTarget={rowIndex === 0}
                             onSent={(message) => setNotice(message)}
                           />
                           <RemoveReviewee

@@ -58,7 +58,7 @@ INSERT INTO flashcards (exam_type, category, front, back)
 SELECT 'TRADITIONAL_LIFE',
     'General',
     'An insurance company generally has the right to rescind a life insurance policy if',
-    'Company discovers during the contestable period that the application contains a material statement'
+    'Company discovers at any time that the policy owner was actually a minor at the time of application'
 WHERE NOT EXISTS (
         SELECT 1
         FROM flashcards
@@ -168,7 +168,7 @@ INSERT INTO flashcards (exam_type, category, front, back)
 SELECT 'TRADITIONAL_LIFE',
     'General',
     'Non-forfeiture provisions are included in whole life and endowment policies to assure the policyowner that certain minimum policy benefits shall remain with him even under certain changed conditions. Non-forfeiture values guarantee to the policyowner that',
-    'The face amount of the policy will remain the same even if the insured''s health becomes impaired'
+    'Any guaranteed policy values will belong to the policy owner even if premium payments are discounted'
 WHERE NOT EXISTS (
         SELECT 1
         FROM flashcards
@@ -178,13 +178,13 @@ WHERE NOT EXISTS (
 INSERT INTO flashcards (exam_type, category, front, back)
 SELECT 'TRADITIONAL_LIFE',
     'General',
-    'Notwithstanding various possible legal impediments, if the owner of an endowment at age 65 policy tells you that at maturity of the policy he wants to provide his church with a monthly donation for as long as the church exists, which option do you recommend?',
+    'Notwithstanding various possible legal impediments, if the owner of an endowment at age 65 policy tells you that the maturity of the policy he wants to provide his church with a monthly donation for as long as the church exists, which option do you recommend?',
     'Interest option'
 WHERE NOT EXISTS (
         SELECT 1
         FROM flashcards
         WHERE exam_type = 'TRADITIONAL_LIFE'
-          AND front = 'Notwithstanding various possible legal impediments, if the owner of an endowment at age 65 policy tells you that at maturity of the policy he wants to provide his church with a monthly donation for as long as the church exists, which option do you recommend?'
+          AND front = 'Notwithstanding various possible legal impediments, if the owner of an endowment at age 65 policy tells you that the maturity of the policy he wants to provide his church with a monthly donation for as long as the church exists, which option do you recommend?'
     );
 INSERT INTO flashcards (exam_type, category, front, back)
 SELECT 'TRADITIONAL_LIFE',
@@ -288,13 +288,13 @@ WHERE NOT EXISTS (
 INSERT INTO flashcards (exam_type, category, front, back)
 SELECT 'TRADITIONAL_LIFE',
     'General',
-    'True or False: A policy is still in force for the full face amount and will remain in force for a further period of four years and 118 days, without the payment of any premiums, has availed of the paid up insurance option.',
+    'True or False: A policy is still in force for the full face amount and will remain in force for a further period of four years and 118 days, without the payment of any premiums has availed of paid up insurance option.',
     'False'
 WHERE NOT EXISTS (
         SELECT 1
         FROM flashcards
         WHERE exam_type = 'TRADITIONAL_LIFE'
-          AND front = 'True or False: A policy is still in force for the full face amount and will remain in force for a further period of four years and 118 days, without the payment of any premiums, has availed of the paid up insurance option.'
+          AND front = 'True or False: A policy is still in force for the full face amount and will remain in force for a further period of four years and 118 days, without the payment of any premiums has availed of paid up insurance option.'
     );
 INSERT INTO flashcards (exam_type, category, front, back)
 SELECT 'TRADITIONAL_LIFE',
@@ -508,13 +508,13 @@ WHERE NOT EXISTS (
 INSERT INTO flashcards (exam_type, category, front, back)
 SELECT 'VUL',
     'General',
-    'The objective of satisfying customers need profitably can be achieved by an agent through I. The giving of freebies to the customers II. Extensive investment training by the company III. The use of sales plan, where sales goals, strategies, and objectives are coordinated with the market analysis, segmentation and training IV. The giving of monetary assistance and discount to the customers',
+    'The objective of satisfying customers need profitably can be achieved by and agent through I. The giving of freebies to the customers II. Extensive investment training by the company III. The use of sales plan, where sales goals, strategies, and objectives are coordinated with the market analysis, segmentation and training IV. The giving of monetary assistance and discount to the customers',
     'II & III'
 WHERE NOT EXISTS (
         SELECT 1
         FROM flashcards
         WHERE exam_type = 'VUL'
-          AND front = 'The objective of satisfying customers need profitably can be achieved by an agent through I. The giving of freebies to the customers II. Extensive investment training by the company III. The use of sales plan, where sales goals, strategies, and objectives are coordinated with the market analysis, segmentation and training IV. The giving of monetary assistance and discount to the customers'
+          AND front = 'The objective of satisfying customers need profitably can be achieved by and agent through I. The giving of freebies to the customers II. Extensive investment training by the company III. The use of sales plan, where sales goals, strategies, and objectives are coordinated with the market analysis, segmentation and training IV. The giving of monetary assistance and discount to the customers'
     );
 INSERT INTO flashcards (exam_type, category, front, back)
 SELECT 'VUL',
@@ -575,7 +575,7 @@ INSERT INTO flashcards (exam_type, category, front, back)
 SELECT 'VUL',
     'General',
     'What are the benefits available when investing in variable life funds? I. The variable life funds offer policyholders an access to pooled or diversified portfolios II. The variable life policyholders can vary his premium payments, take premium holidays, add single premium top-ups and change the level of the sum assured easily III. The variable life policyholder can have access to a pool of qualified and trained professional fund managers',
-    'I, II & III'
+    'I & II'
 WHERE NOT EXISTS (
         SELECT 1
         FROM flashcards
@@ -696,7 +696,7 @@ INSERT INTO flashcards (exam_type, category, front, back)
 SELECT 'VUL',
     'General',
     'Which of the following statements about single premium variable life policies are TRUE? I. There is no fixed term in a single premium variable life policy and therefore, they are technically whole life insurance II. Top-ups or single premium injections are allowed in these plans III. Policyholders have the flexibility of varying the level cover',
-    'I, II & III'
+    'I & II'
 WHERE NOT EXISTS (
         SELECT 1
         FROM flashcards
@@ -844,12 +844,12 @@ WITH new_memo AS (
     INSERT INTO memorization (exam_type, category, text)
     SELECT 'TRADITIONAL_LIFE',
         'General',
-        'An agent who determines a prospect''s complete financial requirements preparatory to offering him a policy using the correct selling approach is known as'
+        'An agent who determines a prospect''s complete financial requirements preparatory to offering him a policy using the correct selling approach knows as'
     WHERE NOT EXISTS (
             SELECT 1
             FROM memorization
             WHERE exam_type = 'TRADITIONAL_LIFE'
-              AND text = 'An agent who determines a prospect''s complete financial requirements preparatory to offering him a policy using the correct selling approach is known as'
+              AND text = 'An agent who determines a prospect''s complete financial requirements preparatory to offering him a policy using the correct selling approach knows as'
         )
     RETURNING id
 )
@@ -883,10 +883,10 @@ SELECT id,
     v.is_correct
 FROM new_memo,
     (
-        VALUES ('Company discovers at any time that the policy owner was actually a minor at the time of application', false),
+        VALUES ('Company discovers at any time that the policy owner was actually a minor at the time of application', true),
             ('Insured person intentionally kills himself during the suicide exclusion period specified in the policy', false),
             ('Insured person is killed in military action during the contestable period of the policy', false),
-            ('Company discovers during the contestable period that the application contains a material statement', true)
+            ('Company discovers during the contestable period that the application contains a material statement', false)
     ) AS v(text, is_correct);
 WITH new_memo AS (
     INSERT INTO memorization (exam_type, category, text)
@@ -1076,20 +1076,20 @@ SELECT id,
 FROM new_memo,
     (
         VALUES ('No death claim will be denied for any misstatement on the application', false),
-            ('Any guaranteed policy values will belong to the policy owner even if premium payments are discontinued', false),
-            ('The face amount of the policy will remain the same even if the insured''s health becomes impaired', true),
+            ('Any guaranteed policy values will belong to the policy owner even if premium payments are discounted', true),
+            ('The face amount of the policy will remain the same even if the insured''s health becomes impaired', false),
             ('The premium on the policy will remain the same even when another beneficiary is added to the policy', false)
     ) AS v(text, is_correct);
 WITH new_memo AS (
     INSERT INTO memorization (exam_type, category, text)
     SELECT 'TRADITIONAL_LIFE',
         'General',
-        'Notwithstanding various possible legal impediments, if the owner of an endowment at age 65 policy tells you that at maturity of the policy he wants to provide his church with a monthly donation for as long as the church exists, which option do you recommend?'
+        'Notwithstanding various possible legal impediments, if the owner of an endowment at age 65 policy tells you that the maturity of the policy he wants to provide his church with a monthly donation for as long as the church exists, which option do you recommend?'
     WHERE NOT EXISTS (
             SELECT 1
             FROM memorization
             WHERE exam_type = 'TRADITIONAL_LIFE'
-              AND text = 'Notwithstanding various possible legal impediments, if the owner of an endowment at age 65 policy tells you that at maturity of the policy he wants to provide his church with a monthly donation for as long as the church exists, which option do you recommend?'
+              AND text = 'Notwithstanding various possible legal impediments, if the owner of an endowment at age 65 policy tells you that the maturity of the policy he wants to provide his church with a monthly donation for as long as the church exists, which option do you recommend?'
         )
     RETURNING id
 )
@@ -1132,12 +1132,12 @@ WITH new_memo AS (
     INSERT INTO memorization (exam_type, category, text)
     SELECT 'TRADITIONAL_LIFE',
         'General',
-        'The basic coverage provided by life insurance policies may be supplemented by a separate provision that provides coverage for accidental amounts or of a different nature. Collectively these provisions are known as'
+        'The basic coverage provided by the life insurance policies may be supplemented by a separate provision that provides coverage for accidental amounts or of a different nature. Collectively these provisions are known as'
     WHERE NOT EXISTS (
             SELECT 1
             FROM memorization
             WHERE exam_type = 'TRADITIONAL_LIFE'
-              AND text = 'The basic coverage provided by life insurance policies may be supplemented by a separate provision that provides coverage for accidental amounts or of a different nature. Collectively these provisions are known as'
+              AND text = 'The basic coverage provided by the life insurance policies may be supplemented by a separate provision that provides coverage for accidental amounts or of a different nature. Collectively these provisions are known as'
         )
     RETURNING id
 )
@@ -1955,9 +1955,9 @@ SELECT id,
     v.is_correct
 FROM new_memo,
     (
-        VALUES ('I & II', false),
+        VALUES ('I & II', true),
             ('I & III', false),
-            ('I, II & III', true),
+            ('I, II & III', false),
             ('II & III', false)
     ) AS v(text, is_correct);
 WITH new_memo AS (
@@ -2194,9 +2194,9 @@ SELECT id,
     v.is_correct
 FROM new_memo,
     (
-        VALUES ('I, II & III', true),
+        VALUES ('I, II & III', false),
             ('II & III', false),
-            ('I & II', false),
+            ('I & II', true),
             ('I & III', false)
     ) AS v(text, is_correct);
 WITH new_memo AS (
