@@ -9,6 +9,7 @@ import {
   findSignInAccount,
   getAvatar,
   getSessionClaims,
+  isActiveRecruit,
   issueResetToken,
   markTourSeen,
   registerWithInvite,
@@ -350,4 +351,18 @@ describe("a busy pool", () => {
 
     expect(outcome.ok).toBe(true);
   }, 20_000);
+});
+
+describe("isActiveRecruit", () => {
+  it("is true only for an active recruit of that manager", async () => {
+    const manager = await user({ role: "MANAGER" });
+    const otherManager = await user({ role: "MANAGER" });
+    const recruit = await user({ managerId: manager.id });
+    const leaver = await user({ managerId: manager.id });
+    await softDelete(leaver.id);
+
+    expect(await isActiveRecruit(recruit.id, manager.id)).toBe(true);
+    expect(await isActiveRecruit(recruit.id, otherManager.id)).toBe(false);
+    expect(await isActiveRecruit(leaver.id, manager.id)).toBe(false);
+  });
 });
