@@ -1,8 +1,7 @@
 import { AppNav } from "@/components/ui/app-nav";
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
+import { findHeldCertificate } from "@/server/data/certificates";
 import { certificateImageSrc } from "@/lib/helper/certificate-image-src";
-import type { Certificate as CertificateRow } from "@/lib/types/attempt";
 import { examLabels } from "@/lib/types/common";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -27,17 +26,7 @@ export default async function Page({
 
   // Scoped to the holder in the query itself: a certificate belonging to
   // someone else should be indistinguishable from one that does not exist.
-  const result = await pool.query(
-    `SELECT c.id, c.exam_type, c.issued_at, c.certificate_no, u.name AS recipient
-       FROM certificates c
-       JOIN users u ON u.id = c.user_id
-      WHERE c.id = $1 AND c.user_id = $2`,
-    [id, session.user.id],
-  );
-
-  const certificate = result.rows[0] as
-    | (CertificateRow & { recipient: string })
-    | undefined;
+  const certificate = await findHeldCertificate(id, session.user.id);
   if (!certificate) {
     notFound();
   }
@@ -45,7 +34,7 @@ export default async function Page({
   // The holder's own name, off their user row — the same source the sheet
   // itself is rendered from, so the page and the image cannot disagree.
   const recipient = certificate.recipient;
-  const issued = new Date(certificate.issued_at).toLocaleDateString("en-PH", {
+  const issued = certificate.issuedAt.toLocaleDateString("en-PH", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -68,12 +57,12 @@ export default async function Page({
               All certificates
             </Link>
             <h1 className="mt-2 text-2xl font-extrabold">
-              {examLabels[certificate.exam_type]}
+              {examLabels[certificate.examType]}
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Issued {issued} ·{" "}
               <span className="tabular-nums">
-                {certificate.certificate_no}
+                {certificate.certificateNo}
               </span>
             </p>
           </div>
@@ -92,7 +81,7 @@ export default async function Page({
               loader would only re-encode it. */}
           <img
             src={certificateImageSrc(certificate.id)}
-            alt={`${examLabels[certificate.exam_type]} certificate awarded to ${recipient}`}
+            alt={`${examLabels[certificate.examType]} certificate awarded to ${recipient}`}
             className="block aspect-[1000/707] w-full"
           />
         </div>

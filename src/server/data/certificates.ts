@@ -74,3 +74,51 @@ export async function issueCertificate(
   });
   return existing ? asCertificate(existing) : null;
 }
+
+/** Every certificate a learner holds, newest first. */
+export async function listCertificates(userId: string): Promise<CertificateRecord[]> {
+  const rows = await prisma.certificate.findMany({
+    where: { userId },
+    orderBy: { issuedAt: "desc" },
+    select: certificateSelect,
+  });
+  return rows.map(asCertificate);
+}
+
+export type HeldCertificate = {
+  id: string;
+  examType: ExamType;
+  issuedAt: Date;
+  certificateNo: string;
+  recipient: string;
+};
+
+/**
+ * One certificate, only if userId holds it. Scoped to the holder in the
+ * query itself: someone else's certificate should be indistinguishable from
+ * one that does not exist. The name is the holder's own, off their user row.
+ */
+export async function findHeldCertificate(
+  id: string,
+  userId: string,
+): Promise<HeldCertificate | null> {
+  const row = await prisma.certificate.findFirst({
+    where: { id, userId },
+    select: {
+      id: true,
+      examType: true,
+      issuedAt: true,
+      certificateNo: true,
+      user: { select: { name: true } },
+    },
+  });
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    examType: row.examType as ExamType,
+    issuedAt: row.issuedAt,
+    certificateNo: row.certificateNo,
+    recipient: row.user.name,
+  };
+}
