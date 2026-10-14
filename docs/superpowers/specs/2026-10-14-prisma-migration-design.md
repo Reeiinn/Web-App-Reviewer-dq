@@ -20,7 +20,10 @@ These override anything else in this document.
 3. **Production is applied by Nelson, by hand,** from the checklist at the end
    of this document, after the PR is merged.
 4. **Commits are authored by Nelson alone,** with no co-author trailer.
-5. **Pull requests target `dev`,** never `main`.
+5. **Pull requests target `dev`,** never `main`. `main` is what production
+   runs, and the client is already using it; work reaches `main` only when
+   Nelson promotes `dev` himself. When opening a PR, check that its base
+   branch reads `dev` before submitting.
 
 ## Problem
 
