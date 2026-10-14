@@ -313,3 +313,24 @@ What implementing Wave 0 found, recorded so later waves start from it:
   connection and run for up to 10s, the `pg` pool's
   `connectionTimeoutMillis`. Prisma's default 2s wait turned a busy moment
   into a 500 on signup; a test holding both connections pins it.
+
+## After the waves: API reference for the frontend
+
+Once Wave 5 lands and `src/lib/db.ts` is gone, write
+`docs/superpowers/specs/<date>-api-reference.md`: the one document the
+frontend reads to know which endpoint to call. It is written then, not
+before, because Waves 2–5 delete and reshape routes as they go.
+
+For every route under `src/app/api` it lists:
+
+- method and path, and who may call it (signed in, role);
+- query parameters and request body, with which fields are required;
+- the response JSON, field by field, with types (timestamps are ISO
+  strings) and the status codes and error bodies it can answer with;
+- which page or component calls it today, and the shared type in
+  `src/lib/types` that describes it, if any.
+
+It is generated from the route handlers and their tests as they stand, not
+from this document, and it says which routes were deleted in the waves so
+nobody brings them back. Endpoints nothing in the frontend calls are listed
+as such.
