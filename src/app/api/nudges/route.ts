@@ -62,7 +62,8 @@ export async function PATCH(req: Request) {
     body = {};
   }
 
-  const one = typeof body.id === "string" ? body.id : null;
+  // An empty id marks everything, as the old truthiness check did.
+  const one = typeof body.id === "string" && body.id ? body.id : null;
 
   try {
     await markNudgesRead(session.user.id, one);

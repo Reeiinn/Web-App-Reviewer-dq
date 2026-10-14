@@ -61,6 +61,11 @@ describe("PATCH /api/nudges", () => {
     expect(markNudgesRead).toHaveBeenLastCalledWith("r1", null);
   });
 
+  it("marks all for an empty id, as the old falsy check did", async () => {
+    await patch({ id: "" });
+    expect(markNudgesRead).toHaveBeenLastCalledWith("r1", null);
+  });
+
   it("answers 500 when the write fails", async () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     markNudgesRead.mockRejectedValue(new Error("down"));
