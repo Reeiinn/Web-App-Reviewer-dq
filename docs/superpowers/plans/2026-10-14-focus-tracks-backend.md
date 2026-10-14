@@ -10,7 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-14-focus-tracks-backend-design.md` (and the ground rules in `docs/superpowers/specs/2026-10-14-prisma-migration-design.md`)
 
-**Prerequisite:** `docs/superpowers/plans/2026-10-14-prisma-wave-0-foundation.md` is complete: the Prisma client, `src/server/data/mastery.ts`, `src/lib/helper/track-counts.ts`, the db test harness and the delete-a-user test all exist.
+**Prerequisite:** the Prisma migration is complete (Waves 0–5, merged to `dev`). Everything this plan touches reads through Prisma: `src/server/data/mastery.ts`, `src/server/data/progress.ts` (streaks and recent activity), `src/lib/helper/track-counts.ts`, the db test harness and the delete-a-user test all exist. `src/lib/db.ts`, the `_lib/*-store.ts` files and the `scripts/parity/` scripts are gone.
+
+**Revised 2026-10-15** after Waves 2–5: Task 6 now changes `src/server/data/progress.ts` (the `pg` stores it named were deleted in Wave 2), and Task 8 pins "no selection reads as all four" with a db test instead of the deleted parity script.
 
 ## Global Constraints
 
@@ -45,8 +47,8 @@
 | `src/server/data/focus-tracks.ts` | `getFocusTracks`, `getFocusTracksFor`, `setFocusTracks` |
 | `src/app/api/user/focus-tracks/route.ts` | GET/PUT settings endpoint |
 | `src/app/api/progress/route.ts`, `src/app/api/_lib/mastery.ts` | Filter to focus |
-| `src/app/api/recent-activity/route.ts`, `src/app/api/_lib/recent-activity-store.ts` | Filter in SQL before LIMIT |
-| `src/app/api/streaks/route.ts`, `src/app/api/_lib/streak-store.ts` | Filter to focus |
+| `src/app/api/recent-activity/route.ts`, `src/server/data/progress.ts` (`fetchRecent`) | Filter in the query before the limit |
+| `src/app/api/streaks/route.ts`, `src/server/data/progress.ts` (`fetchStreaks`) | Filter to focus |
 | `src/app/api/admin/reviewees/route.ts` | Per-reviewee focus scoring, `focusTracks` field |
 | `src/server/db/user-delete.db.test.ts` | Adds the new table to the cascade check |
 
@@ -691,12 +693,12 @@ git commit -m "feat: scope the dashboard summary and eligibility to focus tracks
 ### Task 6: Scope Quick Access and streaks
 
 **Files:**
-- Modify: `src/app/api/_lib/recent-activity-store.ts` (`fetchRecent`), `src/app/api/recent-activity/route.ts`, `src/app/api/_lib/streak-store.ts` (`fetchStreaks`), `src/app/api/streaks/route.ts`
-- Test: `src/app/api/_lib/recent-activity-store.db.test.ts`, `src/app/api/streaks/route.test.ts`
+- Modify: `src/server/data/progress.ts` (`fetchRecent`, `fetchStreaks`), `src/app/api/recent-activity/route.ts`, `src/app/api/streaks/route.ts`
+- Test: `src/server/data/progress.db.test.ts` (extend), `src/app/api/streaks/route.test.ts`
 
 **Interfaces:**
 - Consumes: `getFocusTracks` (Task 3).
-- Produces: `fetchRecent(userId: string, limit: number, tracks: readonly ExamType[]): Promise<RecentActivityRow[]>`; `fetchStreaks(userId: string, tracks: readonly ExamType[]): Promise<StreakRow[]>`. These stores stay on `pg` until Wave 2.
+- Produces: `fetchRecent(userId: string, limit: number, tracks: readonly ExamType[]): Promise<RecentActivityRow[]>`; `fetchStreaks(userId: string, tracks: readonly ExamType[]): Promise<StreakRow[]>`.
 
 - [ ] **Step 1: Check other callers**
 
@@ -706,11 +708,13 @@ Expected: only the two routes. If anything else calls them, pass it `examTypes` 
 - [ ] **Step 2: Write the failing tests**
 
 ```ts
-// src/app/api/_lib/recent-activity-store.db.test.ts
+// src/server/data/progress.db.test.ts — add as its own describe block, with
+// whatever imports the file doesn't already have. Check the fixture names
+// in src/test/db-fixtures.ts before using them.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import prisma from "@/server/db/prisma";
 import { createUser, deleteUsers } from "@/test/db-fixtures";
-import { fetchRecent } from "./recent-activity-store";
+import { fetchRecent } from "./progress";
 
 let userId: string;
 
@@ -747,8 +751,6 @@ describe("fetchRecent", () => {
 });
 ```
 
-(`src/lib/db.ts` reads `DATABASE_URL`, which the db project points at the test database, so the `pg` store runs against it too.)
-
 ```ts
 // src/app/api/streaks/route.test.ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -760,7 +762,7 @@ const { auth, fetchStreaks, getFocusTracks } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
-vi.mock("@/app/api/_lib/streak-store", () => ({ fetchStreaks }));
+vi.mock("@/server/data/progress", () => ({ fetchStreaks }));
 vi.mock("@/server/data/focus-tracks", () => ({ getFocusTracks }));
 
 import { GET } from "./route";
@@ -795,7 +797,7 @@ Run: `pnpm test:db` → the `fetchRecent` focus test FAILS (5 rows' newest three
 
 - [ ] **Step 4: Implement**
 
-`src/app/api/_lib/recent-activity-store.ts`: import `type ExamType` from `@/lib/types/common` if it isn't already, and change `fetchRecent`:
+`src/server/data/progress.ts`, `fetchRecent`:
 
 ```ts
 export async function fetchRecent(
@@ -804,13 +806,12 @@ export async function fetchRecent(
   /** Only these tracks; filtered before the limit so Quick Access still fills. */
   tracks: readonly ExamType[],
 ): Promise<RecentActivityRow[]> {
-  const result = await pool.query(
-    `SELECT exam_type, mode, visited_at FROM recent_activity
-     WHERE user_id = $1 AND exam_type = ANY($3::exam_type[])
-     ORDER BY visited_at DESC
-     LIMIT $2`,
-    [userId, limit, tracks],
-  );
+  const rows = await prisma.recentActivity.findMany({
+    where: { userId, examType: { in: [...tracks] } },
+    orderBy: { visitedAt: "desc" },
+    take: limit,
+    select: { examType: true, mode: true, visitedAt: true },
+  });
 ```
 
 (The mapping below it is unchanged.)
@@ -824,21 +825,20 @@ export async function fetchRecent(
     );
 ```
 
-`src/app/api/_lib/streak-store.ts`, `fetchStreaks`:
+`src/server/data/progress.ts`, `fetchStreaks`:
 
 ```ts
 export async function fetchStreaks(
   userId: string,
   tracks: readonly ExamType[],
 ): Promise<StreakRow[]> {
-  const result = await pool.query(
-    `SELECT exam_type, current_streak, best_streak, last_answer_at
-     FROM study_streaks WHERE user_id = $1 AND exam_type = ANY($2::exam_type[])`,
-    [userId, tracks],
-  );
+  const rows = await prisma.studyStreak.findMany({
+    where: { userId, examType: { in: [...tracks] } },
+    select: { examType: true, currentStreak: true, bestStreak: true, lastAnswerAt: true },
+  });
 ```
 
-(Import `type ExamType` if needed; the mapping is unchanged.)
+(The mapping is unchanged.)
 
 `src/app/api/streaks/route.ts`: add the `getFocusTracks` import and use:
 
@@ -854,7 +854,7 @@ Run: `pnpm test` → PASS. Run: `pnpm test:db` → PASS. Run: `pnpm typecheck` �
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/app/api/_lib/recent-activity-store.ts src/app/api/_lib/recent-activity-store.db.test.ts src/app/api/recent-activity src/app/api/_lib/streak-store.ts src/app/api/streaks
+git add src/server/data/progress.ts src/server/data/progress.db.test.ts src/app/api/recent-activity src/app/api/streaks
 git commit -m "feat: scope Quick Access and streaks to focus tracks"
 ```
 
@@ -976,28 +976,36 @@ git commit -m "feat: score each reviewee on their own focus tracks in the roster
 ### Task 8: Verify "no selection changes nothing", then open the PR
 
 **Files:**
-- Modify: `scripts/parity/mastery-parity.ts`
+- Test: `src/server/data/focus-tracks.db.test.ts` (from Task 3; extend)
 
 **Interfaces:**
-- Consumes: `getFocusTracks` (Task 3); the parity script (Wave 0).
+- Consumes: `getFocusTracks`, `getFocusTracksFor` (Task 3).
 
-- [ ] **Step 1: Add the focus check to the parity script**
+The parity scripts were deleted in Wave 5, so this is pinned by a db test
+rather than a run over the production restore.
 
-Inside `main()`, after the eligibility comparison loop and before the roster block, add:
+- [ ] **Step 1: Pin "no selection reads as all four"**
+
+Add to `src/server/data/focus-tracks.db.test.ts` (if Task 3 already covers
+both cases, skip this step):
 
 ```ts
-  const { getFocusTracks } = await import("../../src/server/data/focus-tracks");
-  let withFocus = 0;
-  for (const userId of users) {
-    const focus = await getFocusTracks(userId);
-    if (focus.chosen) {
-      withFocus++;
-      continue;
+  it("reads a user with no rows as all four, alone and in a batch", async () => {
+    const { id } = await createUser();
+    try {
+      expect(await getFocusTracks(id)).toEqual({ tracks: [...examTypes], chosen: false });
+      expect((await getFocusTracksFor([id])).get(id)).toEqual({
+        tracks: [...examTypes],
+        chosen: false,
+      });
+    } finally {
+      await deleteUsers(id);
     }
-    same(`no selection reads as all four ${userId}`, [...examTypes], focus.tracks);
-  }
-  console.log(`${withFocus} users have a focus selection; the rest must read as all four.`);
+  });
 ```
+
+On the untouched local copy, a read-only
+`SELECT count(*) FROM user_focus_tracks;` must return 0.
 
 - [ ] **Step 2: Run everything**
 
@@ -1005,7 +1013,6 @@ Inside `main()`, after the eligibility comparison loop and before the roster blo
 - `pnpm lint`: no new errors
 - `pnpm test`: pass
 - `pnpm test:db`: pass
-- `pnpm parity`: `0 differences`, and `0 users have a focus selection` on the untouched local copy
 - `pnpm build`: succeeds
 
 Manual check with `pnpm dev` against the local copy, signed in as a seeded reviewee:
@@ -1020,12 +1027,12 @@ Take screenshots of steps 1, 3 and 4 with the built-in browser.
 - [ ] **Step 3: Commit and open the PR**
 
 ```bash
-git add scripts/parity/mastery-parity.ts
+git add src/server/data/focus-tracks.db.test.ts
 git commit -m "test: check that reviewees with no focus selection read as all four"
 git push origin nelson
 ```
 
-If the Wave 0 PR into `dev` is **still open**, these commits join it. Ask Nelson whether to wait for that merge, or to put this work on its own branch (`git switch -c nelson-focus-tracks`) and open a separate PR. Then:
+If the Wave 5 PR into `dev` is **still open**, these commits join it. Ask Nelson whether to wait for that merge, or to put this work on its own branch (`git switch -c nelson-focus-tracks`) and open a separate PR. Then:
 
 ```bash
 gh pr create --base dev --title "Focus tracks (backend)" --body-file <scratchpad>/pr-body.md
@@ -1041,7 +1048,7 @@ Implements docs/superpowers/specs/2026-10-14-focus-tracks-backend-design.md. Bac
 - Dashboard summary, eligibility (all-tracks form), Quick Access and streaks list only focus tracks. Endpoints given an explicit track still serve any track.
 - Roster scores each reviewee on their own focus tracks and adds `focusTracks` to each row; `?exam_type=X` still zooms everyone to X.
 
-Verification: typecheck, lint, unit + db tests, `pnpm parity` (0 differences; 0 users with a selection), build, manual check with screenshots.
+Verification: typecheck, lint, unit + db tests, build, manual check with screenshots.
 
 **Production (Nelson, after merge):** backup; `ALLOW_REMOTE_MIGRATE=1 MIGRATE_DATABASE_URL=<railway> pnpm exec prisma migrate deploy` (creates one empty table); confirm /dashboard and /admin are unchanged. Rollback: `DROP TABLE user_focus_tracks;`.
 ```

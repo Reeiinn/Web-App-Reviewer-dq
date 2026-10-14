@@ -5,9 +5,3 @@ export const studyModes: readonly StudyMode[] = [
 	"memorize",
 	"practice",
 ];
-
-export const modeLabels: Record<StudyMode, string> = {
-	flashcard: "Flashcard",
-	memorize: "Memorize",
-	practice: "Practice",
-};

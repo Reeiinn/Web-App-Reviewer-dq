@@ -17,7 +17,13 @@ import type { Question } from "@/lib/types/questions";
 import { Award, Lock } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { PracticeExamBodySkeleton } from "./PracticeExamSkeleton";
 import { fresh } from "@/lib/helper/fetch-fresh";
 import { resendAnswers } from "@/lib/helper/exam-submit";
@@ -200,9 +206,12 @@ function PracticeExamContent() {
 
   /** Questions whose save has not come back yet, re-sent at submit. */
   const unsaved = useRef<Set<string>>(new Set());
-  /** The current answers, readable inside a fetch callback. */
+  /** The current answers, readable inside a fetch callback. Updated in the
+      same commit as the render, before any response can come back. */
   const answersRef = useRef(answers);
-  answersRef.current = answers;
+  useLayoutEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   useEffect(() => {
     let active = true;

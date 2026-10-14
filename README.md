@@ -71,7 +71,7 @@ a manager working through a deck would build a learner record nobody can see.
 
 - **Framework:** Next.js 16 (App Router), React 19
 - **Database:** PostgreSQL, hosted on [Railway](https://railway.com)
-- **DB Client:** [`pg`](https://node-postgres.com/) — raw SQL, no ORM
+- **DB Client:** [Prisma](https://www.prisma.io/) 7, on the `pg` driver adapter
 - **Auth:** [Auth.js v5](https://authjs.dev/) — Credentials provider, JWT sessions
 - **Styling:** Tailwind CSS, [Base UI](https://base-ui.com/) primitives
 - **Rate limiting:** Upstash Redis, applied in middleware
@@ -83,7 +83,7 @@ a manager working through a deck would build a learner record nobody can see.
 
 ### 1. Install dependencies
 
-    npm install
+    pnpm install
 
 ### 2. Set up environment variables
 
@@ -149,7 +149,7 @@ in `src/migration/archive/` for history.
 
 ### 4. Run the development server
 
-    npm run dev
+    pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) to view the app.
 
@@ -157,19 +157,19 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 
 | Command              | Does                                             |
 | -------------------- | ------------------------------------------------ |
-| `npm run dev`        | Development server                               |
-| `npm run build`      | Production build                                 |
-| `npm test`           | Unit tests, once                                 |
-| `npm run test:watch` | Vitest, watching                                 |
+| `pnpm dev`           | Development server                               |
+| `pnpm build`         | Production build                                 |
+| `pnpm test`          | Unit tests, once                                 |
+| `pnpm test:watch`    | Vitest, watching                                 |
 | `pnpm test:db`       | Data-layer tests against `TEST_DATABASE_URL` (rebuilt each run) |
 | `pnpm migrate`       | Apply pending Prisma migrations to `MIGRATE_DATABASE_URL`; local only unless `ALLOW_REMOTE_MIGRATE=1` |
-| `pnpm parity`        | Compare the old mastery SQL with the new module on the local database |
 
 Two seeding scripts exist for looking at screens that are otherwise a long way
-in. Both write real rows the app reads back through its own rules:
+in. Both write real rows the app reads back through its own rules, into
+`MIGRATE_DATABASE_URL`, and refuse any database that is not local:
 
-    node scripts/seed-vul-mastery.cjs <email> [EXAM_TYPE]
-    node scripts/seed-practice-passes.cjs <email> [EXAM_TYPE] [--fresh]
+    pnpm seed:mastery <email> [EXAM_TYPE]
+    pnpm seed:passes <email> [EXAM_TYPE] [--fresh]
 
 The first masters a track's decks so its practice exam unlocks; the second fills
 in the five passing sittings a certificate needs.
@@ -207,13 +207,16 @@ Everything else from `.env.local` belongs in the production environment too.
       components/ui/      → shared components
       lib/
         auth.ts           → Auth.js setup; auth.config.ts is the edge-safe half
-        db.ts             → shared Postgres pool
         mailer.ts         → Resend over fetch
         helper/           → the rules, unit-tested away from the pages
         types/            → shared TypeScript types
         validation/       → zod schemas
+      server/
+        db/prisma.ts      → the one Prisma client
+        data/             → every query, one module per domain
       middleware.ts       → auth gate, rate limiting, security headers
-      migration/          → numbered SQL migrations
+      migration/archive/  → the hand-applied SQL from before Prisma
+    prisma/               → schema, migrations, glossary seed
     assets/fonts/         → the faces the certificate PNG is rendered in
     public/certificate-art/ → the signature and phoenix the sheet places
 
@@ -224,11 +227,13 @@ and `attempts` for studying and sitting exams; `progress`, `streaks`,
 
 ## Notes
 
-- No ORM — every query is raw SQL through `pg`, with hand-written migrations.
+- Every query lives in `src/server/data/`, through Prisma. Routes and pages
+  call those modules; none builds a query itself. The mastery counts are two
+  SQL views, read only by `src/server/data/mastery.ts`.
 - Auth is Auth.js v5, Credentials provider, JWT sessions. No session table.
 - The rules live in `src/lib/helper/` rather than in the pages, so eligibility,
   streaks, readiness, resume behaviour and the rest are tested directly. Run
-  `npm test`.
+  `pnpm test`.
 - API responses are `no-store`. They are per-learner and behind auth, so caching
   them once served one learner's answers to the next.
 

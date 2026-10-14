@@ -11,10 +11,7 @@ import { createWriteQueue } from "@/lib/helper/session-writes";
 import type { SavedSession } from "@/lib/helper/study-session";
 import { useFitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
-import type {
-  MemorizationProgressResponse,
-  MemorizationQuestion,
-} from "@/lib/types/memo";
+import type { MemorizationQuestion } from "@/lib/types/memo";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { MemorizationBodySkeleton } from "./MemorizationSkeleton";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,7 +65,8 @@ function MemorizationContent() {
   /** Answers timed in this sitting: a resumed one has no clock for the rest. */
   const [timedCount, setTimedCount] = useState(0);
 
-  const questionShownAt = useRef<number>(Date.now());
+  // Set when the questions load, before anything can be timed against it.
+  const questionShownAt = useRef(0);
   const verdictTimer = useRef<number | null>(null);
 
   /** Saves and clearings of the sitting, in the order this page issued them. */
@@ -200,7 +198,11 @@ function MemorizationContent() {
 
   // Refits when the question changes, and again when the window resizes, so
   // the card never needs a scrollbar of its own.
-  const fit = useFitText<HTMLDivElement, HTMLDivElement>(
+  const {
+    boxRef: fitBoxRef,
+    contentRef: fitContentRef,
+    fontSize: fitFontSize,
+  } = useFitText<HTMLDivElement, HTMLDivElement>(
     `${question?.id ?? ""}:${question?.choices.length ?? 0}`,
   );
 
@@ -461,12 +463,12 @@ function MemorizationContent() {
                   size below is an em of the fitted base, so a long question
                   scales itself down rather than scrolling the screen away. */}
               <div
-                ref={fit.boxRef}
+                ref={fitBoxRef}
                 className="mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"
               >
                 <div
-                  ref={fit.contentRef}
-                  style={{ fontSize: fit.fontSize }}
+                  ref={fitContentRef}
+                  style={{ fontSize: fitFontSize }}
                   className="my-auto w-full"
                 >
                   <h2 className="text-[1.3em] font-extrabold leading-[1.4]">

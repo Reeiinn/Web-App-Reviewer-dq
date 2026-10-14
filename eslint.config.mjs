@@ -8,7 +8,7 @@ import next from "eslint-config-next";
  * eslint-config-next ships flat config, so it is imported rather than bridged
  * through FlatCompat.
  */
-export default [
+const config = [
   {
     ignores: [
       ".next/**",
@@ -25,13 +25,13 @@ export default [
       /*
        * The React Compiler rules, reporting rather than failing.
        *
-       * They arrived with this config on code that predates them, and they
-       * flag sixteen places across the study screens, the roster and the photo
-       * cropper — reads of a ref during render, and state set from an effect.
-       * Every one is worth working through, and none of them is a bug today:
-       * failing the build on them would mean either a sweeping refactor of the
-       * screens in the same breath as wiring up a linter, or the linter being
-       * switched off again. They stay visible instead, and come down over time.
+       * They arrived with this config on code that predates them. The reads
+       * of a ref during render have been worked through; four places still
+       * set state from an effect on purpose (the photo cropper's portal
+       * mount, the roster's loading flag, the dashboard menu closing, the
+       * practice exam's one-shot scroll). Rewriting those changes when the
+       * screens render, so they stay visible as warnings rather than failing
+       * the build.
        */
       "react-hooks/refs": "warn",
       "react-hooks/set-state-in-effect": "warn",
@@ -39,3 +39,5 @@ export default [
     },
   },
 ];
+
+export default config;

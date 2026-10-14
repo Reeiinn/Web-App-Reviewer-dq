@@ -1,7 +1,7 @@
 /**
  * Whether a Postgres URL points at this machine.
  *
- * The Prisma CLI, the test setup and the parity script all run against a
+ * The Prisma CLI, the test setup and the seed scripts all run against a
  * database here and never against Railway. Checking the host rather than
  * trusting a variable name is what stops a copied line from pointing a reset
  * at production.

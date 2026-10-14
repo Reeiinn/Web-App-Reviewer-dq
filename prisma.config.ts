@@ -1,9 +1,8 @@
-import { config } from "dotenv";
 import { defineConfig } from "prisma/config";
+import { loadLocalEnv } from "./src/server/db/local-env";
 import { assertLocalDatabase } from "./src/server/db/local-guard";
 
-// Only .env.local, never .env: the database URLs for this tooling live there.
-config({ path: ".env.local" });
+loadLocalEnv();
 
 /**
  * The CLI reads MIGRATE_DATABASE_URL and nothing else, so a migrate or reset

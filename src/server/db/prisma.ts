@@ -8,17 +8,19 @@ declare global {
 }
 
 /**
- * One client per server instance, cached on the global in every environment
- * for the same reason src/lib/db.ts caches its pool: a deploy that evaluates
- * this module more than once would otherwise open a fresh set of connections
- * each time.
+ * One client per server instance, cached on the global in every environment.
+ * This module is evaluated once per module graph, and a deploy that loads it
+ * more than once — a serverless function per route, a dev server rebuilding
+ * on save — would otherwise open a fresh set of connections each time and
+ * leave the old ones idle against the database's own connection limit.
  *
- * `max: 3` while src/lib/db.ts (max 2) still exists beside it, so the two
- * pools together hold no more than the old pool's 5. Since Wave 2 the
- * study routes, the bulk of the traffic, and every session refresh read
- * through this client, so it holds the larger share. Restored to 5 when
- * db.ts is removed.
+ * `max` is kept small for the same reason: Postgres counts connections per
+ * server, not per app, so a handful of instances at the pg default of 10
+ * each is enough to exhaust a managed database's limit. This is the app's
+ * only pool, so it holds the 5 the old pg pool did.
  */
+export const POOL_MAX = 5;
+
 function createClient() {
   const connectionString = process.env.DATABASE_URL ?? "";
   const adapter = new PrismaPg({
@@ -33,7 +35,7 @@ function createClient() {
     // every timestamp read or written through Prisma is off by that zone.
     // Pinning the session to UTC makes the offset zero and the bug moot.
     options: "-c TimeZone=UTC",
-    max: 3,
+    max: POOL_MAX,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
   });

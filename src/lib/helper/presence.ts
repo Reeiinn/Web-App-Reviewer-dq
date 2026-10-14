@@ -15,13 +15,6 @@ export const presenceLabels: Record<PresenceStatus, string> = {
   INACTIVE: "Inactive",
 };
 
-/** Tailwind classes for each presence pill, matching the roster status pills. */
-export const presenceStyles: Record<PresenceStatus, string> = {
-  ACTIVE: "border-emerald-300 bg-emerald-50 text-emerald-700",
-  IDLE: "border-amber-300 bg-amber-50 text-amber-700",
-  INACTIVE: "border-slate-300 bg-slate-50 text-slate-700",
-};
-
 /**
  * How recently a staff account last opened the app.
  *
