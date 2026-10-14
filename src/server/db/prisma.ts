@@ -13,9 +13,9 @@ declare global {
  * this module more than once would otherwise open a fresh set of connections
  * each time.
  *
- * `max: 3` while src/lib/db.ts still exists beside it, so the two pools
- * together hold no more connections than the old one did alone. Restored to
- * 5 when db.ts is removed.
+ * `max: 2` while src/lib/db.ts (max 3) still exists beside it, so the two
+ * pools together hold no more than the old pool's 5. Raised as routes move
+ * here, and restored to 5 when db.ts is removed.
  */
 function createClient() {
   const connectionString = process.env.DATABASE_URL ?? "";
@@ -31,7 +31,7 @@ function createClient() {
     // every timestamp read or written through Prisma is off by that zone.
     // Pinning the session to UTC makes the offset zero and the bug moot.
     options: "-c TimeZone=UTC",
-    max: 3,
+    max: 2,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
   });
