@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
-import { recordAdminAction } from "@/app/api/_lib/audit-store";
-import { touchLastSeen } from "@/app/api/_lib/presence-store";
+import { recordAdminAction, touchLastSeen } from "@/server/data/staff";
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 

@@ -10,7 +10,7 @@ import { findSignInAccount } from "@/server/data/users";
 // that comes back must be one the automatic sign-in can open.
 const { auth } = vi.hoisted(() => ({ auth: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ auth }));
-vi.mock("@/app/api/_lib/presence-store", () => ({ touchLastSeen: vi.fn() }));
+vi.mock("@/server/data/staff", () => ({ touchLastSeen: vi.fn() }));
 vi.mock("@/lib/mailer", () => ({
   sendMail: vi.fn().mockResolvedValue({ sent: false, reason: "not-configured" }),
   mailerConfigured: () => false,

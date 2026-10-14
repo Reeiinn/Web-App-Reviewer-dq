@@ -1,4 +1,4 @@
-import { touchLastSeen } from "@/app/api/_lib/presence-store";
+import { touchLastSeen } from "@/server/data/staff";
 import { auth } from "@/lib/auth";
 import { getAvatar, setAvatar } from "@/server/data/users";
 import { NextResponse } from "next/server";

@@ -10,7 +10,7 @@ const { auth, query, getTrackCountsFor, touchLastSeen } = vi.hoisted(() => ({
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("@/lib/db", () => ({ default: { query } }));
 vi.mock("@/server/data/mastery", () => ({ getTrackCountsFor }));
-vi.mock("@/app/api/_lib/presence-store", () => ({ touchLastSeen }));
+vi.mock("@/server/data/staff", () => ({ touchLastSeen }));
 
 import { buildTrackCounts, type ProgressRow } from "@/lib/helper/track-counts";
 import { examTypes, type ExamType } from "@/lib/types/common";

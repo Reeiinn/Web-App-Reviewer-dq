@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { touchLastSeen } from "@/app/api/_lib/presence-store";
+import { touchLastSeen } from "@/server/data/staff";
 import pool from "@/lib/db";
 import {
   canDeleteNudge,

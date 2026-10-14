@@ -10,7 +10,7 @@ const { auth, emailHasAccount, createInvite, sendMail, mailerConfigured } =
   }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
-vi.mock("@/app/api/_lib/presence-store", () => ({ touchLastSeen: vi.fn() }));
+vi.mock("@/server/data/staff", () => ({ touchLastSeen: vi.fn() }));
 vi.mock("@/server/data/users", () => ({ emailHasAccount, createInvite }));
 vi.mock("@/lib/mailer", () => ({ sendMail, mailerConfigured }));
 
