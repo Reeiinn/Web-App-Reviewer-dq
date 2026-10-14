@@ -1,41 +1,14 @@
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
+import { isExamType, type ExamType } from "@/lib/types/common";
+import { listGlossary } from "@/server/data/content";
 import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
 
+// Search happens on the glossary page, over the whole list, so this route
+// only ever filters by track. `details` (examples, key points) is what the
+// term cards render beneath the definition.
 const getVocabulary = unstable_cache(
-  async (examType: string | null, query: string | null) => {
-    const conditions: string[] = [];
-    const values: string[] = [];
-
-    if (examType) {
-      values.push(examType);
-      conditions.push(`exam_type = $${values.length}`);
-    }
-
-    if (query?.trim()) {
-      values.push(`%${query.trim()}%`);
-      // Examples and key points are searchable too, so "trust" finds the term
-      // whose example mentions one even though its definition does not.
-      conditions.push(
-        `(term ILIKE $${values.length}
-          OR definition ILIKE $${values.length}
-          OR details::text ILIKE $${values.length})`,
-      );
-    }
-
-    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-
-    const result = await pool.query(
-      `SELECT id, exam_type, term, definition
-       FROM vocabulary_terms
-       ${where}
-       ORDER BY term ASC`,
-      values,
-    );
-
-    return result.rows;
-  },
+  async (examType: ExamType | null) => listGlossary(examType),
   ["vocabulary"],
   { tags: ["vocabulary"] },
 );
@@ -47,13 +20,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const examType = searchParams.get("exam_type");
-  const query = searchParams.get("q")?.trim().toLowerCase() ?? null;
+  const examType = new URL(req.url).searchParams.get("exam_type") || null;
+
+  if (examType !== null && !isExamType(examType)) {
+    return NextResponse.json({ error: "exam_type is invalid" }, { status: 400 });
+  }
 
   try {
-    const rows = await getVocabulary(examType, query);
-    return NextResponse.json(rows);
+    return NextResponse.json(await getVocabulary(examType));
   } catch (error) {
     console.error("Error fetching glossary terms:", error);
 

@@ -13,12 +13,11 @@ declare global {
  * this module more than once would otherwise open a fresh set of connections
  * each time.
  *
- * `max: 2` while src/lib/db.ts (max 3) still exists beside it, so the two
- * pools together hold no more than the old pool's 5. Since Wave 1 every
- * auth() call refreshes the session here (one primary-key read), but each
- * request still makes more queries through db.ts than through this client,
- * so the split stays 3 + 2 until the study routes move in Wave 2 and it
- * becomes 2 + 3. Restored to 5 when db.ts is removed.
+ * `max: 3` while src/lib/db.ts (max 2) still exists beside it, so the two
+ * pools together hold no more than the old pool's 5. Since Wave 2 the
+ * study routes, the bulk of the traffic, and every session refresh read
+ * through this client, so it holds the larger share. Restored to 5 when
+ * db.ts is removed.
  */
 function createClient() {
   const connectionString = process.env.DATABASE_URL ?? "";
@@ -34,7 +33,7 @@ function createClient() {
     // every timestamp read or written through Prisma is off by that zone.
     // Pinning the session to UTC makes the offset zero and the bug moot.
     options: "-c TimeZone=UTC",
-    max: 2,
+    max: 3,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
   });

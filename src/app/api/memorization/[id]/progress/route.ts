@@ -1,7 +1,11 @@
 // app/api/memorization/[id]/progress/route.ts
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
-import { applyStreak } from "@/app/api/_lib/streak-store";
+import {
+  applyStreak,
+  choiceBelongsTo,
+  findMemorizationTrack,
+  recordMemorizationAnswer,
+} from "@/server/data/progress";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -33,67 +37,46 @@ export async function POST(
       );
     }
 
-    // Confirm the memorization item exists
-    const itemCheck = await pool.query(
-      `SELECT id, exam_type FROM memorization WHERE id = $1`,
-      [memorizationId],
-    );
+    const examType = await findMemorizationTrack(memorizationId);
 
-    if (itemCheck.rows.length === 0) {
+    if (!examType) {
       return NextResponse.json(
         { error: "Memorization item not found" },
         { status: 404 },
       );
     }
 
-    // Confirm the selected choice belongs to this memorization item
-    const choiceCheck = await pool.query(
-      `SELECT id FROM memorization_choices WHERE id = $1 AND memorization_id = $2`,
-      [selected_choice_id, memorizationId],
-    );
-
-    if (choiceCheck.rows.length === 0) {
+    if (!(await choiceBelongsTo(selected_choice_id, memorizationId))) {
       return NextResponse.json(
         { error: "Choice not found for this memorization item" },
         { status: 404 },
       );
     }
 
-    // Mastery only ever goes up: an item mastered once stays mastered, even if
-    // a later pass gets it wrong. It used to take EXCLUDED.mastered outright,
-    // so every re-run traded newly-learnt items for freshly-missed ones and the
-    // count sat still — a learner could work through the deck repeatedly and
-    // watch "memorize (16/49)" never move, with the practice exam demanding all
-    // 49 be right in a single pass. is_correct still records the last answer,
-    // so the sitting itself is unchanged.
-    const result = await pool.query(
-      `INSERT INTO memorization_progress
-        (user_id, memorization_id, selected_choice_id, is_correct, reviewed_at, mastered)
-       VALUES ($1, $2, $3, $4, now(), $5)
-       ON CONFLICT (user_id, memorization_id)
-       DO UPDATE SET
-         selected_choice_id = EXCLUDED.selected_choice_id,
-         is_correct = EXCLUDED.is_correct,
-         reviewed_at = now(),
-         mastered = memorization_progress.mastered OR EXCLUDED.mastered
-       RETURNING *`,
-      [
-        session.user.id,
-        memorizationId,
-        selected_choice_id,
-        is_correct,
-        mastered,
-      ],
-    );
+    // Mastery only ever goes up (see recordMemorizationAnswer): a learner
+    // working through the deck again watches the count rise rather than
+    // trade newly-learnt items for freshly-missed ones.
+    const answer = await recordMemorizationAnswer({
+      userId: session.user.id,
+      memorizationId,
+      selectedChoiceId: selected_choice_id,
+      isCorrect: is_correct,
+      mastered,
+    });
 
     // Returned with the answer so the client can celebrate without a second call.
-    const streak = await applyStreak(
-      session.user.id,
-      itemCheck.rows[0].exam_type,
-      is_correct,
-    );
+    const streak = await applyStreak(session.user.id, examType, is_correct);
 
-    return NextResponse.json({ ...result.rows[0], streak });
+    return NextResponse.json({
+      id: answer.id,
+      user_id: answer.userId,
+      memorization_id: answer.memorizationId,
+      selected_choice_id: answer.selectedChoiceId,
+      is_correct: answer.isCorrect,
+      reviewed_at: answer.reviewedAt,
+      mastered: answer.mastered,
+      streak,
+    });
   } catch (error) {
     console.error("Error submitting memorization review:", error);
     return NextResponse.json(
