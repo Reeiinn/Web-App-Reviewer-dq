@@ -11,10 +11,7 @@ import { createWriteQueue } from "@/lib/helper/session-writes";
 import type { SavedSession } from "@/lib/helper/study-session";
 import { useFitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
-import type {
-  MemorizationProgressResponse,
-  MemorizationQuestion,
-} from "@/lib/types/memo";
+import type { MemorizationQuestion } from "@/lib/types/memo";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { MemorizationBodySkeleton } from "./MemorizationSkeleton";
 import { Skeleton } from "@/components/ui/skeleton";

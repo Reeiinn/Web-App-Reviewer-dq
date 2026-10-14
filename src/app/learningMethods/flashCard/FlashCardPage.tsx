@@ -18,10 +18,7 @@ import {
 } from "@/lib/helper/study-session";
 import { useFitText, type FitText } from "@/lib/helper/use-fit-text";
 import { examLabels, parseExamType, type ExamType } from "@/lib/types/common";
-import type {
-  Flashcard,
-  FlashcardProgressResponse,
-} from "@/lib/types/flashcard";
+import type { Flashcard } from "@/lib/types/flashcard";
 import {
   Check,
   ChevronLeft,
