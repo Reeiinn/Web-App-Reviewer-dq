@@ -1,77 +1,12 @@
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
-import { Flashcard } from "@/lib/types/flashcard";
+import { isExamType, type ExamType } from "@/lib/types/common";
+import { listFlashcards } from "@/server/data/content";
 import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
 
 const getFlashcards = unstable_cache(
-  async (examType: string | null, category: string | null) => {
-    let query = `
-      SELECT
-        f.id,
-        f.exam_type,
-        f.category,
-        f.front,
-        f.back,
-        COALESCE(
-          (
-            SELECT json_agg(
-              json_build_object('id', c.id, 'text', c.text)
-              -- c.id is a random uuid, so ordering on it dealt the options in
-              -- a different order per card. sort_order is the exam's own.
-              ORDER BY c.sort_order
-            )
-            FROM choices c
-            WHERE c.question_id = q.id
-          ), '[]'
-        ) AS choices
-      FROM flashcards f
-      LEFT JOIN LATERAL (
-        SELECT q.id
-        FROM questions q
-        WHERE q.exam_type = f.exam_type
-          AND q.text = f.front
-          AND (
-            (
-              SELECT count(*)
-              FROM questions dup
-              WHERE dup.exam_type = f.exam_type
-                AND dup.text = f.front
-            ) = 1
-            OR EXISTS (
-              SELECT 1
-              FROM choices c
-              WHERE c.question_id = q.id
-                AND c.is_correct
-                AND c.text = f.back
-            )
-          )
-        LIMIT 1
-      ) q ON true
-    `;
-
-    const conditions: string[] = [];
-    const values: string[] = [];
-
-    if (examType) {
-      values.push(examType);
-      conditions.push(`f.exam_type = $${values.length}`);
-    }
-
-    if (category) {
-      values.push(category);
-      conditions.push(`f.category = $${values.length}`);
-    }
-
-    if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(" AND ")}`;
-    }
-
-    query += ` ORDER BY f.category ASC`;
-
-    const result = await pool.query<Flashcard>(query, values);
-    return result.rows;
-  },
+  async (examType: ExamType | null, category: string | null) =>
+    listFlashcards({ examType, category }),
   ["flashcards"],
   { tags: ["flashcards"] },
 );
@@ -84,8 +19,12 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const examType = searchParams.get("exam_type");
+  const examType = searchParams.get("exam_type") || null;
   const category = searchParams.get("category");
+
+  if (examType !== null && !isExamType(examType)) {
+    return NextResponse.json({ error: "exam_type is invalid" }, { status: 400 });
+  }
 
   try {
     const rows = await getFlashcards(examType, category);
