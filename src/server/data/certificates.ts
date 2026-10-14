@@ -34,6 +34,9 @@ const asCertificate = (row: CertificateRow): CertificateRecord => ({
   examType: row.examType as ExamType,
 });
 
+/** How many numbers to draw before giving up; a clash on six hex digits is rare. */
+const NUMBER_DRAWS = 3;
+
 /**
  * The certificate a user holds for a track, issuing it if the track has just
  * been cleared.
@@ -42,37 +45,42 @@ const asCertificate = (row: CertificateRow): CertificateRecord => ({
  * sitting after it, so it has to be idempotent. The unique key on
  * (user_id, exam_type) is what makes it safe: of two requests racing, one
  * inserts and the other hits the key (P2002) and reads the row that won.
+ * A P2002 with no row to read back was a clash on certificate_no instead,
+ * so another number is drawn.
  */
 export async function issueCertificate(
   userId: string,
   examType: ExamType,
 ): Promise<CertificateRecord | null> {
-  const issuedAt = new Date();
-  try {
-    const created = await prisma.certificate.create({
-      data: {
-        userId,
-        examType,
-        issuedAt,
-        certificateNo: certificateNumber(examType, issuedAt, randomUUID()),
-      },
+  for (let draw = 1; ; draw++) {
+    const issuedAt = new Date();
+    try {
+      const created = await prisma.certificate.create({
+        data: {
+          userId,
+          examType,
+          issuedAt,
+          certificateNo: certificateNumber(examType, issuedAt, randomUUID()),
+        },
+        select: certificateSelect,
+      });
+      return asCertificate(created);
+    } catch (error) {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== "P2002"
+      ) {
+        throw error;
+      }
+    }
+
+    const existing = await prisma.certificate.findUnique({
+      where: { userId_examType: { userId, examType } },
       select: certificateSelect,
     });
-    return asCertificate(created);
-  } catch (error) {
-    if (
-      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-      error.code !== "P2002"
-    ) {
-      throw error;
-    }
+    if (existing) return asCertificate(existing);
+    if (draw >= NUMBER_DRAWS) return null;
   }
-
-  const existing = await prisma.certificate.findUnique({
-    where: { userId_examType: { userId, examType } },
-    select: certificateSelect,
-  });
-  return existing ? asCertificate(existing) : null;
 }
 
 /** Every certificate a learner holds, newest first. */

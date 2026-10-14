@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import prisma from "@/server/db/prisma";
 import {
   createQuestion,
@@ -341,5 +341,29 @@ describe("completeAttempt", () => {
 
     expect(passes).toBe(2);
     expect(await passCount(s.me.id)).toEqual({ passCount: 2 });
+  });
+});
+
+describe("one clock", () => {
+  it("stamps started_at and completed_at from the app's clock, not two", async () => {
+    const s = await sitting(1);
+    await prisma.examAttempt.update({
+      where: { id: s.attempt.id },
+      data: { completedAt: new Date() },
+    });
+
+    // Only Date is faked, so Prisma's own timers keep running.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2031-03-01T00:00:00.000Z"));
+    try {
+      const { attempt } = await openAttempt(s.me.id, "VUL");
+      expect(attempt.startedAt.toISOString()).toBe("2031-03-01T00:00:00.000Z");
+
+      await answer({ ...s, attempt }, 0, true);
+      const { attempt: done } = await completeAttempt(attempt.id);
+      expect(done.completedAt!.getTime()).toBeGreaterThanOrEqual(done.startedAt.getTime());
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

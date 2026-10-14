@@ -1,4 +1,11 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
+
+// Lets a test choose the next uuids the module draws; empty, it is the real one.
+const { nextUuids } = vi.hoisted(() => ({ nextUuids: [] as string[] }));
+vi.mock("node:crypto", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:crypto")>();
+  return { ...actual, randomUUID: () => nextUuids.shift() ?? actual.randomUUID() };
+});
 import prisma from "@/server/db/prisma";
 import { createUser, deleteUsers } from "@/test/db-fixtures";
 import { findHeldCertificate, issueCertificate, listCertificates } from "./certificates";
@@ -92,5 +99,23 @@ describe("reading certificates", () => {
 
     expect(await findHeldCertificate(issued!.id, stranger.id)).toBeNull();
     expect(await findHeldCertificate("00000000-0000-4000-8000-000000000000", holder.id)).toBeNull();
+  });
+});
+
+describe("a certificate number that is already taken", () => {
+  it("draws another number instead of leaving the learner without a certificate", async () => {
+    const earlier = await user();
+    const me = await user();
+    nextUuids.push("abcdef00-0000-4000-8000-000000000000");
+    const taken = await issueCertificate(earlier.id, "VUL");
+
+    // The same suffix again, then a fresh one.
+    nextUuids.push("abcdef00-0000-4000-8000-000000000000", "123456ff-0000-4000-8000-000000000000");
+    const mine = await issueCertificate(me.id, "VUL");
+
+    expect(mine).not.toBeNull();
+    expect(mine!.userId).toBe(me.id);
+    expect(mine!.certificateNo).not.toBe(taken!.certificateNo);
+    expect(mine!.certificateNo).toMatch(/-VUL-123456$/);
   });
 });
