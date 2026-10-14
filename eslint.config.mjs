@@ -16,6 +16,7 @@ export default [
       "next-env.d.ts",
       "scripts/**",
       "src/generated/**",
+      "src/migration/archive/**",
     ],
   },
   ...next,
