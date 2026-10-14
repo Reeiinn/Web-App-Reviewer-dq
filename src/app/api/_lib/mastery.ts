@@ -1,14 +1,13 @@
-import pool from "@/lib/db";
 import { deriveEligibility } from "@/lib/helper/eligibility";
+import { eligibleTracks } from "@/lib/helper/track-counts";
+import type { ExamType } from "@/lib/types/common";
 import type { Eligibility } from "@/lib/types/eligibility";
+import { getTrackCount, getTrackCounts } from "@/server/data/mastery";
 
 /**
- * Mastery counts for one user on every track at once.
- *
- * The dashboard shows four tracks and used to ask about them one at a time:
- * four requests, each running two counting queries, for one screen. The counts
- * group by exam_type in the database instead, which is two queries whatever the
- * app grows to.
+ * Practice-exam eligibility for every track with decks, keyed by exam_type.
+ * The counts come from the mastery views, the same ones the dashboard and the
+ * roster read.
  *
  * A track with no material of one kind still answers — zero of zero, which
  * deriveEligibility already refuses to call a qualification.
@@ -16,98 +15,23 @@ import type { Eligibility } from "@/lib/types/eligibility";
 export async function fetchAllEligibility(
   userId: string,
 ): Promise<Record<string, Eligibility>> {
-  const [flashcards, memorization] = await Promise.all([
-    pool.query(
-      `SELECT f.exam_type,
-              COUNT(f.id) AS total,
-              COUNT(fp.id) FILTER (WHERE fp.mastered = true) AS mastered
-       FROM flashcards f
-       LEFT JOIN flashcard_progress fp
-         ON fp.flashcard_id = f.id AND fp.user_id = $1
-       GROUP BY f.exam_type`,
-      [userId],
-    ),
-    pool.query(
-      `SELECT m.exam_type,
-              COUNT(m.id) AS total,
-              COUNT(mp.id) FILTER (WHERE mp.mastered = true) AS mastered
-       FROM memorization m
-       LEFT JOIN memorization_progress mp
-         ON mp.memorization_id = m.id AND mp.user_id = $1
-       GROUP BY m.exam_type`,
-      [userId],
-    ),
-  ]);
-
-  const counts = (
-    rows: { exam_type: string; total: string; mastered: string }[],
-  ) =>
-    new Map(
-      rows.map((row) => [
-        row.exam_type,
-        { mastered: Number(row.mastered), total: Number(row.total) },
-      ]),
-    );
-
-  const byTrack = {
-    flashcards: counts(flashcards.rows),
-    memorization: counts(memorization.rows),
-  };
-
-  const empty = { mastered: 0, total: 0 };
-  const tracks = new Set([
-    ...byTrack.flashcards.keys(),
-    ...byTrack.memorization.keys(),
-  ]);
-
+  const tracks = eligibleTracks(await getTrackCounts(userId));
   return Object.fromEntries(
-    [...tracks].map((examType) => [
-      examType,
-      deriveEligibility(
-        byTrack.flashcards.get(examType) ?? empty,
-        byTrack.memorization.get(examType) ?? empty,
-      ),
+    tracks.map((t) => [
+      t.examType,
+      deriveEligibility(t.flashcards, t.memorization),
     ]),
   );
 }
 
 /**
- * The same counts for one named track, for the practice-exam gate, which only
- * ever asks about the track someone is trying to sit.
+ * The same for one named track, for the practice-exam gate, which only ever
+ * asks about the track someone is trying to sit.
  */
 export async function fetchEligibility(
   userId: string,
-  examType: string,
+  examType: ExamType,
 ): Promise<Eligibility> {
-  const [flashcards, memorization] = await Promise.all([
-    pool.query(
-      `SELECT COUNT(f.id) AS total,
-              COUNT(fp.id) FILTER (WHERE fp.mastered = true) AS mastered
-       FROM flashcards f
-       LEFT JOIN flashcard_progress fp
-         ON fp.flashcard_id = f.id AND fp.user_id = $1
-       WHERE f.exam_type = $2`,
-      [userId, examType],
-    ),
-    pool.query(
-      `SELECT COUNT(m.id) AS total,
-              COUNT(mp.id) FILTER (WHERE mp.mastered = true) AS mastered
-       FROM memorization m
-       LEFT JOIN memorization_progress mp
-         ON mp.memorization_id = m.id AND mp.user_id = $1
-       WHERE m.exam_type = $2`,
-      [userId, examType],
-    ),
-  ]);
-
-  return deriveEligibility(
-    {
-      mastered: Number(flashcards.rows[0].mastered),
-      total: Number(flashcards.rows[0].total),
-    },
-    {
-      mastered: Number(memorization.rows[0].mastered),
-      total: Number(memorization.rows[0].total),
-    },
-  );
+  const t = await getTrackCount(userId, examType);
+  return deriveEligibility(t.flashcards, t.memorization);
 }

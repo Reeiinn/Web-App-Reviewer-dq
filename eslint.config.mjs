@@ -10,7 +10,14 @@ import next from "eslint-config-next";
  */
 export default [
   {
-    ignores: [".next/**", "node_modules/**", "next-env.d.ts", "scripts/**"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "next-env.d.ts",
+      "scripts/**",
+      "src/generated/**",
+      "src/migration/archive/**",
+    ],
   },
   ...next,
   {

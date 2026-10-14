@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { fetchAllEligibility, fetchEligibility } from "@/app/api/_lib/mastery";
+import { isExamType } from "@/lib/types/common";
 import { NextResponse } from "next/server";
 
 /**
@@ -15,6 +16,13 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const examType = searchParams.get("exam_type");
+
+  if (examType !== null && !isExamType(examType)) {
+    return NextResponse.json(
+      { error: "exam_type is invalid" },
+      { status: 400 },
+    );
+  }
 
   try {
     // No track named means every track, keyed by exam_type. The dashboard shows

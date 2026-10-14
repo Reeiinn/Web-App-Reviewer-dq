@@ -25,3 +25,6 @@ tsconfig.tsbuildinfo
 # npm lockfile: this repo uses pnpm (see packageManager in package.json).
 # A stray npm install produces a second React copy and breaks every client route.
 package-lock.json
+
+# Prisma's generated client; rebuilt by `prisma generate` on install
+src/generated/

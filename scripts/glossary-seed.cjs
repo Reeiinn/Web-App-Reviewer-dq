@@ -5,7 +5,8 @@
 // the document worth studying. Each term now carries a short definition plus a
 // `details` object holding the parts that were being lost.
 //
-// Required by scripts/migrate.cjs, which upserts these on `(exam_type, term)`.
+// Read by prisma/seed.ts (`prisma db seed`), which upserts these on
+// `(exam_type, term)`.
 
 module.exports = [
   {

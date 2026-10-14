@@ -1,121 +1,39 @@
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
+import type { MasteryCounts } from "@/lib/helper/readiness";
 import { PASSES_REQUIRED, cappedPasses } from "@/lib/helper/practice-exam";
+import { getTrackCounts } from "@/server/data/mastery";
 import { NextResponse } from "next/server";
+
+/** Unrounded share mastered; the overall figure averages these before rounding. */
+const share = ({ mastered, total }: MasteryCounts) =>
+  total > 0 ? (mastered / total) * 100 : 0;
 
 export async function GET() {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.id;
 
   try {
-    const query = `
-      WITH flashcard_stats AS (
-        SELECT 
-          f.exam_type,
-          COUNT(f.id) AS total,
-          COUNT(fp.id) FILTER (WHERE fp.mastered = true) AS mastered
-        FROM flashcards f
-        LEFT JOIN flashcard_progress fp 
-          ON fp.flashcard_id = f.id AND fp.user_id = $1
-        GROUP BY f.exam_type
-      ),
-      memorization_stats AS (
-        SELECT 
-          m.exam_type,
-          COUNT(m.id) AS total,
-          COUNT(mp.id) FILTER (WHERE mp.mastered = true) AS mastered
-        FROM memorization m
-        LEFT JOIN memorization_progress mp 
-          ON mp.memorization_id = m.id AND mp.user_id = $1
-        GROUP BY m.exam_type
-      ),
-      question_stats AS (
-        SELECT 
-          q.exam_type,
-          COUNT(q.id) AS total,
-          COUNT(qp.id) FILTER (WHERE qp.mastered = true) AS mastered
-        FROM questions q
-        LEFT JOIN question_progress qp 
-          ON qp.question_id = q.id AND qp.user_id = $1
-        GROUP BY q.exam_type
-      ),
-      -- Passing sittings per track: what the x / 5 counter reads, and the
-      -- only thing that decides whether a track is passed.
-      exam_pass_stats AS (
-        SELECT exam_type, COUNT(*) AS passes
-        FROM exam_attempts
-        WHERE user_id = $1 AND passed = true AND completed_at IS NOT NULL
-        GROUP BY exam_type
-      ),
-      activity_stats AS (
-        SELECT exam_type, MAX(reviewed_at) AS last_activity_at
-        FROM (
-          SELECT f.exam_type, fp.reviewed_at
-          FROM flashcard_progress fp
-          JOIN flashcards f ON f.id = fp.flashcard_id
-          WHERE fp.user_id = $1
-          UNION ALL
-          SELECT m.exam_type, mp.reviewed_at
-          FROM memorization_progress mp
-          JOIN memorization m ON m.id = mp.memorization_id
-          WHERE mp.user_id = $1
-          UNION ALL
-          SELECT q.exam_type, qp.last_reviewed_at
-          FROM question_progress qp
-          JOIN questions q ON q.id = qp.question_id
-          WHERE qp.user_id = $1
-        ) reviews
-        GROUP BY exam_type
-      )
-      SELECT
-        COALESCE(f.exam_type, m.exam_type, q.exam_type) AS exam_type,
-        a.last_activity_at,
-        COALESCE(f.total, 0) AS flashcard_total,
-        COALESCE(f.mastered, 0) AS flashcard_mastered,
-        COALESCE(m.total, 0) AS memorize_total,
-        COALESCE(m.mastered, 0) AS memorize_mastered,
-        COALESCE(q.total, 0) AS practice_total,
-        COALESCE(q.mastered, 0) AS practice_mastered,
-        COALESCE(p.passes, 0) AS exam_passes
-      FROM flashcard_stats f
-      FULL OUTER JOIN memorization_stats m ON m.exam_type = f.exam_type
-      FULL OUTER JOIN question_stats q ON q.exam_type = COALESCE(f.exam_type, m.exam_type)
-      LEFT JOIN activity_stats a
-        ON a.exam_type = COALESCE(f.exam_type, m.exam_type, q.exam_type)
-      LEFT JOIN exam_pass_stats p
-        ON p.exam_type = COALESCE(f.exam_type, m.exam_type, q.exam_type)
-    `;
+    const tracks = await getTrackCounts(session.user.id);
 
-    const result = await pool.query(query, [userId]);
-
-    const summary = result.rows.map((row) => {
-      const flashcardPct =
-        row.flashcard_total > 0
-          ? (row.flashcard_mastered / row.flashcard_total) * 100
-          : 0;
-      const memorizePct =
-        row.memorize_total > 0
-          ? (row.memorize_mastered / row.memorize_total) * 100
-          : 0;
-      const practicePct =
-        row.practice_total > 0
-          ? (row.practice_mastered / row.practice_total) * 100
-          : 0;
-      const overallPct = (flashcardPct + memorizePct + practicePct) / 3;
+    const summary = tracks.map((t) => {
+      const flashcardPct = share(t.flashcards);
+      const memorizePct = share(t.memorization);
+      const practicePct = share(t.practice);
 
       return {
-        exam_type: row.exam_type,
-        last_activity_at: row.last_activity_at
-          ? new Date(row.last_activity_at).toISOString()
+        exam_type: t.examType,
+        last_activity_at: t.lastReviewedAt
+          ? t.lastReviewedAt.toISOString()
           : null,
         flashcard_pct: Math.round(flashcardPct),
         memorize_pct: Math.round(memorizePct),
         practice_exam_pct: Math.round(practicePct),
-        overall_pct: Math.round(overallPct),
-        exam_passes: cappedPasses(Number(row.exam_passes ?? 0)),
+        overall_pct: Math.round((flashcardPct + memorizePct + practicePct) / 3),
+        // Passing sittings per track: what the x / 5 counter reads, and the
+        // only thing that decides whether a track is passed.
+        exam_passes: cappedPasses(t.passingAttempts),
         passes_required: PASSES_REQUIRED,
       };
     });

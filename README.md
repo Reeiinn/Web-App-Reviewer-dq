@@ -89,8 +89,14 @@ a manager working through a deck would build a learner record nobody can see.
 
 Create `.env.local`:
 
-    # Required
-    DATABASE_URL="postgresql://postgres:<password>@<host>:<port>/railway"
+    # Required. For local work, a local database (see step 3).
+    DATABASE_URL="postgresql://postgres:<password>@localhost:5432/insure_dev"
+
+    # Prisma tooling (step 3). Local databases only: the CLI and the tests
+    # refuse any other host.
+    MIGRATE_DATABASE_URL="postgresql://postgres:<password>@localhost:5432/insure_dev"
+    TEST_DATABASE_URL="postgresql://postgres:<password>@localhost:5432/insure"
+    SHADOW_DATABASE_URL="postgresql://postgres:<password>@localhost:5432/insure"
     AUTH_SECRET="your-generated-secret"
 
     # Required for sign-in: the Turnstile widget refuses to render without a
@@ -117,26 +123,29 @@ Leave `APP_URL` unset here. Locally the links a signup invite or a password
 reset carries are built from the request, which is what makes them open on the
 dev server you are running.
 
-### 3. Run database migrations
+### 3. Set up the database
 
-`src/migration/` holds the numbered SQL files, applied in order:
+The schema is managed by [Prisma](https://www.prisma.io/). Migrations live in
+`prisma/migrations`; see its README for the rules (additive only, read every
+generated line).
 
-    psql "$env:DATABASE_URL" -f src/migration/1.sql
-    psql "$env:DATABASE_URL" -f src/migration/2.sql
-    ...
+Build a local database from the migrations and seed the glossary:
 
-> `12.sql` adds enum values that `13.sql` uses, so it has to be committed on its
-> own before `13.sql` runs.
+    pnpm migrate
+    pnpm exec prisma db seed
 
-> On Windows, if `psql` isn't recognized, add it to your session PATH first:
+`pnpm migrate` runs `prisma migrate deploy` against `MIGRATE_DATABASE_URL`. To
+work against real data instead, restore a `pg_dump` of production into the
+local database and mark the baseline applied:
+`pnpm exec prisma migrate resolve --applied 0_init`.
+
+> On Windows, if `pg_dump` or `psql` isn't recognized, add it to your session
+> PATH first:
 >
 >     $env:Path += ";C:\Program Files\PostgreSQL\18\bin"
 
-Tables added after the original schema — study sessions, streaks, nudges,
-recent activity, password reset tokens — are created by an idempotent script
-that can be re-run safely:
-
-    npm run migrate
+The hand-applied SQL files and `migrate.cjs` that came before Prisma are kept
+in `src/migration/archive/` for history.
 
 ### 4. Run the development server
 
@@ -150,9 +159,11 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 | -------------------- | ------------------------------------------------ |
 | `npm run dev`        | Development server                               |
 | `npm run build`      | Production build                                 |
-| `npm test`           | Vitest, once                                     |
+| `npm test`           | Unit tests, once                                 |
 | `npm run test:watch` | Vitest, watching                                 |
-| `npm run migrate`    | Idempotent schema top-up (`scripts/migrate.cjs`) |
+| `pnpm test:db`       | Data-layer tests against `TEST_DATABASE_URL` (rebuilt each run) |
+| `pnpm migrate`       | Apply pending Prisma migrations to `MIGRATE_DATABASE_URL`; local only unless `ALLOW_REMOTE_MIGRATE=1` |
+| `pnpm parity`        | Compare the old mastery SQL with the new module on the local database |
 
 Two seeding scripts exist for looking at screens that are otherwise a long way
 in. Both write real rows the app reads back through its own rules:

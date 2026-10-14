@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import pool from "@/lib/db";
 import { lockReason } from "@/lib/helper/eligibility";
 import { fetchEligibility } from "@/app/api/_lib/mastery";
+import { isExamType } from "@/lib/types/common";
 import { NextResponse } from "next/server";
 
 /** One sitting's question ids, in the order the learner will see them. */
@@ -26,6 +27,12 @@ export async function POST(req: Request) {
     if (!exam_type) {
       return NextResponse.json(
         { error: "exam_type is required" },
+        { status: 400 },
+      );
+    }
+    if (!isExamType(exam_type)) {
+      return NextResponse.json(
+        { error: "exam_type is invalid" },
         { status: 400 },
       );
     }
