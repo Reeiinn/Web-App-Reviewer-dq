@@ -1,7 +1,13 @@
 import { afterAll, describe, expect, it } from "vitest";
 import prisma from "@/server/db/prisma";
 import { createUser, deleteUsers, uniqueSuffix } from "@/test/db-fixtures";
-import { findSignInAccount, getSessionClaims } from "./users";
+import {
+  findSignInAccount,
+  getAvatar,
+  getSessionClaims,
+  markTourSeen,
+  setAvatar,
+} from "./users";
 
 // Every user a test makes is listed here and removed in one statement, so a
 // manager and their recruits go together (users.manager_id has no delete
@@ -59,5 +65,39 @@ describe("sign-in reads", () => {
     expect(
       await findSignInAccount(`nobody-${uniqueSuffix()}@example.test`),
     ).toBeNull();
+  });
+});
+
+describe("avatar", () => {
+  it("stores, reads and clears the photo", async () => {
+    const me = await user();
+    const photo = "data:image/png;base64,AAAA";
+
+    await setAvatar(me.id, photo);
+    expect(await getAvatar(me.id)).toBe(photo);
+
+    await setAvatar(me.id, null);
+    expect(await getAvatar(me.id)).toBeNull();
+  });
+
+  it("reads no photo for a soft-deleted account", async () => {
+    const gone = await user();
+    await setAvatar(gone.id, "data:image/png;base64,AAAA");
+    await softDelete(gone.id);
+
+    expect(await getAvatar(gone.id)).toBeNull();
+  });
+});
+
+describe("tours", () => {
+  it("records a role's tour once, however often it is marked", async () => {
+    const me = await user({ role: "MANAGER" });
+
+    await markTourSeen(me.id, "MANAGER");
+    await markTourSeen(me.id, "MANAGER");
+    await markTourSeen(me.id, "USER");
+
+    const claims = await getSessionClaims(me.id);
+    expect(claims?.onboardingToursSeen).toEqual(["MANAGER", "USER"]);
   });
 });

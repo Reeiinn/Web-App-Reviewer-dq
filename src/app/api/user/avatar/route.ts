@@ -1,6 +1,6 @@
 import { touchLastSeen } from "@/app/api/_lib/presence-store";
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
+import { getAvatar, setAvatar } from "@/server/data/users";
 import { NextResponse } from "next/server";
 
 /**
@@ -30,11 +30,8 @@ export async function GET() {
   await touchLastSeen(session.user.id);
 
   try {
-    const result = await pool.query(
-      `SELECT image FROM users WHERE id = $1 AND deleted_at IS NULL`,
-      [session.user.id],
-    );
-    return NextResponse.json({ image: result.rows[0]?.image ?? null });
+    const image = await getAvatar(session.user.id);
+    return NextResponse.json({ image });
   } catch (error) {
     console.error("Error loading avatar:", error);
     return NextResponse.json(
@@ -66,10 +63,7 @@ export async function POST(req: Request) {
       );
     }
 
-    await pool.query(`UPDATE users SET image = $2 WHERE id = $1`, [
-      session.user.id,
-      image,
-    ]);
+    await setAvatar(session.user.id, image);
 
     return NextResponse.json({ image });
   } catch (error) {
@@ -86,9 +80,7 @@ export async function DELETE() {
   if (!session?.user) return unauthorized();
 
   try {
-    await pool.query(`UPDATE users SET image = NULL WHERE id = $1`, [
-      session.user.id,
-    ]);
+    await setAvatar(session.user.id, null);
     return NextResponse.json({ image: null });
   } catch (error) {
     console.error("Error clearing avatar:", error);

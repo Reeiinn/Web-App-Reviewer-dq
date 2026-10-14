@@ -56,3 +56,32 @@ export async function getSessionClaims(
     select: { role: true, managerId: true, onboardingToursSeen: true },
   });
 }
+
+/** The account's photo, a data URL; null if none or the account is gone. */
+export async function getAvatar(userId: string): Promise<string | null> {
+  const row = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    select: { image: true },
+  });
+  return row?.image ?? null;
+}
+
+/** Sets or (with null) clears the photo. */
+export async function setAvatar(
+  userId: string,
+  image: string | null,
+): Promise<void> {
+  await prisma.user.updateMany({ where: { id: userId }, data: { image } });
+}
+
+/**
+ * Adds the role to the tours this account has seen, unless it is already
+ * there. The condition is in the WHERE, so two tabs finishing the tour at
+ * once still record it once.
+ */
+export async function markTourSeen(userId: string, role: Role): Promise<void> {
+  await prisma.user.updateMany({
+    where: { id: userId, NOT: { onboardingToursSeen: { has: role } } },
+    data: { onboardingToursSeen: { push: role } },
+  });
+}
