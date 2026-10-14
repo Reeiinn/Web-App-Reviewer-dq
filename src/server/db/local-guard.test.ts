@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { assertLocalDatabase, isLocalDatabase } from "./local-guard";
+import {
+  assertLocalDatabase,
+  isLocalDatabase,
+  sameLocalDatabase,
+} from "./local-guard";
 
 describe("isLocalDatabase", () => {
   it.each([
@@ -17,6 +21,9 @@ describe("isLocalDatabase", () => {
     "postgresql://u:pw@10.0.0.5/db",
     "not a url",
     "",
+    // pg connects to a host= or hostaddr= parameter, not the URL's host.
+    "postgresql://u:pw@localhost/db?host=containers.railway.app",
+    "postgresql://u:pw@localhost/db?hostaddr=10.0.0.5",
   ])("rejects %s", (url) => {
     expect(isLocalDatabase(url)).toBe(false);
   });
@@ -41,5 +48,28 @@ describe("assertLocalDatabase", () => {
   it("allows a remote URL only when asked to", () => {
     const url = "postgresql://u@containers.railway.app/railway";
     expect(assertLocalDatabase(url, { allowRemote: true })).toBe(url);
+  });
+});
+
+describe("sameLocalDatabase", () => {
+  it("treats the loopback spellings as one host", () => {
+    expect(
+      sameLocalDatabase(
+        "postgresql://u@127.0.0.1/insure_dev",
+        "postgresql://u@localhost:5432/insure_dev",
+      ),
+    ).toBe(true);
+    expect(
+      sameLocalDatabase("postgres://u@[::1]/Insure_Dev", "postgres://u@localhost/insure_dev"),
+    ).toBe(true);
+  });
+
+  it("tells different databases apart", () => {
+    expect(
+      sameLocalDatabase("postgresql://u@localhost/insure", "postgresql://u@localhost/insure_dev"),
+    ).toBe(false);
+    expect(
+      sameLocalDatabase("postgresql://u@localhost:5433/insure", "postgresql://u@localhost/insure"),
+    ).toBe(false);
   });
 });

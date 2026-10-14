@@ -1,7 +1,10 @@
 import { execSync } from "node:child_process";
 import { Client } from "pg";
 import { loadEnv } from "vite";
-import { assertLocalDatabase } from "../server/db/local-guard";
+import {
+  assertLocalDatabase,
+  sameLocalDatabase,
+} from "../server/db/local-guard";
 
 /**
  * Rebuilds the test database from prisma/migrations before the db project
@@ -15,7 +18,7 @@ export default async function setup() {
   const env = loadEnv("test", process.cwd(), "");
   const url = assertLocalDatabase(env.TEST_DATABASE_URL);
   for (const other of [env.DATABASE_URL, env.MIGRATE_DATABASE_URL]) {
-    if (other && sameDatabase(other, url)) {
+    if (other && sameLocalDatabase(other, url)) {
       throw new Error(
         "TEST_DATABASE_URL names the same database as DATABASE_URL or MIGRATE_DATABASE_URL; refusing to wipe it.",
       );
@@ -38,14 +41,4 @@ export default async function setup() {
     stdio: "inherit",
     env: { ...process.env, MIGRATE_DATABASE_URL: url, SHADOW_DATABASE_URL: "" },
   });
-}
-
-function sameDatabase(a: string, b: string) {
-  const x = new URL(a);
-  const y = new URL(b);
-  return (
-    x.hostname === y.hostname &&
-    (x.port || "5432") === (y.port || "5432") &&
-    x.pathname === y.pathname
-  );
 }
