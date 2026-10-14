@@ -319,3 +319,35 @@ describe("registerWithInvite", () => {
     });
   });
 });
+
+describe("a busy pool", () => {
+  it("waits for a connection to start a signup, as the pg pool did", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const c = `code-${uniqueSuffix()}`;
+    await createInvite({ code: c, createdBy: admin.id, role: "USER", email: null });
+
+    // Hold both of Prisma's connections for three seconds — longer than
+    // Prisma's default two-second wait to start a transaction.
+    const hold = () =>
+      prisma.$transaction(
+        async (tx) => {
+          await tx.user.count();
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+        },
+        { timeout: 10_000 },
+      );
+    const holding = Promise.all([hold(), hold()]);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const outcome = await registerWithInvite({
+      code: c,
+      email: `busy-${uniqueSuffix()}@example.test`,
+      name: "Busy",
+      passwordHash: "hash",
+    });
+    await holding;
+    if (outcome.ok) made.push(outcome.user.id);
+
+    expect(outcome.ok).toBe(true);
+  }, 20_000);
+});

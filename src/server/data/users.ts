@@ -20,6 +20,14 @@ import {
 
 export type Role = "USER" | "MANAGER" | "ADMIN";
 
+/**
+ * How long an interactive transaction may wait for a connection, and run.
+ * Prisma's default wait is 2s; the pg pool these flows used waited up to
+ * connectionTimeoutMillis (10s), so a signup or reset during a burst queued
+ * rather than failing with a 500.
+ */
+const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 10_000 };
+
 export type SignInAccount = {
   id: string;
   email: string;
@@ -161,7 +169,7 @@ export async function resetPassword(
       data: { password: passwordHash },
     });
     return true;
-  });
+  }, TRANSACTION_OPTIONS);
 }
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -294,7 +302,7 @@ export async function registerWithInvite(input: {
       });
 
       return { ok: true as const, user };
-    });
+    }, TRANSACTION_OPTIONS);
   } catch (error) {
     if (error instanceof Refused) return error.outcome;
     // unique_violation on users.email
