@@ -298,6 +298,9 @@ What implementing Wave 0 found, recorded so later waves start from it:
   invite are now atomic as well; before, they were two separate statements.
 - **Clock.** Expiry checks that used Postgres's `now()` use the app's clock.
   With UTC sessions, the only difference is host clock skew.
+- **Production needs nothing for this wave.** It adds no migration and
+  changes no schema, so it ships as code only; the Wave 0 checklist above is
+  still the only thing to run against Railway.
 - **`GET /api/user`** is deleted. A stale `.next/dev/types` left by an
   earlier `pnpm dev` still referenced it and broke `tsc` until it was
   removed; `next dev` regenerates it.
