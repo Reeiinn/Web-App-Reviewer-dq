@@ -1,0 +1,366 @@
+// Introspected from the existing database (`prisma db pull`), then renamed:
+// models and fields take readable names and map onto the real tables and
+// columns with @@map / @map, so nothing in the database changes. Every type,
+// default, index and relation action is exactly as pulled.
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AdminAction {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId     String?  @map("actor_id") @db.Uuid
+  actorEmail  String   @map("actor_email")
+  actorRole   String   @map("actor_role")
+  action      String
+  targetId    String?  @map("target_id") @db.Uuid
+  targetEmail String?  @map("target_email")
+  targetName  String?  @map("target_name")
+  detail      Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  actor       User?    @relation("AdminActionActor", fields: [actorId], references: [id], onUpdate: NoAction)
+  target      User?    @relation("AdminActionTarget", fields: [targetId], references: [id], onUpdate: NoAction)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([targetId], map: "admin_actions_target_idx")
+  @@map("admin_actions")
+}
+
+model Certificate {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  examType      ExamType @map("exam_type")
+  issuedAt      DateTime @default(now()) @map("issued_at") @db.Timestamptz(6)
+  certificateNo String   @unique @map("certificate_no") @db.VarChar(100)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, examType], map: "certificates_user_exam_key")
+  @@index([userId], map: "idx_certificates_user_id")
+  @@map("certificates")
+}
+
+model Choice {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  questionId         String              @map("question_id") @db.Uuid
+  text               String
+  isCorrect          Boolean             @default(false) @map("is_correct")
+  sortOrder          Int                 @map("sort_order")
+  question           Question            @relation(fields: [questionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  examAttemptAnswers ExamAttemptAnswer[]
+  questionProgress   QuestionProgress[]
+
+  @@index([questionId], map: "idx_choices_question_id")
+  @@map("choices")
+}
+
+model ExamAttemptAnswer {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attemptId        String      @map("attempt_id") @db.Uuid
+  questionId       String      @map("question_id") @db.Uuid
+  selectedChoiceId String?     @map("selected_choice_id") @db.Uuid
+  isCorrect        Boolean     @map("is_correct")
+  attempt          ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  question         Question    @relation(fields: [questionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  selectedChoice   Choice?     @relation(fields: [selectedChoiceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Two identical unique constraints exist in the database; both are kept
+  // so the schema matches it exactly.
+  @@unique([attemptId, questionId], map: "exam_attempt_answers_attempt_question_key")
+  @@unique([attemptId, questionId], map: "exam_attempt_answers_attempt_question_unique")
+  @@index([attemptId], map: "idx_attempt_answers_attempt_id")
+  @@map("exam_attempt_answers")
+}
+
+model ExamAttempt {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String              @map("user_id") @db.Uuid
+  examType      ExamType            @map("exam_type")
+  score         Int
+  totalItems    Int                 @map("total_items")
+  passed        Boolean
+  startedAt     DateTime            @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime?           @map("completed_at") @db.Timestamptz(6)
+  questionOrder Json?               @map("question_order")
+  answers       ExamAttemptAnswer[]
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([examType], map: "idx_attempts_exam_type")
+  @@index([userId], map: "idx_attempts_user_id")
+  @@map("exam_attempts")
+}
+
+model FlashcardProgress {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  flashcardId String    @map("flashcard_id") @db.Uuid
+  reviewedAt  DateTime  @default(now()) @map("reviewed_at") @db.Timestamptz(6)
+  mastered    Boolean   @default(false)
+  flashcard   Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, flashcardId])
+  @@map("flashcard_progress")
+}
+
+model Flashcard {
+  id       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  examType ExamType            @map("exam_type")
+  category String              @db.VarChar(255)
+  front    String
+  back     String
+  progress FlashcardProgress[]
+
+  @@index([examType], map: "idx_flashcards_exam_type")
+  @@map("flashcards")
+}
+
+model Memorization {
+  id       String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  examType ExamType               @map("exam_type")
+  category String                 @db.VarChar(255)
+  text     String
+  choices  MemorizationChoice[]
+  progress MemorizationProgress[]
+
+  @@index([examType], map: "idx_memorization_exam_type")
+  @@map("memorization")
+}
+
+model MemorizationChoice {
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  memorizationId String                 @map("memorization_id") @db.Uuid
+  text           String
+  isCorrect      Boolean                @default(false) @map("is_correct")
+  sortOrder      Int                    @map("sort_order")
+  memorization   Memorization           @relation(fields: [memorizationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  progress       MemorizationProgress[]
+
+  @@index([memorizationId], map: "idx_memorization_choices_memorization_id")
+  @@map("memorization_choices")
+}
+
+model MemorizationProgress {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String              @map("user_id") @db.Uuid
+  memorizationId   String              @map("memorization_id") @db.Uuid
+  selectedChoiceId String?             @map("selected_choice_id") @db.Uuid
+  isCorrect        Boolean?            @map("is_correct")
+  reviewedAt       DateTime            @default(now()) @map("reviewed_at") @db.Timestamptz(6)
+  mastered         Boolean             @default(false)
+  memorization     Memorization        @relation(fields: [memorizationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  selectedChoice   MemorizationChoice? @relation(fields: [selectedChoiceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, memorizationId])
+  @@map("memorization_progress")
+}
+
+model Nudge {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  senderId   String?   @map("sender_id") @db.Uuid
+  senderName String    @map("sender_name")
+  message    String
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  readAt     DateTime? @map("read_at") @db.Timestamptz(6)
+  sender     User?     @relation("NudgeSender", fields: [senderId], references: [id], onUpdate: NoAction)
+  user       User      @relation("NudgeRecipient", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId, createdAt(sort: Desc)], map: "nudges_user_id_idx")
+  @@map("nudges")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model QuestionProgress {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  questionId       String   @map("question_id") @db.Uuid
+  selectedChoiceId String?  @map("selected_choice_id") @db.Uuid
+  isCorrect        Boolean  @map("is_correct")
+  timesSeen        Int      @default(1) @map("times_seen")
+  timesCorrect     Int      @default(0) @map("times_correct")
+  mastered         Boolean  @default(false)
+  lastReviewedAt   DateTime @default(now()) @map("last_reviewed_at") @db.Timestamptz(6)
+  question         Question @relation(fields: [questionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  selectedChoice   Choice?  @relation(fields: [selectedChoiceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, questionId])
+  @@index([userId], map: "idx_question_progress_user_id")
+  @@map("question_progress")
+}
+
+model Question {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  examType           ExamType            @map("exam_type")
+  category           String              @db.VarChar(255)
+  text               String
+  explanation        String?
+  difficulty         Int?                @default(1) @db.SmallInt
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  choices            Choice[]
+  examAttemptAnswers ExamAttemptAnswer[]
+  progress           QuestionProgress[]
+
+  @@index([category], map: "idx_questions_category")
+  @@index([examType], map: "idx_questions_exam_type")
+  @@map("questions")
+}
+
+model RecentActivity {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  examType  ExamType @map("exam_type")
+  mode      String
+  visitedAt DateTime @default(now()) @map("visited_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, examType, mode])
+  @@index([userId])
+  @@map("recent_activity")
+}
+
+model RegistrationInvite {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String    @unique @db.VarChar(64)
+  createdBy String    @map("created_by") @db.Uuid
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  role      UserRole  @default(USER)
+  email     String?
+  creator   User      @relation(fields: [createdBy], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([createdBy], map: "idx_registration_invites_created_by")
+  @@map("registration_invites")
+}
+
+model StudySession {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  examType  ExamType @map("exam_type")
+  mode      String
+  cardOrder Json     @default("[]") @map("card_order")
+  cardIndex Int      @default(0) @map("card_index")
+  ratings   Json     @default("{}")
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, examType, mode])
+  @@index([userId])
+  @@map("study_sessions")
+}
+
+model StudyStreak {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  examType      ExamType  @map("exam_type")
+  currentStreak Int       @default(0) @map("current_streak")
+  bestStreak    Int       @default(0) @map("best_streak")
+  lastAnswerAt  DateTime? @map("last_answer_at") @db.Timestamptz(6)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, examType])
+  @@map("study_streaks")
+}
+
+model UserProgress {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  examType       ExamType @map("exam_type")
+  flashcardsDone Int      @default(0) @map("flashcards_done")
+  vocabDone      Int      @default(0) @map("vocab_done")
+  passCount      Int      @default(0) @map("pass_count")
+  // Written by the set_updated_at trigger, not by Prisma.
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, examType])
+  @@map("user_progress")
+}
+
+model User {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                String                 @unique @db.VarChar(255)
+  password             String                 @db.VarChar(255)
+  name                 String                 @db.VarChar(255)
+  role                 UserRole               @default(USER)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  // Written by the set_updated_at trigger, not by Prisma.
+  updatedAt            DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
+  managerId            String?                @map("manager_id") @db.Uuid
+  image                String?
+  lastSeenAt           DateTime?              @map("last_seen_at") @db.Timestamptz(6)
+  deletedAt            DateTime?              @map("deleted_at") @db.Timestamptz(6)
+  onboardingToursSeen  String[]               @default([]) @map("onboarding_tours_seen")
+  actionsTaken         AdminAction[]          @relation("AdminActionActor")
+  actionsReceived      AdminAction[]          @relation("AdminActionTarget")
+  certificates         Certificate[]
+  examAttempts         ExamAttempt[]
+  flashcardProgress    FlashcardProgress[]
+  memorizationProgress MemorizationProgress[]
+  nudgesSent           Nudge[]                @relation("NudgeSender")
+  nudgesReceived       Nudge[]                @relation("NudgeRecipient")
+  passwordResetTokens  PasswordResetToken[]
+  questionProgress     QuestionProgress[]
+  recentActivity       RecentActivity[]
+  invitesCreated       RegistrationInvite[]
+  studySessions        StudySession[]
+  studyStreaks         StudyStreak[]
+  userProgress         UserProgress[]
+  // The recruiter. No delete rule in the database: hard-deleting a manager
+  // who still has recruits fails (see the Prisma migration spec).
+  manager              User?                  @relation("Recruits", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recruits             User[]                 @relation("Recruits")
+
+  @@index([managerId], map: "idx_users_manager_id")
+  @@index([id], map: "users_active_idx", where: raw("(deleted_at IS NULL)"))
+  @@map("users")
+}
+
+model VocabularyTerm {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  examType   ExamType @map("exam_type")
+  term       String   @db.VarChar(255)
+  definition String
+  details    Json?
+
+  @@unique([examType, term], map: "vocabulary_terms_exam_term_key")
+  @@map("vocabulary_terms")
+}
+
+enum ExamType {
+  VUL
+  TRADITIONAL_LIFE
+  IIAP
+  IIAP_A
+  IIAP_B
+
+  @@map("exam_type")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  MANAGER
+
+  @@map("user_role")
+}

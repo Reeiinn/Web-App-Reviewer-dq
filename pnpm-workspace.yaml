@@ -1,5 +1,10 @@
 allowBuilds:
+  # Prisma's install scripts fetch the schema engine that `migrate` and
+  # `db pull` run on; esbuild's checks the native binary tsx relies on.
+  '@prisma/engines': true
+  esbuild: true
   msw: true
+  prisma: true
   unrs-resolver: false
 overrides:
   "hono": "4.12.25"
