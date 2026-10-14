@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
-import { MemorizationQuestion } from "@/lib/types/memo";
+import { isExamType } from "@/lib/types/common";
+import { listMemorization } from "@/server/data/content";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -9,57 +9,20 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { searchParams } = new URL(req.url);
-  const examType = searchParams.get("exam_type");
+  const examType = searchParams.get("exam_type") || null;
   const category = searchParams.get("category");
+
+  if (examType !== null && !isExamType(examType)) {
+    return NextResponse.json({ error: "exam_type is invalid" }, { status: 400 });
+  }
 
   try {
     // The learner's own last answer rides along with the item, so a resumed
     // sitting can show a question they already answered exactly as they left
     // it rather than blank and answerable a second time.
-    let query = `
-      SELECT
-        m.id,
-        m.exam_type,
-        m.category,
-        m.text,
-        mp.selected_choice_id AS answered_choice_id,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'id', c.id,
-              'text', c.text,
-              'is_correct', c.is_correct
-            )
-            -- Same fixed order the exam shows, so a card and its question
-            -- present their options identically.
-            ORDER BY c.sort_order
-          ) FILTER (WHERE c.id IS NOT NULL), '[]'
-        ) AS choices
-      FROM memorization m
-      LEFT JOIN memorization_choices c ON c.memorization_id = m.id
-      LEFT JOIN memorization_progress mp
-        ON mp.memorization_id = m.id AND mp.user_id = $1
-    `;
-
-    const conditions: string[] = [];
-    const values: string[] = [session.user.id];
-
-    if (examType) {
-      values.push(examType);
-      conditions.push(`m.exam_type = $${values.length}`);
-    }
-    if (category) {
-      values.push(category);
-      conditions.push(`m.category = $${values.length}`);
-    }
-    if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(" AND ")}`;
-    }
-
-    query += ` GROUP BY m.id, mp.selected_choice_id ORDER BY m.text ASC`;
-
-    const result = await pool.query<MemorizationQuestion>(query, values);
-    return NextResponse.json(result.rows);
+    return NextResponse.json(
+      await listMemorization(session.user.id, { examType, category }),
+    );
   } catch (error) {
     console.error("Error fetching memorization:", error);
     return NextResponse.json(

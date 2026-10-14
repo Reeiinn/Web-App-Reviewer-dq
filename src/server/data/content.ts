@@ -3,6 +3,7 @@ import prisma from "@/server/db/prisma";
 import { choicesForCard } from "@/lib/helper/flashcard-choices";
 import type { ExamType } from "@/lib/types/common";
 import type { Flashcard } from "@/lib/types/flashcard";
+import type { MemorizationQuestion } from "@/lib/types/memo";
 import type { Question } from "@/lib/types/questions";
 
 /**
@@ -87,5 +88,66 @@ export async function listQuestions(filter: ContentFilter): Promise<Question[]> 
     difficulty: q.difficulty as number,
     created_at: q.createdAt.toISOString(),
     choices: q.choices.map((c) => ({ id: c.id, text: c.text, is_correct: c.isCorrect })),
+  }));
+}
+
+/**
+ * Memorization items by text, each with this learner's last answer, so a
+ * resumed sitting redraws an answered item instead of asking it again.
+ */
+export async function listMemorization(
+  userId: string,
+  filter: ContentFilter,
+): Promise<MemorizationQuestion[]> {
+  const rows = await prisma.memorization.findMany({
+    where: whereOf(filter),
+    orderBy: { text: "asc" },
+    select: {
+      id: true,
+      examType: true,
+      category: true,
+      text: true,
+      choices: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, text: true, isCorrect: true },
+      },
+      // (user_id, memorization_id) is unique, so this is at most one row.
+      progress: { where: { userId }, select: { selectedChoiceId: true } },
+    },
+  });
+
+  return rows.map((m) => ({
+    id: m.id,
+    exam_type: m.examType as ExamType,
+    category: m.category,
+    text: m.text,
+    answered_choice_id: m.progress[0]?.selectedChoiceId ?? null,
+    choices: m.choices.map((c) => ({ id: c.id, text: c.text, is_correct: c.isCorrect })),
+  }));
+}
+
+export type GlossaryRow = {
+  id: string;
+  exam_type: ExamType;
+  term: string;
+  definition: string;
+  /** jsonb as stored; the glossary page validates it (normalizeDetails). */
+  details: unknown;
+};
+
+/** Every glossary term, alphabetically, optionally for one track. */
+export async function listGlossary(examType: ExamType | null): Promise<GlossaryRow[]> {
+  const rows = await prisma.vocabularyTerm.findMany({
+    where: { examType: examType ?? undefined },
+    orderBy: { term: "asc" },
+    select: { id: true, examType: true, term: true, definition: true, details: true },
+  });
+
+  return rows.map((t) => ({
+    id: t.id,
+    exam_type: t.examType as ExamType,
+    term: t.term,
+    definition: t.definition,
+    details: t.details,
   }));
 }
