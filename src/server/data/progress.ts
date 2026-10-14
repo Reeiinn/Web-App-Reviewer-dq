@@ -187,3 +187,103 @@ export async function clearSession(
 ): Promise<void> {
   await prisma.studySession.deleteMany({ where: { userId, examType, mode } });
 }
+
+/** The track a flashcard belongs to; null if there is no such card. */
+export async function findFlashcardTrack(flashcardId: string): Promise<ExamType | null> {
+  const card = await prisma.flashcard.findUnique({
+    where: { id: flashcardId },
+    select: { examType: true },
+  });
+  return (card?.examType as ExamType | undefined) ?? null;
+}
+
+export type FlashcardReview = {
+  id: string;
+  userId: string;
+  flashcardId: string;
+  reviewedAt: Date;
+  mastered: boolean;
+};
+
+/**
+ * "A card counts as mastered once you have" — the About page's words. A
+ * card known in one pass and missed in the next stays mastered, so repeated
+ * runs add to the tally instead of trading one card for another.
+ */
+export async function recordFlashcardReview(
+  userId: string,
+  flashcardId: string,
+  mastered: boolean,
+): Promise<FlashcardReview> {
+  const reviewedAt = new Date();
+  return prisma.flashcardProgress.upsert({
+    where: { userId_flashcardId: { userId, flashcardId } },
+    create: { userId, flashcardId, reviewedAt, mastered },
+    update: mastered ? { reviewedAt, mastered: true } : { reviewedAt },
+    select: { id: true, userId: true, flashcardId: true, reviewedAt: true, mastered: true },
+  });
+}
+
+/** The track a memorization item belongs to; null if there is no such item. */
+export async function findMemorizationTrack(
+  memorizationId: string,
+): Promise<ExamType | null> {
+  const item = await prisma.memorization.findUnique({
+    where: { id: memorizationId },
+    select: { examType: true },
+  });
+  return (item?.examType as ExamType | undefined) ?? null;
+}
+
+/** Whether the choice is one of this item's options. */
+export async function choiceBelongsTo(
+  choiceId: string,
+  memorizationId: string,
+): Promise<boolean> {
+  return (
+    (await prisma.memorizationChoice.count({
+      where: { id: choiceId, memorizationId },
+    })) > 0
+  );
+}
+
+export type MemorizationAnswer = {
+  id: string;
+  userId: string;
+  memorizationId: string;
+  selectedChoiceId: string | null;
+  isCorrect: boolean | null;
+  reviewedAt: Date;
+  mastered: boolean;
+};
+
+/**
+ * Records the learner's latest answer. Mastery only ever goes up: an item
+ * mastered once stays mastered even if a later pass gets it wrong, while
+ * isCorrect and the selected choice always describe the last answer.
+ */
+export async function recordMemorizationAnswer(input: {
+  userId: string;
+  memorizationId: string;
+  selectedChoiceId: string;
+  isCorrect: boolean;
+  mastered: boolean;
+}): Promise<MemorizationAnswer> {
+  const { userId, memorizationId, selectedChoiceId, isCorrect, mastered } = input;
+  const reviewedAt = new Date();
+  const answer = { selectedChoiceId, isCorrect, reviewedAt };
+  return prisma.memorizationProgress.upsert({
+    where: { userId_memorizationId: { userId, memorizationId } },
+    create: { userId, memorizationId, ...answer, mastered },
+    update: mastered ? { ...answer, mastered: true } : answer,
+    select: {
+      id: true,
+      userId: true,
+      memorizationId: true,
+      selectedChoiceId: true,
+      isCorrect: true,
+      reviewedAt: true,
+      mastered: true,
+    },
+  });
+}

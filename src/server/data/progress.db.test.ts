@@ -1,12 +1,23 @@
 import { afterAll, describe, expect, it } from "vitest";
 import prisma from "@/server/db/prisma";
-import { createUser, deleteUsers } from "@/test/db-fixtures";
+import {
+  createFlashcard,
+  createMemorization,
+  createUser,
+  deleteContent,
+  deleteUsers,
+} from "@/test/db-fixtures";
 import {
   applyStreak,
+  choiceBelongsTo,
   clearSession,
   fetchRecent,
   fetchStreaks,
+  findFlashcardTrack,
+  findMemorizationTrack,
   loadSession,
+  recordFlashcardReview,
+  recordMemorizationAnswer,
   recordVisit,
   saveSession,
 } from "./progress";
@@ -18,8 +29,11 @@ async function user() {
   return created;
 }
 
+const content = { flashcards: [] as string[], memorization: [] as string[] };
+
 afterAll(async () => {
   await deleteUsers(...made);
+  await deleteContent(content);
 });
 
 describe("applyStreak", () => {
@@ -123,5 +137,74 @@ describe("saved sessions", () => {
       card_index: 0,
       ratings: {},
     });
+  });
+});
+
+describe("flashcard reviews", () => {
+  it("finds a card's track, and nothing for an unknown id", async () => {
+    const card = await createFlashcard({ examType: "IIAP_B" });
+    content.flashcards.push(card.id);
+
+    expect(await findFlashcardTrack(card.id)).toBe("IIAP_B");
+    expect(await findFlashcardTrack("00000000-0000-0000-0000-000000000000")).toBeNull();
+  });
+
+  it("keeps a card mastered once it has been", async () => {
+    const me = await user();
+    const card = await createFlashcard({});
+    content.flashcards.push(card.id);
+
+    expect((await recordFlashcardReview(me.id, card.id, false)).mastered).toBe(false);
+    const known = await recordFlashcardReview(me.id, card.id, true);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const missed = await recordFlashcardReview(me.id, card.id, false);
+
+    expect(known.mastered).toBe(true);
+    expect(missed).toMatchObject({ id: known.id, userId: me.id, flashcardId: card.id, mastered: true });
+    expect(missed.reviewedAt.getTime()).toBeGreaterThan(known.reviewedAt.getTime());
+  });
+
+  it("records two simultaneous first reviews as one row", async () => {
+    const me = await user();
+    const card = await createFlashcard({});
+    content.flashcards.push(card.id);
+
+    await Promise.all([
+      recordFlashcardReview(me.id, card.id, true),
+      recordFlashcardReview(me.id, card.id, false),
+    ]);
+
+    const rows = await prisma.flashcardProgress.findMany({ where: { userId: me.id } });
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("memorization answers", () => {
+  it("checks that a choice belongs to the item", async () => {
+    const item = await createMemorization({ choices: [{ text: "A", sortOrder: 1 }] });
+    const other = await createMemorization({ choices: [{ text: "B", sortOrder: 1 }] });
+    content.memorization.push(item.id, other.id);
+
+    expect(await findMemorizationTrack(item.id)).toBe("VUL");
+    expect(await choiceBelongsTo(item.choices[0].id, item.id)).toBe(true);
+    expect(await choiceBelongsTo(other.choices[0].id, item.id)).toBe(false);
+  });
+
+  it("records the last answer but never takes mastery back", async () => {
+    const me = await user();
+    const item = await createMemorization({
+      choices: [
+        { text: "Right", isCorrect: true, sortOrder: 1 },
+        { text: "Wrong", sortOrder: 2 },
+      ],
+    });
+    content.memorization.push(item.id);
+    const right = item.choices.find((c) => c.isCorrect)!.id;
+    const wrong = item.choices.find((c) => !c.isCorrect)!.id;
+
+    await recordMemorizationAnswer({ userId: me.id, memorizationId: item.id, selectedChoiceId: right, isCorrect: true, mastered: true });
+    const later = await recordMemorizationAnswer({ userId: me.id, memorizationId: item.id, selectedChoiceId: wrong, isCorrect: false, mastered: false });
+
+    expect(later).toMatchObject({ selectedChoiceId: wrong, isCorrect: false, mastered: true });
   });
 });

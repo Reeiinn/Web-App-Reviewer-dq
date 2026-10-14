@@ -1,7 +1,10 @@
 // app/api/flashcards/[id]/progress/route.ts
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
-import { applyStreak } from "@/server/data/progress";
+import {
+  applyStreak,
+  findFlashcardTrack,
+  recordFlashcardReview,
+} from "@/server/data/progress";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -26,42 +29,32 @@ export async function POST(
       );
     }
 
-    const cardCheck = await pool.query(
-      `SELECT id, exam_type FROM flashcards WHERE id = $1`,
-      [flashcardId],
-    );
+    const examType = await findFlashcardTrack(flashcardId);
 
-    if (cardCheck.rows.length === 0) {
+    if (!examType) {
       return NextResponse.json(
         { error: "Flashcard not found" },
         { status: 404 },
       );
     }
 
-    // "A card counts as mastered once you have" — the About page's words, and
-    // now the query's. Taking EXCLUDED.mastered outright meant a card known in
-    // one pass and missed in the next went back to unmastered, so repeated runs
-    // swapped one card for another and the tally stood still.
-    const result = await pool.query(
-      `INSERT INTO flashcard_progress
-        (user_id, flashcard_id, reviewed_at, mastered)
-       VALUES ($1, $2, now(), $3)
-       ON CONFLICT (user_id, flashcard_id)
-       DO UPDATE SET
-         reviewed_at = now(),
-         mastered = flashcard_progress.mastered OR EXCLUDED.mastered
-       RETURNING *`,
-      [session.user.id, flashcardId, mastered],
-    );
-
-    // Returned with the answer so the client can celebrate without a second call.
-    const streak = await applyStreak(
+    const review = await recordFlashcardReview(
       session.user.id,
-      cardCheck.rows[0].exam_type,
+      flashcardId,
       mastered,
     );
 
-    return NextResponse.json({ ...result.rows[0], streak });
+    // Returned with the answer so the client can celebrate without a second call.
+    const streak = await applyStreak(session.user.id, examType, mastered);
+
+    return NextResponse.json({
+      id: review.id,
+      user_id: review.userId,
+      flashcard_id: review.flashcardId,
+      reviewed_at: review.reviewedAt,
+      mastered: review.mastered,
+      streak,
+    });
   } catch (error) {
     console.error("Error submitting flashcard review:", error);
     return NextResponse.json(
