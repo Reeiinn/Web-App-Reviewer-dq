@@ -1,7 +1,7 @@
 # Prisma migration — design
 
 **Date:** 2026-10-14
-**Status:** approved; Wave 0 implemented (see Wave 0 outcome)
+**Status:** approved; Waves 0–1 implemented (see Wave 0 and Wave 1 outcomes)
 **Follow-up:** [Focus tracks (backend)](2026-10-14-focus-tracks-backend-design.md) builds on this.
 
 ## Ground rules (from Nelson)
@@ -20,7 +20,10 @@ These override anything else in this document.
 3. **Production is applied by Nelson, by hand,** from the checklist at the end
    of this document, after the PR is merged.
 4. **Commits are authored by Nelson alone,** with no co-author trailer.
-5. **Pull requests target `dev`,** never `main`.
+5. **Pull requests target `dev`,** never `main`. `main` is what production
+   runs, and the client is already using it; work reaches `main` only when
+   Nelson promotes `dev` himself. When opening a PR, check that its base
+   branch reads `dev` before submitting.
 
 ## Problem
 
@@ -273,3 +276,40 @@ What implementing Wave 0 found, recorded so later waves start from it:
   move in Waves 2 and 3.
 - **Connection budget** is 3 (`pg`) + 2 (Prisma) while both exist.
 - **Parity:** all 56 users of the production restore, 0 differences.
+
+## Wave 1 outcome (2026-10-14)
+
+- **`src/server/data/users.ts`** holds every account query: sign-in, session
+  claims, avatar, tours, reset tokens, invites and registration. Routes map
+  its camelCase results back to the old snake_case JSON. Route tests pin
+  register and invites byte for byte.
+- **The signup link is tested end to end** against the local test database
+  (`register/signup-link.db.test.ts`): the invites route makes the link, the
+  `?code=` it carries is posted to register exactly as the signup page does,
+  and the account that comes back passes the signup grant and password
+  check that the automatic sign-in runs. The same link a second time is
+  refused. The test passed on the old `pg` code before the switch and passes
+  after it.
+- **Transactions.** Registration claims the invite and inserts the user in
+  one interactive transaction. A refusal throws inside it, so the claim is
+  rolled back, and a duplicate email (Prisma `P2002`, confirmed against
+  Postgres) releases the invite. Reset spends the token and sets the
+  password together. Issuing a reset link and replacing an addressed
+  invite are now atomic as well; before, they were two separate statements.
+- **Clock.** Expiry checks that used Postgres's `now()` use the app's clock.
+  With UTC sessions, the only difference is host clock skew.
+- **Production needs nothing for this wave.** It adds no migration and
+  changes no schema, so it ships as code only; the Wave 0 checklist above is
+  still the only thing to run against Railway.
+- **`GET /api/user`** is deleted. A stale `.next/dev/types` left by an
+  earlier `pnpm dev` still referenced it and broke `tsc` until it was
+  removed; `next dev` regenerates it.
+- **Connection budget** is unchanged at 3 + 2. Session refresh (the `jwt`
+  callback, on every `auth()` call) now reads through Prisma, but it is one
+  primary-key lookup per request against several `pg` queries, so `pg` keeps
+  the larger share. Wave 2 moves the study routes, the bulk of the traffic,
+  and flips the split to 2 (`pg`) + 3 (Prisma) in the same change.
+- **Interactive transactions** (register, reset) wait up to 10s for a
+  connection and run for up to 10s, the `pg` pool's
+  `connectionTimeoutMillis`. Prisma's default 2s wait turned a busy moment
+  into a 500 on signup; a test holding both connections pins it.

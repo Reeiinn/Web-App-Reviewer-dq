@@ -1,7 +1,7 @@
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import pool from "@/lib/db";
+import { findSignInAccount, getSessionClaims } from "@/server/data/users";
 import { authConfig } from "./auth.config";
 import { isValidSignupGrant } from "./helper/signup-grant";
 import { verifyTurnstile } from "./helper/turnstile";
@@ -70,21 +70,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           throw new RateLimitError();
         }
 
-        const result = await pool.query(
-          `SELECT
-             id,
-             email,
-             password,
-             name,
-             role,
-             manager_id,
-             onboarding_tours_seen
-           FROM users
-           WHERE email = $1 AND deleted_at IS NULL`,
-          [normalizedEmail],
-        );
-
-        const user = result.rows[0];
+        const user = await findSignInAccount(normalizedEmail);
 
         if (!user) {
           return null;
@@ -101,8 +87,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
-          managerId: user.manager_id,
-          onboardingToursSeen: user.onboarding_tours_seen ?? [],
+          managerId: user.managerId,
+          onboardingToursSeen: user.onboardingToursSeen,
         };
       },
     }),
@@ -126,8 +112,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
      * rather than carrying its claims forward.
      *
      * This lives here rather than in auth.config.ts because that file is also
-     * the middleware's config, and the middleware runs on the edge where the
-     * Postgres pool cannot.
+     * the middleware's config, and the middleware runs on the edge where
+     * Prisma cannot.
      */
     async jwt({ token, user, ...rest }) {
       const base = await authConfig.callbacks!.jwt!({ token, user, ...rest });
@@ -136,18 +122,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user || !base.id) return base;
 
       try {
-        const current = await pool.query(
-          `SELECT role, manager_id, onboarding_tours_seen FROM users
-            WHERE id = $1 AND deleted_at IS NULL`,
-          [base.id],
-        );
-
-        const account = current.rows[0];
+        const account = await getSessionClaims(String(base.id));
         if (!account) return null;
 
         base.role = account.role;
-        base.managerId = account.manager_id;
-        base.onboardingToursSeen = account.onboarding_tours_seen ?? [];
+        base.managerId = account.managerId;
+        base.onboardingToursSeen = account.onboardingToursSeen;
       } catch (error) {
         // A database that cannot answer is not grounds for signing everyone
         // out; the claims already in the token stand until the next refresh.
