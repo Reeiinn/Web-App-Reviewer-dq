@@ -72,3 +72,78 @@ export async function recordAdminAction(entry: {
     console.error("Failed to record admin action:", entry.action, error);
   }
 }
+
+export type StaffRole = "USER" | "MANAGER" | "ADMIN";
+
+export type RosterReviewee = {
+  id: string;
+  email: string;
+  name: string;
+  image: string | null;
+  manager: {
+    id: string;
+    name: string;
+    email: string;
+    role: StaffRole;
+    image: string | null;
+  } | null;
+};
+
+/**
+ * Active reviewees for the roster, by name. recruitedBy null is everyone
+ * (an admin's view); an id is that manager's own recruits. manager_id is set
+ * at signup from the invite used, so it is the recruiter. The recruiter is
+ * read even if since removed, as the old LEFT JOIN did.
+ */
+export async function listReviewees(
+  recruitedBy: string | null,
+): Promise<RosterReviewee[]> {
+  return prisma.user.findMany({
+    where: {
+      role: "USER",
+      deletedAt: null,
+      ...(recruitedBy === null ? {} : { managerId: recruitedBy }),
+    },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      image: true,
+      manager: {
+        select: { id: true, name: true, email: true, role: true, image: true },
+      },
+    },
+  });
+}
+
+export type ManagerActivity = {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  lastSeenAt: Date | null;
+  reviewees: number;
+};
+
+/**
+ * Active unit managers, most recently seen first (never seen last, then by
+ * name), each with how many active reviewees they recruited.
+ */
+export async function listManagers(): Promise<ManagerActivity[]> {
+  const rows = await prisma.user.findMany({
+    where: { role: "MANAGER", deletedAt: null },
+    orderBy: [{ lastSeenAt: { sort: "desc", nulls: "last" } }, { name: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+      lastSeenAt: true,
+      _count: {
+        select: { recruits: { where: { role: "USER", deletedAt: null } } },
+      },
+    },
+  });
+  return rows.map(({ _count, ...row }) => ({ ...row, reviewees: _count.recruits }));
+}
