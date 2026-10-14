@@ -24,29 +24,6 @@ export function Skeleton({ className, ...props }: ComponentProps<"div">) {
 }
 
 /**
- * A stack of skeleton lines standing in for a paragraph.
- *
- * The last line is short, the way a real paragraph's is — a stack of
- * full-width bars reads as a table, not prose.
- */
-export function SkeletonText({
-  lines = 3,
-  className,
-  ...props
-}: ComponentProps<"div"> & { lines?: number }) {
-  return (
-    <div className={cn("flex flex-col gap-2", className)} {...props}>
-      {Array.from({ length: lines }, (_, line) => (
-        <Skeleton
-          key={line}
-          className={cn("h-3", line === lines - 1 ? "w-3/5" : "w-full")}
-        />
-      ))}
-    </div>
-  );
-}
-
-/**
  * The announcement wrapper for a screenful of skeletons.
  *
  * Screen readers get one polite "Loading your dashboard…" rather than silence

@@ -1,7 +1,5 @@
 "use client";
 
-import type { MotivationMessage } from "@/lib/helper/motivation";
-import { CheckCircle2, Sparkles, XCircle } from "lucide-react";
 import { useMemo } from "react";
 
 const confettiColors = [
@@ -69,48 +67,6 @@ export function Confetti({
           }
         />
       ))}
-    </div>
-  );
-}
-
-export function AnswerFeedback({
-  message,
-  correctAnswer,
-}: {
-  message: MotivationMessage;
-  /** Shown only when the answer was wrong, so the user leaves knowing it. */
-  correctAnswer?: string;
-}) {
-  const correct = message.mood === "correct";
-
-  return (
-    <div
-      role="status"
-      className={`rv-pop-in flex items-start gap-3 rounded-xl border p-4 ${
-        correct
-          ? "border-emerald-300 bg-emerald-50 text-emerald-900"
-          : "border-rose-300 bg-rose-50 text-rose-900"
-      }`}
-    >
-      {correct ? (
-        message.milestone ? (
-          <Sparkles className="mt-0.5 size-5 shrink-0 text-[#C98A00]" />
-        ) : (
-          <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
-        )
-      ) : (
-        <XCircle className="mt-0.5 size-5 shrink-0 text-rose-600" />
-      )}
-
-      <div>
-        <p className="font-bold">{message.headline}</p>
-        {!correct && correctAnswer && (
-          <p className="mt-1 text-sm">
-            <span className="font-semibold">Correct answer:</span>{" "}
-            {correctAnswer}
-          </p>
-        )}
-      </div>
     </div>
   );
 }
