@@ -2,6 +2,8 @@ import { afterAll, describe, expect, it } from "vitest";
 import prisma from "@/server/db/prisma";
 import { createUser, deleteUsers, uniqueSuffix } from "@/test/db-fixtures";
 import {
+  createInvite,
+  emailHasAccount,
   findActiveUserId,
   findResetToken,
   findSignInAccount,
@@ -9,6 +11,7 @@ import {
   getSessionClaims,
   issueResetToken,
   markTourSeen,
+  registerWithInvite,
   resetPassword,
   setAvatar,
 } from "./users";
@@ -166,5 +169,153 @@ describe("password reset", () => {
 
   it("finds nothing for an unknown hash", async () => {
     expect(await findResetToken(`hash-${uniqueSuffix()}`)).toBeNull();
+  });
+});
+
+describe("invites", () => {
+  const code = () => `code-${uniqueSuffix()}`;
+  const inviteBy = (c: string) =>
+    prisma.registrationInvite.findUniqueOrThrow({ where: { code: c } });
+
+  it("makes an open link that lasts seven days", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const c = code();
+
+    const invite = await createInvite({
+      code: c, createdBy: admin.id, role: "USER", email: null,
+    });
+
+    expect(invite).toMatchObject({ code: c, role: "USER", email: null });
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    expect(
+      Math.abs(invite.expiresAt.getTime() - (Date.now() + sevenDays)),
+    ).toBeLessThan(60_000);
+  });
+
+  it("replaces an earlier invite to the same address", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const address = `invitee-${uniqueSuffix()}@example.test`;
+    const first = code();
+    const second = code();
+
+    await createInvite({ code: first, createdBy: admin.id, role: "MANAGER", email: address });
+    await createInvite({ code: second, createdBy: admin.id, role: "MANAGER", email: address });
+
+    expect((await inviteBy(first)).usedAt).toBeInstanceOf(Date);
+    expect((await inviteBy(second)).usedAt).toBeNull();
+  });
+
+  it("counts a soft-deleted account's address as taken", async () => {
+    const gone = await user();
+    await softDelete(gone.id);
+
+    expect(await emailHasAccount(gone.email)).toBe(true);
+    expect(await emailHasAccount(`free-${uniqueSuffix()}@example.test`)).toBe(false);
+  });
+});
+
+describe("registerWithInvite", () => {
+  const code = () => `code-${uniqueSuffix()}`;
+  const address = () => `new-${uniqueSuffix()}@example.test`;
+  const inviteBy = (c: string) =>
+    prisma.registrationInvite.findUniqueOrThrow({ where: { code: c } });
+  async function register(c: string, email = address()) {
+    const outcome = await registerWithInvite({
+      code: c, email, name: "New Person", passwordHash: "hash",
+    });
+    if (outcome.ok) made.push(outcome.user.id);
+    return outcome;
+  }
+
+  it("creates a reviewee under whoever invited them and spends the link", async () => {
+    const manager = await user({ role: "MANAGER" });
+    const c = code();
+    await createInvite({ code: c, createdBy: manager.id, role: "USER", email: null });
+    const email = address();
+
+    const outcome = await register(c, email);
+
+    expect(outcome).toEqual({
+      ok: true,
+      user: {
+        id: expect.any(String),
+        email,
+        name: "New Person",
+        role: "USER",
+        managerId: manager.id,
+        createdAt: expect.any(Date),
+      },
+    });
+    expect((await inviteBy(c)).usedAt).toBeInstanceOf(Date);
+  });
+
+  it("creates a Unit Manager who reports to nobody", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const c = code();
+    const email = address();
+    await createInvite({ code: c, createdBy: admin.id, role: "MANAGER", email });
+
+    const outcome = await register(c, email);
+
+    expect(outcome).toMatchObject({ ok: true, user: { role: "MANAGER", managerId: null } });
+  });
+
+  it("explains a spent, an unknown and an expired code", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const spent = code();
+    await createInvite({ code: spent, createdBy: admin.id, role: "USER", email: null });
+    await register(spent);
+
+    const expired = code();
+    await prisma.registrationInvite.create({
+      data: { code: expired, createdBy: admin.id, expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    expect(await register(spent)).toEqual({
+      ok: false, reason: "invite", error: "This invitation link has already been used.",
+    });
+    expect(await register(code())).toEqual({
+      ok: false, reason: "invite", error: "This invitation code is not valid.",
+    });
+    expect(await register(expired)).toEqual({
+      ok: false, reason: "invite", error: "This invitation link has expired.",
+    });
+  });
+
+  it("refuses someone else's addressed invite and leaves it for them", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const c = code();
+    await createInvite({ code: c, createdBy: admin.id, role: "MANAGER", email: address() });
+
+    expect(await register(c, address())).toEqual({
+      ok: false, reason: "claimant",
+      error: "This invitation was sent to a different email address.",
+    });
+    expect((await inviteBy(c)).usedAt).toBeNull();
+  });
+
+  it("refuses a registered address and leaves the invite unspent", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const existing = await user();
+    const c = code();
+    await createInvite({ code: c, createdBy: admin.id, role: "USER", email: null });
+
+    expect(await register(c, existing.email)).toEqual({
+      ok: false, reason: "email-taken",
+    });
+    expect((await inviteBy(c)).usedAt).toBeNull();
+  });
+
+  it("lets only one of two simultaneous signups spend a link", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const c = code();
+    await createInvite({ code: c, createdBy: admin.id, role: "USER", email: null });
+
+    const outcomes = await Promise.all([register(c), register(c)]);
+
+    expect(outcomes.filter((o) => o.ok)).toHaveLength(1);
+    expect(outcomes.find((o) => !o.ok)).toEqual({
+      ok: false, reason: "invite", error: "This invitation link has already been used.",
+    });
   });
 });

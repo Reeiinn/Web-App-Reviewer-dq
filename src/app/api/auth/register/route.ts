@@ -1,28 +1,8 @@
-import pool from "@/lib/db";
-import {
-  claimantMatches,
-  isInviteRole,
-  managerForInvite,
-  type InviteRole,
-} from "@/lib/helper/invites";
 import { registerBodySchema } from "@/lib/validation/auth.validation";
+import { registerWithInvite } from "@/server/data/users";
 import bcrypt from "bcryptjs";
 import { createSignupGrant } from "@/lib/helper/signup-grant";
 import { NextResponse } from "next/server";
-
-async function explainUnusableInvite(code: string) {
-  const result = await pool.query(
-    `SELECT used_at, expires_at FROM registration_invites WHERE code = $1`,
-    [code],
-  );
-
-  const invite = result.rows[0];
-  if (!invite) return "This invitation code is not valid.";
-  if (invite.used_at) {
-    return "This invitation link has already been used.";
-  }
-  return "This invitation link has expired.";
-}
 
 export async function POST(req: Request) {
   try {
@@ -40,78 +20,48 @@ export async function POST(req: Request) {
     const { email, password, name, code } = parsed.data;
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
+    // Claiming the invite and creating the account happen in one
+    // transaction: a link can never be spent twice, and a refused signup
+    // releases it instead of burning it.
+    const outcome = await registerWithInvite({
+      code,
+      email: email.trim().toLowerCase(),
+      name: name.trim(),
+      passwordHash: hashedPassword,
+    });
 
-      // Claiming and inserting in one transaction means a link can never be
-      // spent twice, and a failed signup releases it instead of burning it.
-      const claim = await client.query(
-        `UPDATE registration_invites SET used_at = now()
-         WHERE code = $1 AND used_at IS NULL AND expires_at > now()
-         RETURNING created_by, role, email`,
-        [code],
-      );
-
-      if (claim.rowCount === 0) {
-        await client.query("ROLLBACK");
-        return NextResponse.json(
-          { error: await explainUnusableInvite(code) },
-          { status: 400 },
-        );
-      }
-
-      const invite = claim.rows[0];
-
-      // An addressed invite belongs to one person. Rolling back rather than
-      // burning the link leaves it there for whoever it was sent to.
-      const claimant = claimantMatches(invite.email, email);
-      if (!claimant.ok) {
-        await client.query("ROLLBACK");
-        return NextResponse.json({ error: claimant.error }, { status: 403 });
-      }
-
-      const role: InviteRole = isInviteRole(invite.role) ? invite.role : "USER";
-
-      const result = await client.query(
-        `INSERT INTO users (email, password, name, role, manager_id)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, email, name, role, manager_id, created_at`,
-        [
-          email.trim().toLowerCase(),
-          hashedPassword,
-          name.trim(),
-          role,
-          managerForInvite(role, invite.created_by),
-        ],
-      );
-
-      await client.query("COMMIT");
-
-      // The signup form signs the new account in straight away, and the
-      // credentials provider wants a bot check it has no widget to satisfy.
-      // This stands in for one, for this address, for the next two minutes.
-      return NextResponse.json(
-        {
-          ...result.rows[0],
-          signupGrant: createSignupGrant(result.rows[0].email),
-        },
-        { status: 201 },
-      );
-    } catch (dbError: any) {
-      await client.query("ROLLBACK").catch(() => {});
-
-      // unique_violation on users.email
-      if (dbError.code === "23505") {
+    if (!outcome.ok) {
+      if (outcome.reason === "email-taken") {
         return NextResponse.json(
           { error: "Email already registered" },
           { status: 409 },
         );
       }
-      throw dbError;
-    } finally {
-      client.release();
+      // An addressed invite belongs to one person; any other refusal is the
+      // code itself.
+      return NextResponse.json(
+        { error: outcome.error },
+        { status: outcome.reason === "claimant" ? 403 : 400 },
+      );
     }
+
+    const { user } = outcome;
+
+    // The signup form signs the new account in straight away, and the
+    // credentials provider wants a bot check it has no widget to satisfy.
+    // This stands in for one, for this address, for the next two minutes.
+    return NextResponse.json(
+      {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        manager_id: user.managerId,
+        created_at: user.createdAt,
+        signupGrant: createSignupGrant(user.email),
+      },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Error registering user:", error);
     return NextResponse.json(
