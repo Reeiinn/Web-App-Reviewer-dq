@@ -22,7 +22,7 @@ describe("certificateNumber", () => {
     ).toBe("INS-2026-TRADITIONAL_LIFE-ABCDEF");
   });
 
-  it("takes the year in UTC, the zone the old SQL ran in", () => {
+  it("takes the year in UTC", () => {
     // 07:30 on 1 January in Manila is still 31 December in UTC.
     expect(
       certificateNumber(
