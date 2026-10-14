@@ -1,7 +1,7 @@
 # Prisma migration — design
 
 **Date:** 2026-10-14
-**Status:** approved; Waves 0–1 implemented (see Wave 0 and Wave 1 outcomes)
+**Status:** approved; Waves 0–2 implemented (see Wave 0, 1 and 2 outcomes)
 **Follow-up:** [Focus tracks (backend)](2026-10-14-focus-tracks-backend-design.md) builds on this.
 
 ## Ground rules (from Nelson)
@@ -62,7 +62,9 @@ Out of scope:
   `activity.lastActivity`, which sorted `Date` objects as text and so
   reported the alphabetically last weekday, and now reports the latest
   instant; and an unknown `exam_type` on the eligibility routes and
-  `POST /api/attempts`, which answers 400 instead of a 500.
+  `POST /api/attempts`, which answers 400 instead of a 500. Wave 2 adds the
+  four study lists to that 400 rule, deletes six study routes nothing
+  called, and puts the glossary's `details` back (see Wave 2 outcome).
 - Any change to how a user is removed (see Deleting a user).
 - Renaming tables or columns, or any other schema cleanup.
 - The focus-tracks feature (its own spec).
@@ -313,6 +315,40 @@ What implementing Wave 0 found, recorded so later waves start from it:
   connection and run for up to 10s, the `pg` pool's
   `connectionTimeoutMillis`. Prisma's default 2s wait turned a busy moment
   into a 500 on signup; a test holding both connections pins it.
+
+## Wave 2 outcome (2026-10-14)
+
+- **`src/server/data/content.ts`** reads flashcards, questions, memorization
+  and the glossary, returning the API types in `src/lib/types` directly.
+  **`progress.ts`** holds per-item answers, streaks, recent activity and
+  saved decks. `_lib/streak-store.ts` and `_lib/recent-activity-store.ts`
+  had no callers left once those moved, so they were deleted now rather
+  than kept as re-exports until Wave 5.
+- **The flashcard → question match** (the old `LEFT JOIN LATERAL`) is the
+  pure `choicesForCard`, unit-tested. `pnpm parity:content` compares every
+  list, every track and all 56 users' memorization answers with the old
+  SQL on the production restore (228 flashcards, questions and
+  memorization items, 1,342 answers, 10 glossary terms, 2 question texts
+  shared by two questions each): 0 differences.
+- **Deleted, unused:** `GET /api/flashcards/[id]`, `GET /api/flashcards/progress`,
+  `GET /api/memorization/[id]`, `POST /api/memorization/[id]/answer` (it took
+  `user_id` from the body, so anyone signed in could write anyone's
+  progress), `GET /api/memorization/progress`, `GET /api/questions/[id]`.
+- **Glossary** returns `details` again (a caching commit had dropped it, so
+  the cards' examples and key points were empty) and ignores `?q=`: the
+  page searches client-side.
+- **Unknown `exam_type`** on the four study lists answers 400.
+- **Streaks.** The increment is in the upsert and the best is raised
+  conditionally in the same transaction, so two answers at once both count;
+  a test fires two on a new track. Prisma runs these compound-key upserts
+  as native `INSERT ... ON CONFLICT`, so no retry was needed.
+- **`study_sessions.updated_at`** has no trigger, so `saveSession` sets it.
+- **Connection budget** is now 2 (`pg`) + 3 (Prisma).
+- **Stale generated types.** After deleting routes, `tsc` failed on
+  `.next/types` left by an earlier `pnpm build` (Wave 1 saw the same in
+  `.next/dev/types`). Deleting both is safe; build and `next dev`
+  regenerate them.
+- **Production needs nothing for this wave:** no migration, no schema change.
 
 ## After the waves: API reference for the frontend
 
