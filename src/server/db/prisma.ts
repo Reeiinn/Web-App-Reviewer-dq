@@ -26,6 +26,11 @@ function createClient() {
     ssl: isLocalDatabase(connectionString)
       ? false
       : { rejectUnauthorized: false },
+    // The pg adapter drops the offset Postgres sends with a timestamptz, and
+    // sends instants without one, so on a server whose time zone is not UTC
+    // every timestamp read or written through Prisma is off by that zone.
+    // Pinning the session to UTC makes the offset zero and the bug moot.
+    options: "-c TimeZone=UTC",
     max: 3,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
