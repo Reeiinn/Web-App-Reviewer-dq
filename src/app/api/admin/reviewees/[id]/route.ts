@@ -1,11 +1,16 @@
 import { auth } from "@/lib/auth";
-import { recordAdminAction, touchLastSeen } from "@/server/data/staff";
-import pool from "@/lib/db";
+import {
+  findActiveAccount,
+  recordAdminAction,
+  removeReviewee,
+  touchLastSeen,
+} from "@/server/data/staff";
 import { NextResponse } from "next/server";
 
 /**
- * Removes a reviewee and everything they have done. Progress, attempts,
- * streaks and reset tokens all cascade from users.id, so one delete is enough.
+ * Removes a reviewee. A soft delete: deleted_at is stamped, every read
+ * filters on it, and their progress, attempts and streaks stay so they can
+ * be restored.
  *
  * Deliberately narrow: only USER accounts can be removed, an admin cannot
  * delete themselves, and a manager can only remove their own reports.
@@ -36,13 +41,7 @@ export async function DELETE(
   }
 
   try {
-    const target = await pool.query(
-      `SELECT id, name, email, role, manager_id FROM users
-        WHERE id = $1 AND deleted_at IS NULL`,
-      [id],
-    );
-
-    const user = target.rows[0];
+    const user = await findActiveAccount(id);
     if (!user) {
       return NextResponse.json(
         { error: "That reviewee no longer exists." },
@@ -57,28 +56,26 @@ export async function DELETE(
       );
     }
 
-    if (role === "MANAGER" && user.manager_id !== currentUserId) {
+    if (role === "MANAGER" && user.managerId !== currentUserId) {
       return NextResponse.json(
         { error: "You can only remove reviewees you manage." },
         { status: 403 },
       );
     }
 
-    await pool.query(
-      `UPDATE users SET deleted_at = now()
-        WHERE id = $1 AND deleted_at IS NULL`,
-      [id],
-    );
-
-    await recordAdminAction({
-      actor: {
-        id: currentUserId,
-        email: session.user.email ?? "unknown",
-        role,
-      },
-      action: "reviewee.removed",
-      target: { id: user.id, email: user.email, name: user.name },
-    });
+    // Two removals racing both get here; only the one that stamped the row
+    // records it, so the audit log says it once.
+    if (await removeReviewee(id)) {
+      await recordAdminAction({
+        actor: {
+          id: currentUserId,
+          email: session.user.email ?? "unknown",
+          role,
+        },
+        action: "reviewee.removed",
+        target: { id: user.id, email: user.email, name: user.name },
+      });
+    }
 
     return NextResponse.json({
       message: `${user.name} has been removed.`,

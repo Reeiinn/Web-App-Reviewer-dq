@@ -2,7 +2,14 @@ import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import prisma from "@/server/db/prisma";
 import { createUser, deleteUsers } from "@/test/db-fixtures";
-import { listManagers, listReviewees, recordAdminAction, touchLastSeen } from "./staff";
+import {
+  findActiveAccount,
+  listManagers,
+  listReviewees,
+  recordAdminAction,
+  removeReviewee,
+  touchLastSeen,
+} from "./staff";
 
 const made: string[] = [];
 afterAll(async () => {
@@ -188,5 +195,54 @@ describe("listManagers", () => {
     expect(rows.find((r) => r.id === never.id)!.lastSeenAt).toBeNull();
     expect(rows.find((r) => r.id === late.id)!.reviewees).toBe(0);
     expect(rows.find((r) => r.id === gone.id || r.id === admin.id)).toBeUndefined();
+  });
+});
+
+describe("findActiveAccount", () => {
+  it("reads what a staff action checks, and nothing for a removed account", async () => {
+    const boss = await user({ role: "MANAGER" });
+    const me = await named("Rae", { managerId: boss.id });
+
+    expect(await findActiveAccount(me.id)).toEqual({
+      id: me.id, name: "Rae", email: me.email, role: "USER", managerId: boss.id,
+    });
+
+    await prisma.user.update({ where: { id: me.id }, data: { deletedAt: new Date() } });
+    expect(await findActiveAccount(me.id)).toBeNull();
+    expect(await findActiveAccount(randomUUID())).toBeNull();
+  });
+});
+
+describe("removeReviewee", () => {
+  it("stamps deleted_at once and reports whether this call did it", async () => {
+    const me = await user();
+    const before = Date.now();
+
+    expect(await removeReviewee(me.id)).toBe(true);
+    const { deletedAt } = await prisma.user.findUniqueOrThrow({
+      where: { id: me.id },
+      select: { deletedAt: true },
+    });
+    expect(deletedAt!.getTime()).toBeGreaterThanOrEqual(before);
+
+    expect(await removeReviewee(me.id)).toBe(false);
+    const again = await prisma.user.findUniqueOrThrow({
+      where: { id: me.id },
+      select: { deletedAt: true },
+    });
+    expect(again.deletedAt).toEqual(deletedAt);
+  });
+
+  it("lets only one of two simultaneous removals claim it", async () => {
+    const me = await user();
+    const results = await Promise.all([removeReviewee(me.id), removeReviewee(me.id)]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+  });
+
+  it("keeps everything the reviewee did", async () => {
+    const me = await user();
+    await prisma.studyStreak.create({ data: { userId: me.id, examType: "VUL" } });
+    await removeReviewee(me.id);
+    expect(await prisma.studyStreak.count({ where: { userId: me.id } })).toBe(1);
   });
 });

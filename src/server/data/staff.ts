@@ -147,3 +147,34 @@ export async function listManagers(): Promise<ManagerActivity[]> {
   });
   return rows.map(({ _count, ...row }) => ({ ...row, reviewees: _count.recruits }));
 }
+
+export type StaffTarget = {
+  id: string;
+  name: string;
+  email: string;
+  role: StaffRole;
+  managerId: string | null;
+};
+
+/** The account a staff action is aimed at, or null if unknown or removed. */
+export async function findActiveAccount(id: string): Promise<StaffTarget | null> {
+  return prisma.user.findFirst({
+    where: { id, deletedAt: null },
+    select: { id: true, name: true, email: true, role: true, managerId: true },
+  });
+}
+
+/**
+ * Removes a reviewee: a soft delete that stamps deleted_at. Every read
+ * filters on it, and their work stays, so they can be restored.
+ *
+ * True only if this call did the stamping. Of two removals racing, one gets
+ * true; the caller writes the audit record only then.
+ */
+export async function removeReviewee(id: string): Promise<boolean> {
+  const { count } = await prisma.user.updateMany({
+    where: { id, deletedAt: null },
+    data: { deletedAt: new Date() },
+  });
+  return count === 1;
+}
