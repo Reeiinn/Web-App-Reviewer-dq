@@ -18,6 +18,7 @@
     "parity": "tsx --conditions=react-server scripts/parity/mastery-parity.ts",
     "parity:content": "tsx --conditions=react-server scripts/parity/content-parity.ts",
     "parity:exams": "tsx --conditions=react-server scripts/parity/exams-parity.ts",
+    "parity:staff": "tsx --conditions=react-server scripts/parity/staff-parity.ts",
     "migrate": "prisma migrate deploy"
   },
   "dependencies": {
