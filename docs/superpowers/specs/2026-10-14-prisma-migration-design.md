@@ -65,8 +65,9 @@ Out of scope:
   `POST /api/attempts`, which answers 400 instead of a 500. Wave 2 adds the
   four study lists to that 400 rule, deletes six study routes nothing
   called, and puts the glossary's `details` back (see Wave 2 outcome).
-  Wave 3 deletes `GET /api/attempts`, which nothing called (see Wave 3
-  outcome).
+  Wave 3 deletes `GET /api/attempts`, which nothing called, and the
+  practice exam page no longer scores a sitting while an answer is still
+  unsaved (see Wave 3 outcome).
 - Any change to how a user is removed (see Deleting a user).
 - Renaming tables or columns, or any other schema cleanup.
 - The focus-tracks feature (its own spec).
@@ -406,12 +407,25 @@ What implementing Wave 0 found, recorded so later waves start from it:
   holder's certificate showed the 404 page and its image answered 404.
   Both throwaway accounts were deleted afterwards.
 - **Final review** (fresh reviewer, whole branch): no Critical or
-  Important findings. Four minors deferred. The one worth deciding: the old
-  certificate year came from `to_char(now(), 'YYYY')` in the production
-  session's time zone, which the `pg` pool never set. If Railway's server
-  zone is not UTC, a certificate issued in the first hours of 1 January
-  (Manila time) now carries the previous year. A read-only
-  `SHOW TimeZone;` on Railway settles it.
+  Important findings, four minors, all addressed:
+  - A clash on `certificate_no` was caught as the race on
+    `(user_id, exam_type)`, found no row and left the fifth pass without a
+    certificate. `issueCertificate` now draws another number (up to three
+    draws); a test forces the clash.
+  - A failed answer save at submit was ignored and the sitting scored
+    without it. The page now re-sends unsaved answers four at a time
+    (`resendAnswers`, unit-tested) and, if any still fail, keeps the
+    sitting open and asks the learner to submit again. This is the one
+    frontend change in the migration.
+  - "Two clocks" was not a defect: Prisma fills `@default(now())` on the
+    client, so `started_at` already comes from the app clock. A test pins
+    it with a faked clock.
+  - The certificate year: the old SQL took it from `to_char(now(), 'YYYY')`
+    in the database server's own zone, which the `pg` pool never set. The
+    code comment now says so. If Railway's zone is not UTC, a certificate
+    issued in the first hours of 1 January (Manila time) now carries the
+    previous year. A read-only `SHOW TimeZone;` on Railway settles it;
+    Nelson to run it.
 - **Vercel build.** The `dev` deployment failed with
   `Can't resolve '@/generated/prisma/client'`: Vercel installs with
   `--ignore-scripts`, so `postinstall` never ran `prisma generate`, and
