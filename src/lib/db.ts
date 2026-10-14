@@ -33,9 +33,10 @@ const pool =
     ssl: isLocalDatabase(process.env.DATABASE_URL ?? "")
       ? false
       : { rejectUnauthorized: false },
-    // 3 rather than 5 while the Prisma client (max 2) runs beside this pool,
-    // so the two together stay within the old 5. Removed with this file.
-    max: 3,
+    // 2 rather than 5 while the Prisma client (max 3) runs beside this pool,
+    // so the two together stay within the old 5. Since Wave 2 the study
+    // routes, most of the traffic, read through Prisma. Removed with this file.
+    max: 2,
     // A connection nothing has used for half a minute is given back rather
     // than held against the database's limit for the life of the instance.
     idleTimeoutMillis: 30_000,

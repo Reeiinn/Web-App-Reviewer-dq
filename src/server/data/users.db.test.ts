@@ -326,8 +326,8 @@ describe("a busy pool", () => {
     const c = `code-${uniqueSuffix()}`;
     await createInvite({ code: c, createdBy: admin.id, role: "USER", email: null });
 
-    // Hold both of Prisma's connections for three seconds — longer than
-    // Prisma's default two-second wait to start a transaction.
+    // Hold all three of Prisma's connections for three seconds — longer
+    // than Prisma's default two-second wait to start a transaction.
     const hold = () =>
       prisma.$transaction(
         async (tx) => {
@@ -336,7 +336,7 @@ describe("a busy pool", () => {
         },
         { timeout: 10_000 },
       );
-    const holding = Promise.all([hold(), hold()]);
+    const holding = Promise.all([hold(), hold(), hold()]);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     const outcome = await registerWithInvite({
