@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { isLocalDatabase } from "@/server/db/local-guard";
 
 declare global {
   var pgPool: Pool | undefined;
@@ -27,9 +28,14 @@ const pool =
     connectionString: process.env.DATABASE_URL,
     // The managed database is reached through a TLS proxy that presents a
     // certificate for its own internal name, so the chain cannot be verified
-    // from here. The connection is still encrypted.
-    ssl: { rejectUnauthorized: false },
-    max: 5,
+    // from here. The connection is still encrypted. A local database for
+    // development has no TLS, so none is asked for.
+    ssl: isLocalDatabase(process.env.DATABASE_URL ?? "")
+      ? false
+      : { rejectUnauthorized: false },
+    // 3 rather than 5 while the Prisma client runs beside this pool, so the
+    // two together stay within the old budget. Removed with this file.
+    max: 3,
     // A connection nothing has used for half a minute is given back rather
     // than held against the database's limit for the life of the instance.
     idleTimeoutMillis: 30_000,
