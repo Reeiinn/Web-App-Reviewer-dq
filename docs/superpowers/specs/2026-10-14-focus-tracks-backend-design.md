@@ -52,7 +52,7 @@ Out of scope:
 
 ## Data
 
-Migration `2_user_focus_tracks`, additive:
+Migration `<timestamp>_user_focus_tracks`, hand-written and additive:
 
 ```sql
 CREATE TABLE user_focus_tracks (
@@ -142,8 +142,9 @@ glossary, attempts for a named track), certificates, and
 ## Production checklist (Nelson runs this, after merge)
 
 1. Take a Railway backup.
-2. `prisma migrate deploy` applies `2_user_focus_tracks`, which only creates
-   an empty table.
+2. With `MIGRATE_DATABASE_URL=<Railway URL>` and `ALLOW_REMOTE_MIGRATE=1`
+   set for this command only, `prisma migrate deploy` applies the
+   focus-tracks migration, which only creates an empty table.
 3. Confirm the dashboard and roster numbers are unchanged; with no selections
    saved, they must be.
 

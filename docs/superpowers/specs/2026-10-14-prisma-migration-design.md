@@ -54,8 +54,12 @@ In scope:
 Out of scope:
 
 - Any change to what an endpoint returns. Response shapes stay byte-for-byte
-  compatible; the frontend is not touched. The one exception is
-  `GET /api/user`, which is deleted (see Wave 1).
+  compatible; the frontend is not touched. The exceptions are
+  `GET /api/user`, which is deleted (see Wave 1); the roster's
+  `activity.lastActivity`, which sorted `Date` objects as text and so
+  reported the alphabetically last weekday, and now reports the latest
+  instant; and an unknown `exam_type` on the eligibility routes and
+  `POST /api/attempts`, which answers 400 instead of a 500.
 - Any change to how a user is removed (see Deleting a user).
 - Renaming tables or columns, or any other schema cleanup.
 - The focus-tracks feature (its own spec).
@@ -96,22 +100,24 @@ Out of scope:
 
 ### One source for mastery
 
-A migration `1_mastery_views` adds two views (additive, read-only):
+A migration (`<timestamp>_mastery_views`, hand-written) adds two views
+(additive, read-only):
 
 - `track_content_totals` — `exam_type`, `flashcards`, `memorization`,
   `questions`: how many items each track holds.
 - `user_track_progress` — one row per `(user_id, exam_type)` with
   `flashcards_mastered`, `memorization_mastered`, `memorization_answered`,
   `memorization_correct`, `questions_mastered`, `passing_attempts`,
-  `attempts_taken` and `last_activity_at`.
+  `attempts_taken`, `last_reviewed_at` (latest review in any mode — the
+  dashboard's notion of activity) and `last_answer_at` (from
+  `study_streaks` — the roster's). Both are kept because the two screens
+  have always meant different things by "last activity".
 
 The counting SQL in those views is lifted from the three existing copies, so
-the numbers do not move. The view SQL is hand-written in the migration
-(`prisma migrate dev --create-only`), since Prisma does not generate views.
-Both are declared in the schema as `view` models (the `views` preview
-feature) so reads through them are typed; if the installed Prisma version
-cannot read them that way, `mastery.ts` falls back to one typed
-`$queryRaw` per view, and that stays the only raw SQL in the app.
+the numbers do not move. The view SQL is hand-written in the migration,
+since Prisma does not generate views. `mastery.ts` reads them with typed
+`$queryRaw` rather than Prisma `view` models, which are still a preview
+feature; that file stays the only raw SQL in the app.
 
 `src/server/data/mastery.ts` is the only reader. It returns counts per track
 for one user or many; the arithmetic stays in the pure functions that already
@@ -203,18 +209,26 @@ later that references `users` (starting with `user_focus_tracks`) uses
 - **Existing tests keep passing.** The two tests that mock `@/lib/db`
   (`auth/forgot-password/route.test.ts`, `certificates/[id]/image/route.test.ts`)
   switch to mocking the data module they now call.
-- **Data modules are tested against the local database,** not mocks, with
-  vitest, using a throwaway schema the test run creates and drops. They never
-  read the production `DATABASE_URL`.
+- **Data modules are tested against a local database,** not mocks, with
+  vitest: a separate, local-only test database (`TEST_DATABASE_URL`) that
+  each run rebuilds from `prisma/migrations`. The setup refuses any
+  non-local host, and tests never read the production `DATABASE_URL`.
+- **The Prisma CLI reads only `MIGRATE_DATABASE_URL`,** and
+  `prisma.config.ts` refuses a non-local host unless `ALLOW_REMOTE_MIGRATE=1`
+  is set by hand — which happens only in the production checklist.
 - Every wave: `pnpm typecheck`, `pnpm lint`, `pnpm test`, and a manual pass of
   the screens that wave touches in `pnpm dev` against the local database.
 
 ## Production checklist (Nelson runs this, after merge)
 
 1. Take a Railway backup.
-2. `prisma migrate resolve --applied 0_init` — records the baseline; runs no SQL.
-3. `prisma migrate deploy` — applies `1_mastery_views`, which only creates views.
-4. Spot-check `/dashboard` and `/admin` numbers against the backup's.
+2. Set `MIGRATE_DATABASE_URL=<Railway URL>` and `ALLOW_REMOTE_MIGRATE=1` in
+   the shell for these two commands only.
+3. `prisma migrate resolve --applied 0_init` — records the baseline; runs no SQL.
+4. `prisma migrate deploy` — applies the mastery-views migration, which only
+   creates views.
+5. Unset both variables. Spot-check `/dashboard` and `/admin` numbers
+   against the backup's.
 
 Rollback for step 3 is `DROP VIEW user_track_progress, track_content_totals;`,
 which touches no table.
