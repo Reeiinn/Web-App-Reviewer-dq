@@ -7,11 +7,15 @@ import {
   deleteUsers,
 } from "@/test/db-fixtures";
 import {
+  choiceCorrectness,
+  completeAttempt,
   findAttempt,
+  findAttemptOwner,
   findOpenAttempt,
   listAttemptAnswers,
   listCompletedSittings,
   openAttempt,
+  recordExamAnswer,
 } from "./attempts";
 
 // Users go first: their attempts' answers point at the questions with no
@@ -181,5 +185,161 @@ describe("reading a sitting", () => {
       { examType: "VUL", passed: false, score: 3, totalItems: 4, completedAt: at("2026-10-01T00:00:00.000Z") },
       { examType: "VUL", passed: true, score: 3, totalItems: 4, completedAt: at("2026-10-02T00:00:00.000Z") },
     ]);
+  });
+});
+
+/** A sitting on a fresh track of `n` questions, with each question's right and wrong choice. */
+async function sitting(n: number) {
+  const me = await user();
+  const qs: { id: string; right: string; wrong: string }[] = [];
+  for (let i = 0; i < n; i++) {
+    const id = await question("VUL");
+    const choices = await prisma.choice.findMany({
+      where: { questionId: id },
+      select: { id: true, isCorrect: true },
+    });
+    qs.push({
+      id,
+      right: choices.find((c) => c.isCorrect)!.id,
+      wrong: choices.find((c) => !c.isCorrect)!.id,
+    });
+  }
+  const { attempt } = await openAttempt(me.id, "VUL");
+  return { me, qs, attempt };
+}
+
+const answer = (
+  s: Awaited<ReturnType<typeof sitting>>,
+  i: number,
+  right: boolean,
+) =>
+  recordExamAnswer({
+    attemptId: s.attempt.id,
+    userId: s.me.id,
+    questionId: s.qs[i].id,
+    selectedChoiceId: right ? s.qs[i].right : s.qs[i].wrong,
+    isCorrect: right,
+  });
+
+const progressOf = (userId: string, questionId: string) =>
+  prisma.questionProgress.findUniqueOrThrow({
+    where: { userId_questionId: { userId, questionId } },
+    select: { isCorrect: true, timesSeen: true, timesCorrect: true, mastered: true },
+  });
+
+describe("answers", () => {
+  it("knows an attempt's owner, and null for no attempt", async () => {
+    const s = await sitting(1);
+    expect(await findAttemptOwner(s.attempt.id)).toBe(s.me.id);
+    expect(await findAttemptOwner("00000000-0000-4000-8000-000000000000")).toBeNull();
+  });
+
+  it("says whether a choice is right, and null for another question's choice", async () => {
+    const s = await sitting(2);
+    expect(await choiceCorrectness(s.qs[0].right, s.qs[0].id)).toBe(true);
+    expect(await choiceCorrectness(s.qs[0].wrong, s.qs[0].id)).toBe(false);
+    expect(await choiceCorrectness(s.qs[1].right, s.qs[0].id)).toBeNull();
+  });
+
+  it("saves an answer and the learner's question progress", async () => {
+    const s = await sitting(1);
+
+    const saved = await answer(s, 0, true);
+
+    expect(saved).toEqual({
+      id: expect.any(String),
+      attemptId: s.attempt.id,
+      questionId: s.qs[0].id,
+      selectedChoiceId: s.qs[0].right,
+      isCorrect: true,
+    });
+    expect(await progressOf(s.me.id, s.qs[0].id)).toEqual({
+      isCorrect: true,
+      timesSeen: 1,
+      timesCorrect: 1,
+      mastered: true,
+    });
+  });
+
+  it("replaces a changed answer, and a wrong one un-masters the question", async () => {
+    const s = await sitting(1);
+    const first = await answer(s, 0, true);
+
+    const second = await answer(s, 0, false);
+
+    expect(second.id).toBe(first.id);
+    expect(second).toMatchObject({ selectedChoiceId: s.qs[0].wrong, isCorrect: false });
+    expect(await prisma.examAttemptAnswer.count({ where: { attemptId: s.attempt.id } })).toBe(1);
+    expect(await progressOf(s.me.id, s.qs[0].id)).toEqual({
+      isCorrect: false,
+      timesSeen: 2,
+      timesCorrect: 1,
+      mastered: false,
+    });
+  });
+
+  it("keeps one answer row when the same answer arrives twice at once", async () => {
+    const s = await sitting(1);
+
+    await Promise.all([answer(s, 0, true), answer(s, 0, true)]);
+
+    expect(await prisma.examAttemptAnswer.count({ where: { attemptId: s.attempt.id } })).toBe(1);
+    expect(await progressOf(s.me.id, s.qs[0].id)).toMatchObject({ timesSeen: 2, timesCorrect: 2 });
+  });
+});
+
+describe("completeAttempt", () => {
+  const passCount = (userId: string) =>
+    prisma.userProgress.findUnique({
+      where: { userId_examType: { userId, examType: "VUL" } },
+      select: { passCount: true },
+    });
+
+  it("scores the saved answers and counts a pass at 75%", async () => {
+    const s = await sitting(4);
+    await answer(s, 0, true);
+    await answer(s, 1, true);
+    await answer(s, 2, true);
+    await answer(s, 3, false);
+
+    const { attempt, passes } = await completeAttempt(s.attempt.id);
+
+    expect(attempt).toMatchObject({ id: s.attempt.id, score: 3, totalItems: 4, passed: true });
+    expect(attempt.completedAt).toBeInstanceOf(Date);
+    expect(passes).toBe(1);
+    expect(await passCount(s.me.id)).toEqual({ passCount: 1 });
+  });
+
+  it("records a fail without touching the pass count", async () => {
+    const s = await sitting(4);
+    await answer(s, 0, true);
+    await answer(s, 1, true);
+    await answer(s, 2, false);
+    await answer(s, 3, false);
+
+    const { attempt, passes } = await completeAttempt(s.attempt.id);
+
+    expect(attempt).toMatchObject({ score: 2, totalItems: 4, passed: false });
+    expect(passes).toBe(0);
+    expect(await passCount(s.me.id)).toBeNull();
+  });
+
+  it("counts passes off the completed sittings, not the open one", async () => {
+    const s = await sitting(1);
+    await answer(s, 0, true);
+    await completeAttempt(s.attempt.id);
+
+    const next = await openAttempt(s.me.id, "VUL");
+    await recordExamAnswer({
+      attemptId: next.attempt.id,
+      userId: s.me.id,
+      questionId: s.qs[0].id,
+      selectedChoiceId: s.qs[0].right,
+      isCorrect: true,
+    });
+    const { passes } = await completeAttempt(next.attempt.id);
+
+    expect(passes).toBe(2);
+    expect(await passCount(s.me.id)).toEqual({ passCount: 2 });
   });
 });
