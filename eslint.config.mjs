@@ -8,7 +8,7 @@ import next from "eslint-config-next";
  * eslint-config-next ships flat config, so it is imported rather than bridged
  * through FlatCompat.
  */
-export default [
+const config = [
   {
     ignores: [
       ".next/**",
@@ -39,3 +39,5 @@ export default [
     },
   },
 ];
+
+export default config;
