@@ -1,7 +1,7 @@
 # Prisma migration — design
 
 **Date:** 2026-10-14
-**Status:** approved, ready for an implementation plan
+**Status:** approved; Wave 0 implemented (see Wave 0 outcome)
 **Follow-up:** [Focus tracks (backend)](2026-10-14-focus-tracks-backend-design.md) builds on this.
 
 ## Ground rules (from Nelson)
@@ -80,9 +80,10 @@ Out of scope:
   verification, `idleTimeoutMillis: 30_000`, `connectionTimeoutMillis: 10_000`.
   It is cached on `global` in every environment, as `db.ts` is, and imports
   `server-only`.
-- **Connection budget.** While `db.ts` and Prisma coexist, each pool is capped
-  at `max: 3` instead of 5, so one instance holds no more connections than it
-  does today. Once `db.ts` is gone, Prisma's pool returns to 5.
+- **Connection budget.** While `db.ts` and Prisma coexist, `db.ts` is capped
+  at `max: 3` and Prisma at `max: 2`, so one instance holds no more than
+  today's 5. The split shifts towards Prisma as routes move, and once `db.ts`
+  is gone Prisma's pool returns to 5.
 
 ### Baseline and migrations
 
@@ -213,6 +214,10 @@ later that references `users` (starting with `user_focus_tracks`) uses
   vitest: a separate, local-only test database (`TEST_DATABASE_URL`) that
   each run rebuilds from `prisma/migrations`. The setup refuses any
   non-local host, and tests never read the production `DATABASE_URL`.
+- **Migrations are checked mechanically.** A unit test reads every migration
+  except `0_init` and fails on `DROP`, `RENAME`, `TRUNCATE`, row rewrites and
+  column type or nullability changes. A reviewed exception must be marked
+  `-- additive-check: allow` on its line.
 - **The Prisma CLI reads only `MIGRATE_DATABASE_URL`,** and
   `prisma.config.ts` refuses a non-local host unless `ALLOW_REMOTE_MIGRATE=1`
   is set by hand — which happens only in the production checklist.
@@ -223,12 +228,48 @@ later that references `users` (starting with `user_focus_tracks`) uses
 
 1. Take a Railway backup.
 2. Set `MIGRATE_DATABASE_URL=<Railway URL>` and `ALLOW_REMOTE_MIGRATE=1` in
-   the shell for these two commands only.
-3. `prisma migrate resolve --applied 0_init` — records the baseline; runs no SQL.
-4. `prisma migrate deploy` — applies the mastery-views migration, which only
-   creates views.
-5. Unset both variables. Spot-check `/dashboard` and `/admin` numbers
+   the shell for the commands below only.
+3. **Check for drift (read-only):**
+   `prisma migrate diff --from-config-datasource --to-migrations prisma/migrations --script`.
+   It must print an empty migration (Prisma does not compare views, so the
+   missing mastery views do not show). Anything else means production changed
+   since the 2026-10-14 dump: stop.
+4. `prisma migrate resolve --applied 0_init` — records the baseline; runs no
+   SQL. Its only side effect is Prisma's `_prisma_migrations` bookkeeping
+   table.
+5. `prisma migrate status` — must list exactly one pending migration, the
+   mastery views.
+6. `prisma migrate deploy` — applies it; it only creates views.
+7. Unset both variables. Spot-check `/dashboard` and `/admin` numbers
    against the backup's.
 
-Rollback for step 3 is `DROP VIEW user_track_progress, track_content_totals;`,
-which touches no table.
+Rollback for step 6 is `DROP VIEW user_track_progress, track_content_totals;`,
+which touches no table. If `deploy` is run before step 4 by mistake, `0_init`
+fails on its first `CREATE TYPE` without touching data; recover with
+`prisma migrate resolve --rolled-back 0_init` and continue from step 4.
+
+## Wave 0 outcome (2026-10-14)
+
+What implementing Wave 0 found, recorded so later waves start from it:
+
+- **Prisma 7.10.0** throughout (CLI pinned; the registry default had
+  resolved to an 8.0 release candidate). pnpm 11 must be allowed to run
+  Prisma's and esbuild's install scripts (`pnpm-workspace.yaml`).
+- **The real schema** has no `exam_attempts.type` column and no
+  `attempt_type` enum; `choices` and `memorization_choices` require
+  `sort_order`; `exam_attempt_answers` carries two identical unique
+  constraints. `exam_type` still holds the legacy `IIAP` value.
+- **`0_init`** needed hand fixes beyond generation (pgcrypto, the trigger,
+  `NOT NULL` on `onboarding_tours_seen`, constraints rather than unique
+  indexes). With them, a database built from the migrations dumps to the
+  same schema as the production restore. `partialIndexes` models
+  `users_active_idx` and Prisma ignores views, so diffs start empty.
+- **Time zones.** `@prisma/adapter-pg` 7.10 drops the offset on every
+  `timestamptz` it reads and sends instants without one, so on a non-UTC
+  server every timestamp was off by that zone. Prisma's sessions are pinned
+  to UTC (`-c TimeZone=UTC`). That also makes session-dependent SQL —
+  `now()::date`, `date_trunc`, `to_char(now(), ...)` — evaluate in UTC: check
+  this when certificate numbering (`to_char(now(), 'YYYY')`) and streak days
+  move in Waves 2 and 3.
+- **Connection budget** is 3 (`pg`) + 2 (Prisma) while both exist.
+- **Parity:** all 56 users of the production restore, 0 differences.
