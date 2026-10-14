@@ -348,6 +348,20 @@ What implementing Wave 0 found, recorded so later waves start from it:
   `.next/types` left by an earlier `pnpm build` (Wave 1 saw the same in
   `.next/dev/types`). Deleting both is safe; build and `next dev`
   regenerate them.
+- **Manual pass in `pnpm dev`** against the local restore, signed in as a
+  throwaway account made through the app's own invite and signup flow (no
+  real account used; both test accounts deleted afterwards, which cascaded
+  everything they wrote). Flashcards show their question's options and save
+  a review; a wrong memorization answer resets the streak and is brought
+  back on reload; the practice exam stays locked at 1/58 and 0/58; the
+  glossary shows examples and key points again; the dashboard's progress
+  and Quick Access match. An unknown `exam_type` answers 400 and the
+  deleted routes 404.
+- **Final review** (fresh reviewer, whole branch): no Critical or Important
+  findings. Seven minors deferred, none changing behaviour today. The most
+  useful to carry forward: the cached list routes are now thin wrappers, so
+  a future change to a list's shape must also change its `unstable_cache`
+  key, or stale entries keep being served.
 - **Production needs nothing for this wave:** no migration, no schema change.
 
 ## After the waves: API reference for the frontend
