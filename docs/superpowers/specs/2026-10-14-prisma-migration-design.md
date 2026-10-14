@@ -1,7 +1,7 @@
 # Prisma migration — design
 
 **Date:** 2026-10-14
-**Status:** approved; Waves 0–4 implemented (see Wave 0, 1, 2, 3 and 4 outcomes)
+**Status:** approved; Waves 0–5 implemented (see the wave outcomes)
 **Follow-up:** [Focus tracks (backend)](2026-10-14-focus-tracks-backend-design.md) builds on this.
 
 ## Ground rules (from Nelson)
@@ -469,6 +469,44 @@ What implementing Wave 0 found, recorded so later waves start from it:
   Important findings, two minors. `PATCH /api/nudges` with `{"id": ""}`
   answered 500 where the old falsy check marked everything read; fixed,
   with a test. Pinning `vite` exactly rather than `^8.2.2` is deferred.
+- **Production needs nothing for this wave:** no migration, no schema change.
+
+## Wave 5 outcome (2026-10-15)
+
+- **`src/lib/db.ts` is deleted** and Prisma's pool is back to 5
+  (`POOL_MAX`). The busy-pool test in `users.db.test.ts` holds `POOL_MAX`
+  connections rather than a hard-coded three, so it still proves a signup
+  waits for one.
+- **The `_lib` stores** were already gone. `_lib/mastery.ts` stays: it
+  builds no query, only shapes `server/data/mastery.ts` into eligibility.
+- **Seed scripts.** `scripts/seed-vul-mastery.cjs` and
+  `seed-practice-passes.cjs` are now `pnpm seed:mastery` and
+  `pnpm seed:passes` (TypeScript, Prisma). They read
+  `MIGRATE_DATABASE_URL` and refuse any non-local host, with no
+  `ALLOW_REMOTE_MIGRATE` escape; the old ones read `DATABASE_URL` and would
+  write wherever it pointed. The pass mark, pass count and certificate
+  number come from `practice-exam.ts` and `certificateNumber` instead of
+  copies. Run against a throwaway local account: idempotent, `--fresh`
+  resets the track, one certificate kept across reruns.
+- **Parity scripts deleted.** Each reported 0 differences in its wave;
+  they stay in git history (last in `a6dbf05`).
+- **`dotenv` dropped.** `prisma.config.ts` and `prisma/seed.ts` call
+  `loadLocalEnv` (`src/server/db/local-env.ts`), Node's own
+  `process.loadEnvFile` on `.env.local`. As before, a variable already set
+  wins and a missing file is fine (the Vercel build). The archived
+  `migrate.cjs` still requires it; it is history and never run.
+- **Unused dependencies removed:** `cors`, `express-rate-limit`, `helmet`,
+  `@types/express`, `ts-node`. `pg` and `@types/pg` stay: the adapter runs
+  on `pg`, and the test setup uses its `Client` to wipe the test schema.
+- **Unused imports removed** in `rateLimit.ts`, `FlashCardPage.tsx` and
+  `MemorizationPage.tsx`.
+- **README** describes Prisma, `src/server/`, the seed commands and pnpm.
+- **Certificate year settled.** Railway's `SHOW TimeZone;` reads
+  `Etc/UTC`, so the old SQL's `to_char(now(), 'YYYY')` was already the UTC
+  year: `certificateNumber` changes nothing.
+- **Left for a decision:** `GET /api/flashcards/eligibility` and
+  `GET /api/streaks` have no caller in the frontend. The focus-tracks spec
+  scopes `/api/streaks`, so neither was deleted.
 - **Production needs nothing for this wave:** no migration, no schema change.
 
 ## After the waves: API reference for the frontend
