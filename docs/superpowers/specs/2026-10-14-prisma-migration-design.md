@@ -1,7 +1,7 @@
 # Prisma migration — design
 
 **Date:** 2026-10-14
-**Status:** approved; Wave 0 implemented (see Wave 0 outcome)
+**Status:** approved; Waves 0–1 implemented (see Wave 0 and Wave 1 outcomes)
 **Follow-up:** [Focus tracks (backend)](2026-10-14-focus-tracks-backend-design.md) builds on this.
 
 ## Ground rules (from Nelson)
@@ -276,3 +276,29 @@ What implementing Wave 0 found, recorded so later waves start from it:
   move in Waves 2 and 3.
 - **Connection budget** is 3 (`pg`) + 2 (Prisma) while both exist.
 - **Parity:** all 56 users of the production restore, 0 differences.
+
+## Wave 1 outcome (2026-10-14)
+
+- **`src/server/data/users.ts`** holds every account query: sign-in, session
+  claims, avatar, tours, reset tokens, invites and registration. Routes map
+  its camelCase results back to the old snake_case JSON. Route tests pin
+  register and invites byte for byte.
+- **The signup link is tested end to end** against the local test database
+  (`register/signup-link.db.test.ts`): the invites route makes the link, the
+  `?code=` it carries is posted to register exactly as the signup page does,
+  and the account that comes back passes the signup grant and password
+  check that the automatic sign-in runs. The same link a second time is
+  refused. The test passed on the old `pg` code before the switch and passes
+  after it.
+- **Transactions.** Registration claims the invite and inserts the user in
+  one interactive transaction. A refusal throws inside it, so the claim is
+  rolled back, and a duplicate email (Prisma `P2002`, confirmed against
+  Postgres) releases the invite. Reset spends the token and sets the
+  password together. Issuing a reset link and replacing an addressed
+  invite are now atomic as well; before, they were two separate statements.
+- **Clock.** Expiry checks that used Postgres's `now()` use the app's clock.
+  With UTC sessions, the only difference is host clock skew.
+- **`GET /api/user`** is deleted. A stale `.next/dev/types` left by an
+  earlier `pnpm dev` still referenced it and broke `tsc` until it was
+  removed; `next dev` regenerates it.
+- **Connection budget** is unchanged at 3 + 2.
