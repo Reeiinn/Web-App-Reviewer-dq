@@ -1,6 +1,5 @@
-import { touchLastSeen } from "@/app/api/_lib/presence-store";
+import { listManagers, touchLastSeen } from "@/server/data/staff";
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
 import { presenceStatus } from "@/lib/helper/presence";
 import { NextResponse } from "next/server";
 
@@ -30,23 +29,10 @@ export async function GET() {
   await touchLastSeen(currentUserId);
 
   try {
-    const result = await pool.query(
-      `SELECT u.id, u.name, u.email, u.image, u.last_seen_at,
-              COUNT(r.id) AS reviewees
-         FROM users u
-         LEFT JOIN users r ON r.manager_id = u.id AND r.role = 'USER'
-                          AND r.deleted_at IS NULL
-        WHERE u.role = 'MANAGER' AND u.deleted_at IS NULL
-        GROUP BY u.id
-        ORDER BY u.last_seen_at DESC NULLS LAST, u.name ASC`,
-    );
-
-    const managers = result.rows.map((row) => {
-      // pg hands back a Date for timestamptz. Settling on an ISO string here
-      // keeps the shape the same whether a caller reads it or JSON does.
-      const lastSeenAt = row.last_seen_at
-        ? new Date(row.last_seen_at).toISOString()
-        : null;
+    const managers = (await listManagers()).map((row) => {
+      // Settling on an ISO string here keeps the shape the same whether a
+      // caller reads it or JSON does.
+      const lastSeenAt = row.lastSeenAt ? row.lastSeenAt.toISOString() : null;
 
       return {
         id: row.id,
@@ -57,7 +43,7 @@ export async function GET() {
         // was added, which reads the same as never having opened the app.
         lastSeenAt,
         status: presenceStatus(lastSeenAt),
-        reviewees: Number(row.reviewees),
+        reviewees: row.reviewees,
       };
     });
 

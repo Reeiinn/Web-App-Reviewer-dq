@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
-import { touchLastSeen } from "@/app/api/_lib/presence-store";
-import pool from "@/lib/db";
+import { listReviewees, touchLastSeen } from "@/server/data/staff";
 import {
   masteryPercent,
   readinessStatus,
@@ -57,27 +56,7 @@ export async function GET(req: Request) {
     // manager_id is set at signup from the invite the reviewee used, so it is
     // the recruiter. An admin sees every reviewee and who recruited them; a
     // manager sees only the reviewees they recruited themselves.
-    const selectReviewees = `
-      SELECT u.id, u.email, u.name, u.role, u.image,
-             m.id    AS manager_id,
-             m.name  AS manager_name,
-             m.email AS manager_email,
-             m.role  AS manager_role,
-             m.image AS manager_image
-        FROM users u
-        LEFT JOIN users m ON m.id = u.manager_id
-       WHERE u.role = 'USER' AND u.deleted_at IS NULL
-    `;
-
-    const usersResult =
-      role === "ADMIN"
-        ? await pool.query(`${selectReviewees} ORDER BY u.name ASC`)
-        : await pool.query(
-            `${selectReviewees} AND u.manager_id = $1 ORDER BY u.name ASC`,
-            [currentUserId],
-          );
-
-    const users = usersResult.rows;
+    const users = await listReviewees(role === "ADMIN" ? null : currentUserId);
     if (users.length === 0) return NextResponse.json([]);
 
     const userIds = users.map((user) => user.id);
@@ -136,13 +115,13 @@ export async function GET(req: Request) {
         email: user.email,
         image: user.image ?? null,
         // Null when the account predates invite-only signup.
-        manager: user.manager_id
+        manager: user.manager
           ? {
-              id: user.manager_id,
-              name: user.manager_name,
-              email: user.manager_email,
-              role: user.manager_role as "ADMIN" | "MANAGER",
-              image: user.manager_image ?? null,
+              id: user.manager.id,
+              name: user.manager.name,
+              email: user.manager.email,
+              role: user.manager.role as "ADMIN" | "MANAGER",
+              image: user.manager.image ?? null,
             }
           : null,
         readiness,

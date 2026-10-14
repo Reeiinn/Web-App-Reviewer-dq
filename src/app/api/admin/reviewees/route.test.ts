@@ -1,26 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, query, getTrackCountsFor, touchLastSeen } = vi.hoisted(() => ({
+const { auth, listReviewees, getTrackCountsFor, touchLastSeen } = vi.hoisted(() => ({
   auth: vi.fn(),
-  query: vi.fn(),
+  listReviewees: vi.fn(),
   getTrackCountsFor: vi.fn(),
   touchLastSeen: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
-vi.mock("@/lib/db", () => ({ default: { query } }));
 vi.mock("@/server/data/mastery", () => ({ getTrackCountsFor }));
-vi.mock("@/app/api/_lib/presence-store", () => ({ touchLastSeen }));
+vi.mock("@/server/data/staff", () => ({ listReviewees, touchLastSeen }));
 
 import { buildTrackCounts, type ProgressRow } from "@/lib/helper/track-counts";
 import { examTypes, type ExamType } from "@/lib/types/common";
 import { GET } from "./route";
 
-const reviewee = {
-  id: "r1", email: "r@example.test", name: "Rae", role: "USER", image: null,
-  manager_id: null, manager_name: null, manager_email: null,
-  manager_role: null, manager_image: null,
-};
+const reviewee = { id: "r1", email: "r@example.test", name: "Rae", image: null, manager: null };
 
 const progress = (exam_type: string, last_answer_at: Date | null): ProgressRow => ({
   user_id: "r1", exam_type, flashcards_mastered: 1, memorization_mastered: 1,
@@ -38,7 +33,8 @@ const roster = async (query = "") =>
 beforeEach(() => {
   vi.clearAllMocks();
   auth.mockResolvedValue({ user: { id: "admin", role: "ADMIN" } });
-  query.mockResolvedValue({ rows: [reviewee] });
+  listReviewees.mockResolvedValue([reviewee]);
+  getTrackCountsFor.mockResolvedValue(new Map([["r1", []]]));
 });
 
 describe("GET /api/admin/reviewees", () => {
@@ -72,8 +68,42 @@ describe("GET /api/admin/reviewees", () => {
   });
 
   it("narrows to one track with ?exam_type", async () => {
-    getTrackCountsFor.mockResolvedValue(new Map([["r1", []]]));
     await roster("?exam_type=IIAP_A");
     expect(getTrackCountsFor).toHaveBeenCalledWith(["r1"], ["IIAP_A"]);
+  });
+
+  it("lists every reviewee for an admin and only their own for a manager", async () => {
+    await roster();
+    expect(listReviewees).toHaveBeenLastCalledWith(null);
+
+    auth.mockResolvedValue({ user: { id: "m1", role: "MANAGER" } });
+    await roster();
+    expect(listReviewees).toHaveBeenLastCalledWith("m1");
+  });
+
+  it("keeps the row's leading keys and the manager object in order", async () => {
+    listReviewees.mockResolvedValue([{
+      ...reviewee,
+      manager: { id: "m1", name: "Mae", email: "m@example.test", role: "MANAGER", image: null },
+    }]);
+    const [row] = await roster();
+
+    expect(Object.keys(row).slice(0, 5)).toEqual(["id", "name", "email", "image", "manager"]);
+    expect(JSON.stringify(row.manager)).toBe(
+      JSON.stringify({ id: "m1", name: "Mae", email: "m@example.test", role: "MANAGER", image: null }),
+    );
+  });
+
+  it("answers an empty roster without reading counts", async () => {
+    listReviewees.mockResolvedValue([]);
+    expect(await roster()).toEqual([]);
+    expect(getTrackCountsFor).not.toHaveBeenCalled();
+  });
+
+  it("refuses a reviewee", async () => {
+    auth.mockResolvedValue({ user: { id: "r1", role: "USER" } });
+    const response = await GET(new Request("http://internal.local/api/admin/reviewees"));
+    expect(response.status).toBe(403);
+    expect(listReviewees).not.toHaveBeenCalled();
   });
 });

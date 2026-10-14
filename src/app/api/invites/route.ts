@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { auth } from "@/lib/auth";
 import { appUrl } from "@/lib/helper/app-url";
-import { touchLastSeen } from "@/app/api/_lib/presence-store";
+import { touchLastSeen } from "@/server/data/staff";
 import {
   canInvite,
   isInviteRole,

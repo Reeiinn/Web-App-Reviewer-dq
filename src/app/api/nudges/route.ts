@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import pool from "@/lib/db";
+import { listNudges, markNudgesRead, unreadNudgeCount } from "@/server/data/staff";
 import { NextResponse } from "next/server";
 
 /** Enough to fill the dropdown; older reminders are history nobody scrolls. */
@@ -18,33 +18,20 @@ export async function GET() {
   }
 
   try {
-    const { rows } = await pool.query(
-      `SELECT id, sender_name, message, created_at, read_at
-         FROM nudges
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT ${LIMIT}`,
-      [session.user.id],
-    );
-
-    const unread = await pool.query(
-      `SELECT COUNT(*)::int AS count
-         FROM nudges
-        WHERE user_id = $1 AND read_at IS NULL`,
-      [session.user.id],
-    );
+    const nudges = await listNudges(session.user.id, LIMIT);
+    const unread = await unreadNudgeCount(session.user.id);
 
     return NextResponse.json({
-      nudges: rows.map((row) => ({
+      nudges: nudges.map((row) => ({
         id: row.id,
-        sender: row.sender_name,
+        sender: row.senderName,
         message: row.message,
-        createdAt: row.created_at,
-        read: row.read_at !== null,
+        createdAt: row.createdAt,
+        read: row.readAt !== null,
       })),
       // Counted across every row, not just the twenty returned, so a buried
       // reminder still keeps the dot lit.
-      unread: unread.rows[0]?.count ?? 0,
+      unread,
     });
   } catch (error) {
     console.error("Error loading nudges:", error);
@@ -75,31 +62,12 @@ export async function PATCH(req: Request) {
     body = {};
   }
 
-  const one = typeof body.id === "string" ? body.id : null;
+  // An empty id marks everything, as the old truthiness check did.
+  const one = typeof body.id === "string" && body.id ? body.id : null;
 
   try {
-    if (one) {
-      await pool.query(
-        `UPDATE nudges SET read_at = now()
-          WHERE id = $1 AND user_id = $2 AND read_at IS NULL`,
-        [one, session.user.id],
-      );
-    } else {
-      await pool.query(
-        `UPDATE nudges SET read_at = now()
-          WHERE user_id = $1 AND read_at IS NULL`,
-        [session.user.id],
-      );
-    }
-
-    const unread = await pool.query(
-      `SELECT COUNT(*)::int AS count
-         FROM nudges
-        WHERE user_id = $1 AND read_at IS NULL`,
-      [session.user.id],
-    );
-
-    return NextResponse.json({ unread: unread.rows[0]?.count ?? 0 });
+    await markNudgesRead(session.user.id, one);
+    return NextResponse.json({ unread: await unreadNudgeCount(session.user.id) });
   } catch (error) {
     console.error("Error marking nudges read:", error);
     return NextResponse.json(

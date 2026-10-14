@@ -1,7 +1,7 @@
 # Prisma migration — design
 
 **Date:** 2026-10-14
-**Status:** approved; Waves 0–3 implemented (see Wave 0, 1, 2 and 3 outcomes)
+**Status:** approved; Waves 0–4 implemented (see Wave 0, 1, 2, 3 and 4 outcomes)
 **Follow-up:** [Focus tracks (backend)](2026-10-14-focus-tracks-backend-design.md) builds on this.
 
 ## Ground rules (from Nelson)
@@ -433,6 +433,42 @@ What implementing Wave 0 found, recorded so later waves start from it:
   `prisma generate && next build`.
 - **Connection budget** unchanged at 2 (`pg`) + 3 (Prisma); only the staff
   routes (Wave 4) still use `pg`.
+- **Production needs nothing for this wave:** no migration, no schema change.
+
+## Wave 4 outcome (2026-10-14)
+
+- **`src/server/data/staff.ts`** holds the roster and managers reads, the
+  account a staff action targets, removal, nudges, the audit log and
+  presence stamps. `_lib/presence-store.ts` and `_lib/audit-store.ts`
+  moved into it and were deleted; their callers (including the Wave 1
+  invites and avatar routes) import from it. Nothing in `src` imports
+  `@/lib/db` any more, so its pool is never created; Wave 5 deletes it.
+- **Removal is recorded once.** `removeReviewee` reports whether its
+  `updateMany` stamped the row, and the route writes the audit row only
+  then. Before, two removals racing both wrote one. Both still answer 200
+  with the same body; a DB test fires two at once.
+- **No-op writes stay no-ops.** Presence stamps, removal, marking read and
+  deleting a reminder use `updateMany` / `deleteMany`, so a row that is
+  already gone is not a P2025.
+- **Clock.** `last_seen_at`, `deleted_at`, `read_at` and `nudges.created_at`
+  come from the app clock, so the cooldown compares two app-clock instants.
+- **Parity:** `pnpm parity:staff` compares the admin roster (39
+  reviewees), all 12 staff accounts' own rosters, the managers list (10),
+  every user's staff-action target, reminders (50) and unread count (56
+  users), and all 35 reviewee–sender cooldowns with the old SQL on the
+  production restore: 0 differences.
+- **Not changed, recorded:** two sends at once can both pass the
+  cooldown; a malformed id is still a 500; lists still order by
+  `created_at` / name with no tiebreak.
+- **Vercel build.** The `dev` deployment failed type-checking
+  `src/test/db-global-setup.ts` with `Cannot find module 'vite'`:
+  `vite` was imported directly but only installed as `vitest`'s
+  dependency, and pnpm's clean install doesn't put it at the top level.
+  It is now a devDependency (8.2.2, the version already locked).
+- **Final review** (fresh reviewer, whole branch): no Critical or
+  Important findings, two minors. `PATCH /api/nudges` with `{"id": ""}`
+  answered 500 where the old falsy check marked everything read; fixed,
+  with a test. Pinning `vite` exactly rather than `^8.2.2` is deferred.
 - **Production needs nothing for this wave:** no migration, no schema change.
 
 ## After the waves: API reference for the frontend
