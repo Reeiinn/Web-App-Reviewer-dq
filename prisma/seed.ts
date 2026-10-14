@@ -1,14 +1,14 @@
-import { config } from "dotenv";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "../src/generated/prisma/client";
 import type { ExamType } from "../src/generated/prisma/client";
+import { loadLocalEnv } from "../src/server/db/local-env";
 import {
   assertLocalDatabase,
   isLocalDatabase,
 } from "../src/server/db/local-guard";
 import seedTerms from "../scripts/glossary-seed.cjs";
 
-config({ path: ".env.local" });
+loadLocalEnv();
 
 type SeedTerm = {
   exam_type: ExamType;
