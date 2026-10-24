@@ -316,6 +316,7 @@ model User {
   certificates         Certificate[]
   examAttempts         ExamAttempt[]
   flashcardProgress    FlashcardProgress[]
+  focusTracks          UserFocusTrack[]
   memorizationProgress MemorizationProgress[]
   nudgesSent           Nudge[]                @relation("NudgeSender")
   nudgesReceived       Nudge[]                @relation("NudgeRecipient")
@@ -363,4 +364,15 @@ enum UserRole {
   MANAGER
 
   @@map("user_role")
+}
+
+/// Tracks a reviewee is focused on. No rows means all four.
+model UserFocusTrack {
+  userId    String   @map("user_id") @db.Uuid
+  examType  ExamType @map("exam_type")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([userId, examType])
+  @@map("user_focus_tracks")
 }
