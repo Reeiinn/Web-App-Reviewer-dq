@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, getTrackCounts } = vi.hoisted(() => ({
+const { auth, getTrackCounts, getFocusTracks } = vi.hoisted(() => ({
   auth: vi.fn(),
   getTrackCounts: vi.fn(),
+  getFocusTracks: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("@/server/data/mastery", () => ({ getTrackCounts }));
+vi.mock("@/server/data/focus-tracks", () => ({ getFocusTracks }));
 
 import { buildTrackCounts } from "@/lib/helper/track-counts";
 import { GET } from "./route";
@@ -14,9 +16,23 @@ import { GET } from "./route";
 beforeEach(() => {
   vi.clearAllMocks();
   auth.mockResolvedValue({ user: { id: "u1", role: "USER" } });
+  getFocusTracks.mockResolvedValue({
+    tracks: ["VUL", "TRADITIONAL_LIFE", "IIAP_A", "IIAP_B"],
+    chosen: false,
+  });
 });
 
 describe("GET /api/progress", () => {
+  it("lists only the reviewee's focus tracks", async () => {
+    getFocusTracks.mockResolvedValue({ tracks: ["IIAP_A"], chosen: true });
+    getTrackCounts.mockResolvedValue([
+      buildTrackCounts("VUL", { exam_type: "VUL", flashcards: 1, memorization: 0, questions: 0 }, undefined),
+      buildTrackCounts("IIAP_A", { exam_type: "IIAP_A", flashcards: 1, memorization: 0, questions: 0 }, undefined),
+    ]);
+    const body = await (await GET()).json();
+    expect(body.map((row: { exam_type: string }) => row.exam_type)).toEqual(["IIAP_A"]);
+  });
+
   it("refuses a caller who is not signed in", async () => {
     auth.mockResolvedValue(null);
     expect((await GET()).status).toBe(401);

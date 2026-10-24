@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import type { MasteryCounts } from "@/lib/helper/readiness";
 import { PASSES_REQUIRED, cappedPasses } from "@/lib/helper/practice-exam";
+import { getFocusTracks } from "@/server/data/focus-tracks";
 import { getTrackCounts } from "@/server/data/mastery";
 import { NextResponse } from "next/server";
 
@@ -15,7 +16,12 @@ export async function GET() {
   }
 
   try {
-    const tracks = await getTrackCounts(session.user.id);
+    // Only the tracks the reviewee is focused on; with none chosen, all four.
+    const [counts, focus] = await Promise.all([
+      getTrackCounts(session.user.id),
+      getFocusTracks(session.user.id),
+    ]);
+    const tracks = counts.filter((t) => focus.tracks.includes(t.examType));
 
     const summary = tracks.map((t) => {
       const flashcardPct = share(t.flashcards);
