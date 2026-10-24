@@ -24,4 +24,13 @@ describe("GET /api/recent-activity", () => {
     await GET();
     expect(fetchRecent).toHaveBeenCalledWith("u1", 3, ["IIAP_B"]);
   });
+
+  it("asks for all four with no selection", async () => {
+    getFocusTracks.mockResolvedValue({
+      tracks: ["VUL", "TRADITIONAL_LIFE", "IIAP_A", "IIAP_B"],
+      chosen: false,
+    });
+    await GET();
+    expect(fetchRecent).toHaveBeenCalledWith("u1", 3, ["VUL", "TRADITIONAL_LIFE", "IIAP_A", "IIAP_B"]);
+  });
 });

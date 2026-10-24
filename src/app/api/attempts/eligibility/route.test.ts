@@ -41,7 +41,14 @@ describe("GET /api/attempts/eligibility", () => {
     getTrackCount.mockResolvedValue(
       buildTrackCounts("VUL", { exam_type: "VUL", flashcards: 1, memorization: 1, questions: 0 }, undefined),
     );
-    expect((await get("?exam_type=VUL")).status).toBe(200);
+    const response = await get("?exam_type=VUL");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      eligible: false,
+      flashcards: { mastered: 0, total: 1 },
+      memorization: { mastered: 0, total: 1 },
+    });
+    expect(getFocusTracks).not.toHaveBeenCalled();
   });
 
   it("refuses a caller who is not signed in", async () => {

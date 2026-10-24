@@ -42,6 +42,14 @@ describe("focus tracks", () => {
     expect((await getFocusTracks(a)).tracks).toEqual(["VUL"]);
   });
 
+  it("lets the last of two overlapping saves win, never a mix", async () => {
+    await Promise.all([
+      setFocusTracks(a, ["VUL"]),
+      setFocusTracks(a, ["IIAP_A"]),
+    ]);
+    expect([["VUL"], ["IIAP_A"]]).toContainEqual((await getFocusTracks(a)).tracks);
+  });
+
   it("answers for every user in one call", async () => {
     await setFocusTracks(a, ["VUL"]);
     const map = await getFocusTracksFor([a, b]);

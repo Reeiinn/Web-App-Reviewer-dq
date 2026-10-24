@@ -35,16 +35,21 @@ export async function getFocusTracksFor(
  * Replaces a user's pick. One transaction, so a failure leaves the old pick
  * in place: an empty set would otherwise read as "all four" without anyone
  * having chosen it. Callers validate with focusTracksBody first.
+ *
+ * The user's row is locked first, so two saves at once (two tabs) run one
+ * after the other and the last one wins, rather than each deleting only the
+ * rows it can see and leaving a mix of both picks.
  */
 export async function setFocusTracks(
   userId: string,
   tracks: ExamType[],
 ): Promise<FocusTracks> {
-  await prisma.$transaction([
-    prisma.userFocusTrack.deleteMany({ where: { userId } }),
-    prisma.userFocusTrack.createMany({
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT 1 FROM users WHERE id = ${userId}::uuid FOR UPDATE`;
+    await tx.userFocusTrack.deleteMany({ where: { userId } });
+    await tx.userFocusTrack.createMany({
       data: tracks.map((examType) => ({ userId, examType })),
-    }),
-  ]);
+    });
+  });
   return resolveFocusTracks(tracks);
 }
