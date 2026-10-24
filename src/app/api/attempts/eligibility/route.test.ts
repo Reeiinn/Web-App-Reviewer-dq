@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, getTrackCounts, getTrackCount } = vi.hoisted(() => ({
+const { auth, getTrackCounts, getTrackCount, getFocusTracks } = vi.hoisted(() => ({
   auth: vi.fn(),
   getTrackCounts: vi.fn(),
   getTrackCount: vi.fn(),
+  getFocusTracks: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("@/server/data/mastery", () => ({ getTrackCounts, getTrackCount }));
+vi.mock("@/server/data/focus-tracks", () => ({ getFocusTracks }));
 
 import { buildTrackCounts } from "@/lib/helper/track-counts";
 import { GET } from "./route";
@@ -18,9 +20,30 @@ const get = (query = "") =>
 beforeEach(() => {
   vi.clearAllMocks();
   auth.mockResolvedValue({ user: { id: "u1", role: "USER" } });
+  getFocusTracks.mockResolvedValue({
+    tracks: ["VUL", "TRADITIONAL_LIFE", "IIAP_A", "IIAP_B"],
+    chosen: false,
+  });
 });
 
 describe("GET /api/attempts/eligibility", () => {
+  it("keys only focus tracks in the all-tracks form", async () => {
+    getFocusTracks.mockResolvedValue({ tracks: ["TRADITIONAL_LIFE"], chosen: true });
+    getTrackCounts.mockResolvedValue([
+      buildTrackCounts("VUL", { exam_type: "VUL", flashcards: 1, memorization: 1, questions: 0 }, undefined),
+      buildTrackCounts("TRADITIONAL_LIFE", { exam_type: "TRADITIONAL_LIFE", flashcards: 1, memorization: 1, questions: 0 }, undefined),
+    ]);
+    expect(Object.keys(await (await get()).json())).toEqual(["TRADITIONAL_LIFE"]);
+  });
+
+  it("still answers for a named track outside focus", async () => {
+    getFocusTracks.mockResolvedValue({ tracks: ["TRADITIONAL_LIFE"], chosen: true });
+    getTrackCount.mockResolvedValue(
+      buildTrackCounts("VUL", { exam_type: "VUL", flashcards: 1, memorization: 1, questions: 0 }, undefined),
+    );
+    expect((await get("?exam_type=VUL")).status).toBe(200);
+  });
+
   it("refuses a caller who is not signed in", async () => {
     auth.mockResolvedValue(null);
     expect((await get()).status).toBe(401);
