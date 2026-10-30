@@ -40,12 +40,12 @@ export type ExamAnswerFields = {
   isCorrect: boolean;
 };
 
+/** A saved answer. Whether it was right stays out: the sitting is still open. */
 export const examAnswerJson = (a: ExamAnswerFields) => ({
   id: a.id,
   attempt_id: a.attemptId,
   question_id: a.questionId,
   selected_choice_id: a.selectedChoiceId,
-  is_correct: a.isCorrect,
 });
 
 /** An answer as GET /api/attempts/[id] lists it, with its question's text. */
@@ -62,6 +62,14 @@ export const reviewedAnswerJson = (a: ReviewedAnswerFields) => ({
   question_id: a.questionId,
   selected_choice_id: a.selectedChoiceId,
   is_correct: a.isCorrect,
+  question_text: a.questionText,
+});
+
+/** The same for a sitting still open, which a right or wrong would give away. */
+export const openAnswerJson = (a: ReviewedAnswerFields) => ({
+  id: a.id,
+  question_id: a.questionId,
+  selected_choice_id: a.selectedChoiceId,
   question_text: a.questionText,
 });
 

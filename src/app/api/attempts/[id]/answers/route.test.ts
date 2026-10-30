@@ -50,7 +50,7 @@ describe("POST /api/attempts/[id]/answers", () => {
 
     expect(response.status).toBe(201);
     expect(await response.text()).toBe(
-      '{"id":"x1","attempt_id":"a1","question_id":"q1","selected_choice_id":"c1","is_correct":true}',
+      '{"id":"x1","attempt_id":"a1","question_id":"q1","selected_choice_id":"c1"}',
     );
     expect(choiceCorrectness).toHaveBeenCalledWith("c1", "q1");
     expect(recordExamAnswer).toHaveBeenCalledWith({

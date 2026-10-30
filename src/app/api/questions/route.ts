@@ -1,16 +1,13 @@
+import { getQuestions } from "@/app/api/_lib/questions";
 import { auth } from "@/lib/auth";
-import { isExamType, type ExamType } from "@/lib/types/common";
-import { listQuestions } from "@/server/data/content";
-import { unstable_cache } from "next/cache";
+import { withoutAnswers } from "@/lib/helper/answer-key";
+import { isExamType } from "@/lib/types/common";
 import { NextResponse } from "next/server";
 
-const getQuestions = unstable_cache(
-  async (examType: ExamType | null, category: string | null) =>
-    listQuestions({ examType, category }),
-  ["questions"],
-  { tags: ["questions"] },
-);
-
+/**
+ * The questions without their answers. Sittings are scored on the server, so
+ * a reviewee sitting one has no need of them; see /api/questions/answers.
+ */
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -27,7 +24,7 @@ export async function GET(request: Request) {
 
   try {
     const rows = await getQuestions(examType, category);
-    return NextResponse.json(rows);
+    return NextResponse.json(withoutAnswers(rows));
   } catch (error) {
     console.error("Error fetching questions:", error);
     return NextResponse.json(

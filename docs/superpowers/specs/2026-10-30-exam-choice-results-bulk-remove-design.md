@@ -477,6 +477,26 @@ above:
   and additive: one new, empty table. `exam_results` joins the
   delete-a-user test.
 
+## Amendment: answers stay on the server during a sitting (2026-10-31)
+
+Found in the pre-production check: `/api/questions` sent every option's
+`is_correct`, and `GET /api/attempts/[id]` and `POST .../answers` said whether an
+answer was right, all during an open sitting.
+
+- `GET /api/questions` never carries `is_correct` or `explanation`.
+- `GET /api/questions/answers?exam_type=` is the answer key. A reviewee may read
+  it with no sitting open on that track and at least one finished, or with a
+  Passed mark. Staff may always read it.
+- `GET /api/attempts/[id]` reports `is_correct` only on a finished sitting, and
+  `POST .../answers` never does.
+- The result screen's score comes from the server. Its paper is marked from the
+  key, which is read once the sitting is closed.
+- While a sitting is open, past sittings and the review are refused with
+  "Finish your open practice exam before reviewing the answers."
+
+This protects the exam in progress. Flashcards and memorization still teach the
+same material, so studying a track still shows its answers.
+
 ## Production checklist (Nelson runs this, before merging to `main`)
 
 Merging to `main` is the live deploy, so the migrations come first. The build

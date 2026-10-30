@@ -164,7 +164,7 @@ function SittingDetail({
       // The paper is read from the sitting's own track, not the URL's, so a
       // link edited by hand cannot mark one exam's answers against another.
       const reply = await fetch(
-        `/api/questions?exam_type=${encodeURIComponent(attempt.exam_type)}`,
+        `/api/questions/answers?exam_type=${encodeURIComponent(attempt.exam_type)}`,
         fresh,
       );
       const questions = await reply.json();
@@ -235,6 +235,8 @@ function SittingDetail({
                 ) : (
                   <p className="mt-2 text-sm text-muted-foreground">
                     This question is no longer in the bank
+                    {row.chosen &&
+                      ` · You answered it ${row.correct ? "correctly" : "incorrectly"}`}
                   </p>
                 )}
               </section>

@@ -17,6 +17,7 @@ import {
   listFinishedAttempts,
   openAttempt,
   recordExamAnswer,
+  sittingStanding,
 } from "./attempts";
 
 // Users go first: their attempts' answers point at the questions with no
@@ -134,6 +135,27 @@ describe("openAttempt", () => {
 });
 
 describe("reading a sitting", () => {
+  it("tells whether a sitting is open and how many are finished", async () => {
+    const me = await user();
+    await question();
+    expect(await sittingStanding(me.id, "IIAP_B")).toEqual({
+      openSitting: false,
+      finishedSittings: 0,
+    });
+
+    const { attempt } = await openAttempt(me.id, "IIAP_B");
+    expect(await sittingStanding(me.id, "IIAP_B")).toEqual({
+      openSitting: true,
+      finishedSittings: 0,
+    });
+
+    await completeAttempt(attempt.id);
+    expect(await sittingStanding(me.id, "IIAP_B")).toEqual({
+      openSitting: false,
+      finishedSittings: 1,
+    });
+  });
+
   it("finds an attempt by id, and null for one that does not exist", async () => {
     const me = await user();
     await question();
@@ -256,6 +278,8 @@ describe("answers", () => {
     const s = await sitting(1);
     expect(await findAttemptOwner(s.attempt.id)).toBe(s.me.id);
     expect(await findAttemptOwner("00000000-0000-4000-8000-000000000000")).toBeNull();
+    expect(await findAttemptOwner("not-a-uuid")).toBeNull();
+    expect(await findAttempt("not-a-uuid")).toBeNull();
   });
 
   it("says whether a choice is right, and null for another question's choice", async () => {
