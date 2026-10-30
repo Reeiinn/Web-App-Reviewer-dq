@@ -1,5 +1,7 @@
 import "server-only";
 import prisma from "@/server/db/prisma";
+import type { ExamPick } from "@/lib/helper/exam-choice";
+import { resolveFocusTracks } from "@/lib/helper/focus-tracks";
 import { Prisma } from "@/generated/prisma/client";
 import {
   claimantMatches,
@@ -36,13 +38,27 @@ export type SignInAccount = {
   role: Role;
   managerId: string | null;
   onboardingToursSeen: string[];
+  /** The exams they picked, null until they have picked (see exam-choice). */
+  focusTracks: ExamPick;
+};
+
+const focusSelect = { focusTracks: { select: { examType: true } } } as const;
+
+/**
+ * Saved focus rows to the pick a session carries. Unlike resolveFocusTracks,
+ * nothing saved stays null: the session has to know a reviewee was never
+ * asked, not just which tracks to show.
+ */
+const asPick = (rows: { examType: string }[]): ExamPick => {
+  const resolved = resolveFocusTracks(rows.map((row) => row.examType));
+  return resolved.chosen ? resolved.tracks : null;
 };
 
 /** The account behind a sign-in attempt. `email` is already normalised. */
 export async function findSignInAccount(
   email: string,
 ): Promise<SignInAccount | null> {
-  return prisma.user.findFirst({
+  const row = await prisma.user.findFirst({
     where: { email, deletedAt: null },
     select: {
       id: true,
@@ -52,24 +68,28 @@ export async function findSignInAccount(
       role: true,
       managerId: true,
       onboardingToursSeen: true,
+      ...focusSelect,
     },
   });
+  return row && { ...row, focusTracks: asPick(row.focusTracks) };
 }
 
 export type SessionClaims = {
   role: Role;
   managerId: string | null;
   onboardingToursSeen: string[];
+  focusTracks: ExamPick;
 };
 
 /** What a session may claim right now; null once the account is gone. */
 export async function getSessionClaims(
   userId: string,
 ): Promise<SessionClaims | null> {
-  return prisma.user.findFirst({
+  const row = await prisma.user.findFirst({
     where: { id: userId, deletedAt: null },
-    select: { role: true, managerId: true, onboardingToursSeen: true },
+    select: { role: true, managerId: true, onboardingToursSeen: true, ...focusSelect },
   });
+  return row && { ...row, focusTracks: asPick(row.focusTracks) };
 }
 
 /** The account's photo, a data URL; null if none or the account is gone. */

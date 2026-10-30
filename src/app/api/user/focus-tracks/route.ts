@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { firstIssue, focusTracksBody } from "@/lib/helper/focus-tracks";
 import { getFocusTracks, setFocusTracks } from "@/server/data/focus-tracks";
+import { outcomesFor } from "@/server/data/exam-results";
+import { markedTrackDropped, markedTrackMessage } from "@/lib/helper/exam-choice";
 import { NextResponse } from "next/server";
 
 /**
@@ -48,6 +50,17 @@ export async function PUT(req: Request) {
   }
 
   try {
+    // A recorded licensing result has to keep pointing at an exam the
+    // reviewee still has. The picker locks those boxes; this is the rule
+    // behind the lock.
+    const dropped = markedTrackDropped(
+      parsed.data.tracks,
+      await outcomesFor(caller.userId),
+    );
+    if (dropped) {
+      return NextResponse.json({ error: markedTrackMessage(dropped) }, { status: 409 });
+    }
+
     return NextResponse.json(await setFocusTracks(caller.userId, parsed.data.tracks));
   } catch (error) {
     console.error("Error saving focus tracks:", error);

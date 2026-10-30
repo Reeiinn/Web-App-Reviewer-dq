@@ -1,3 +1,4 @@
+import { needsExamChoice } from "@/lib/helper/exam-choice";
 import { isStaff } from "@/lib/helper/roles";
 import type { NextAuthConfig } from "next-auth";
 import { NextResponse } from "next/server";
@@ -7,7 +8,12 @@ import { NextResponse } from "next/server";
  * Analytics is here because it charts the signed-in account's own mastery,
  * which is empty for staff. Glossary stays open — it is reference material.
  */
-const learnerOnly = ["/dashboard", "/learningMethods", "/analytics"];
+const learnerOnly = [
+  "/dashboard",
+  "/learningMethods",
+  "/analytics",
+  "/choose-exams",
+];
 
 /**
  * Screens and endpoints that answer to anyone.
@@ -133,6 +139,19 @@ export const authConfig: NextAuthConfig = {
         return NextResponse.redirect(new URL("/admin", request.nextUrl));
       }
 
+      // A reviewee who has never said which exams they are taking is asked
+      // once, on the way in, rather than handed all four and left to find the
+      // setting. A pick of all four is still a pick, so they are not asked
+      // again; API calls are never redirected.
+      if (
+        isLoggedIn &&
+        needsExamChoice(auth?.user?.role, auth?.user?.focusTracks) &&
+        pathname !== "/choose-exams" &&
+        learnerOnly.some((prefix) => pathname.startsWith(prefix))
+      ) {
+        return NextResponse.redirect(new URL("/choose-exams", request.nextUrl));
+      }
+
       // An API caller is a fetch(), not a browser following a redirect: it
       // parses the body it gets back, and a sign-in page arrives as HTML that
       // throws in JSON.parse. The routes themselves answer 401 the same way.
@@ -148,6 +167,7 @@ export const authConfig: NextAuthConfig = {
         token.role = (user as any).role;
         token.managerId = (user as any).managerId;
         token.onboardingToursSeen = (user as any).onboardingToursSeen ?? [];
+        token.focusTracks = (user as any).focusTracks ?? null;
       }
       return token;
     },
@@ -158,6 +178,7 @@ export const authConfig: NextAuthConfig = {
         (session.user as any).managerId = token.managerId;
         (session.user as any).onboardingToursSeen =
           token.onboardingToursSeen ?? [];
+        (session.user as any).focusTracks = token.focusTracks ?? null;
       }
       return session;
     },

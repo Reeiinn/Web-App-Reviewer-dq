@@ -13,6 +13,7 @@ import {
 import { pickActiveTrack, type TrackActivity } from "@/lib/helper/active-track";
 import { OnboardingTour } from "@/components/ui/onboarding-tour";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
+import { trackCopy } from "./track-copy";
 import type { StudyMode } from "@/lib/types/study";
 import {
   ArrowRight,
@@ -64,25 +65,6 @@ const modeMeta: Record<
     title: "Practice Exam",
     icon: ClipboardCheck,
     href: (type) => `/learningMethods/practiceExam?exam_type=${type}`,
-  },
-};
-
-const trackCopy: Record<ExamType, { title: string; blurb: string }> = {
-  VUL: {
-    title: "VUL (Variable Universal Life)",
-    blurb: "Master the complexities of investment-linked insurance.",
-  },
-  TRADITIONAL_LIFE: {
-    title: "Traditional Life",
-    blurb: "Core fundamentals of whole and term life insurance.",
-  },
-  IIAP_A: {
-    title: "IIAP (Set A)",
-    blurb: "The first IIAP question set, with its own deck and exam.",
-  },
-  IIAP_B: {
-    title: "IIAP (Set B)",
-    blurb: "The second IIAP question set, tracked separately from Set A.",
   },
 };
 
