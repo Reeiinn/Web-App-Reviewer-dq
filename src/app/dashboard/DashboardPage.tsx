@@ -14,6 +14,10 @@ import { pickActiveTrack, type TrackActivity } from "@/lib/helper/active-track";
 import { OnboardingTour } from "@/components/ui/onboarding-tour";
 import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import { trackCopy } from "./track-copy";
+import { tracksFor } from "@/lib/helper/exam-choice";
+import type { FocusTracks } from "@/lib/helper/focus-tracks";
+import { trackLayout } from "@/lib/helper/track-layout";
+import type { ExamResults, LicensingOutcome } from "@/lib/types/exam-results";
 import type { StudyMode } from "@/lib/types/study";
 import {
   ArrowRight,
@@ -121,6 +125,8 @@ function TrackCard({
   passes,
   eligibility,
   active,
+  wide,
+  outcome,
   expanded,
   onToggle,
   onClose,
@@ -131,6 +137,10 @@ function TrackCard({
   passes: number;
   eligibility: Eligibility | null;
   active: boolean;
+  /** Spans the grid's row, laid out side to side once there is room. */
+  wide: boolean;
+  /** How the real licensing exam went, once staff have recorded it. */
+  outcome: LicensingOutcome | undefined;
   expanded: boolean;
   onToggle: () => void;
   onClose: () => void;
@@ -138,6 +148,7 @@ function TrackCard({
   const { title, blurb } = trackCopy[type];
   const started = overall > 0;
   const trackPassed = hasPassedTrack(passes);
+  const licensed = outcome === "PASSED";
   const locked = eligibility ? !eligibility.eligible : true;
   const reason = eligibility
     ? lockReason(eligibility.flashcards, eligibility.memorization)
@@ -218,12 +229,29 @@ function TrackCard({
   }, [expanded, onClose]);
 
   return (
-    <section className="rv-card flex h-full flex-col p-4">
+    <section
+      className={`rv-card flex h-full flex-col p-4 ${
+        wide ? "col-span-2 lg:flex-row lg:gap-6 lg:p-5" : ""
+      } ${licensed ? "border-[#B8DFCA] bg-[linear-gradient(#fff,#F5FBF8)]" : ""}`}
+    >
+      {/* Split in two so a wide card can set them side by side: what the
+          track is and how far along, then what to do next. */}
+      <div className={wide ? "lg:min-w-0 lg:flex-1" : ""}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          {active && (
+          {active && !licensed && (
             <span className="rounded bg-[#FFD400] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#0B2340]">
               Active
+            </span>
+          )}
+          {licensed && (
+            <span className="rounded bg-[#E7F4EE] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#0F7B52]">
+              Passed
+            </span>
+          )}
+          {outcome === "FAILED" && (
+            <span className="rounded bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-rose-700">
+              Retaking
             </span>
           )}
           {/* A phone card is too narrow for the full name without wrapping to
@@ -260,7 +288,15 @@ function TrackCard({
           />
         </div>
       </div>
+      </div>
 
+      <div
+        className={
+          wide
+            ? "lg:flex lg:w-72 lg:shrink-0 lg:flex-col lg:justify-center lg:border-l lg:border-border lg:pl-6"
+            : ""
+        }
+      >
       {/* The exam counter sits under the progress bar because it answers a
           different question: not how much of the track has been studied, but
           how much of it has been proved. */}
@@ -305,7 +341,17 @@ function TrackCard({
           />
         </button>
 
-        {locked ? (
+        {licensed ? (
+          // Passing the real exam closes new sittings, not the record of the
+          // old ones — and it does so whether or not the decks were finished,
+          // so this is offered ahead of the study lock.
+          <Link
+            href={`/learningMethods/practiceExam?exam_type=${type}&mode=history`}
+            className="w-full rounded-lg border-2 border-[#0F7B52] px-3 py-2 text-center text-sm font-bold leading-tight text-[#0F7B52] transition hover:bg-[#E7F4EE] sm:w-auto"
+          >
+            Review past exams
+          </Link>
+        ) : locked ? (
           <span
             aria-disabled="true"
             title={reason ?? undefined}
@@ -382,12 +428,20 @@ function TrackCard({
 
       {/* Hidden on a phone, where the four cards need every pixel: the locked
           Practice Exam button still reads as locked on its own. */}
-      {locked && reason && (
-        <p className="mt-2 hidden items-start gap-1.5 text-xs text-muted-foreground sm:flex">
-          <Lock className="mt-0.5 size-3 shrink-0" />
-          {reason}
+      {licensed ? (
+        <p className="mt-2 text-xs font-bold text-[#0F7B52]">
+          View-only: you&apos;ve passed this exam
         </p>
+      ) : (
+        locked &&
+        reason && (
+          <p className="mt-2 hidden items-start gap-1.5 text-xs text-muted-foreground sm:flex">
+            <Lock className="mt-0.5 size-3 shrink-0" />
+            {reason}
+          </p>
+        )
       )}
+      </div>
     </section>
   );
 }
@@ -453,6 +507,8 @@ function QuickAccess({ recent }: { recent: RecentItem[] }) {
 }
 
 function ExamTracks({
+  chosen,
+  results,
   progress,
   passes,
   eligibility,
@@ -461,6 +517,9 @@ function ExamTracks({
   onToggle,
   onClose,
 }: {
+  /** The exams this reviewee is taking, in display order. */
+  chosen: ExamType[];
+  results: ExamResults;
   progress: Record<ExamType, number>;
   passes: Record<ExamType, number>;
   eligibility: Partial<Record<ExamType, Eligibility>>;
@@ -469,12 +528,22 @@ function ExamTracks({
   onToggle: (type: ExamType) => void;
   onClose: () => void;
 }) {
+  const { order, wide } = trackLayout(chosen, activeTrack ?? null);
+
   return (
     <div>
-      {/* Below lg the tab above already names the section. */}
-      <h2 className="hidden text-xl font-extrabold lg:block">Exam Tracks</h2>
-      <div className="grid grid-cols-2 gap-3 lg:mt-3">
-        {examTypes.map((type) => (
+      <div className="flex items-baseline justify-between gap-3">
+        {/* Below lg the tab above already names the section. */}
+        <h2 className="hidden text-xl font-extrabold lg:block">Your Exams</h2>
+        <Link
+          href="/choose-exams?edit=1"
+          className="ml-auto text-sm font-bold text-[#8A6D0B] underline underline-offset-2 hover:text-[#0B2340]"
+        >
+          Edit exams
+        </Link>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-3 lg:mt-3">
+        {order.map((type) => (
           <TrackCard
             key={type}
             type={type}
@@ -482,6 +551,8 @@ function ExamTracks({
             passes={passes[type] ?? 0}
             eligibility={eligibility[type] ?? null}
             active={type === activeTrack}
+            wide={type === wide}
+            outcome={results[type]}
             expanded={expanded === type}
             onToggle={() => onToggle(type)}
             onClose={onClose}
@@ -502,6 +573,9 @@ export function DashboardPage() {
   >({});
   const [expanded, setExpanded] = useState<ExamType | null>(null);
   const [recent, setRecent] = useState<RecentItem[]>([]);
+  /** The exams this reviewee chose; all four until the first load says. */
+  const [chosen, setChosen] = useState<ExamType[]>(() => tracksFor(null));
+  const [results, setResults] = useState<ExamResults>({});
   const [activeTab, setActiveTab] = useState<"tracks" | "quick">("tracks");
   /**
    * True until the first load settles, and never true again.
@@ -559,10 +633,28 @@ export function DashboardPage() {
       })
       .catch((error) => console.error("Failed to load eligibility:", error));
 
-    // All three, because a card needs progress, passes and its lock reason
-    // before it says anything true. Clearing the skeleton on the first reply
-    // would only move the flash of wrong numbers later.
-    Promise.all([activity, summary, unlocks]).then(() => {
+    // Read on every refresh, so a pick changed in another tab, or a result
+    // staff record while the reviewee is away, is on the cards when they come
+    // back to them.
+    const exams = Promise.all([
+      fetch("/api/user/focus-tracks").then(
+        (response) => response.json() as Promise<Partial<FocusTracks>>,
+      ),
+      fetch("/api/user/exam-results").then(
+        (response) => response.json() as Promise<{ results?: ExamResults }>,
+      ),
+    ])
+      .then(([focus, marks]) => {
+        if (!current()) return;
+        setChosen(tracksFor(focus.chosen ? focus.tracks : null));
+        setResults(marks.results ?? {});
+      })
+      .catch((error) => console.error("Failed to load your exams:", error));
+
+    // All four, because a card needs its exam, progress, passes and lock
+    // reason before it says anything true. Clearing the skeleton on the first
+    // reply would only move the flash of wrong numbers later.
+    Promise.all([activity, summary, unlocks, exams]).then(() => {
       if (current()) setLoading(false);
     });
   }, []);
@@ -605,8 +697,11 @@ export function DashboardPage() {
   // opened but not answered yet still left the badge on the previous one.
   // Progress timestamps stay the fallback for accounts recorded before the
   // visit feed existed.
+  const visited = recent[0]?.exam_type;
   const activeTrack =
-    recent[0]?.exam_type ?? pickActiveTrack(examTypes, activity);
+    visited && chosen.includes(visited)
+      ? visited
+      : (pickActiveTrack(chosen, activity) ?? undefined);
 
   return (
     // The dashboard is a fixed screen: the shell owns the viewport height and
@@ -684,6 +779,8 @@ export function DashboardPage() {
             className={activeTab === "tracks" ? undefined : "hidden lg:block"}
           >
             <ExamTracks
+              chosen={chosen}
+              results={results}
               progress={progress}
               passes={passes}
               eligibility={eligibility}
