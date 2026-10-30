@@ -618,6 +618,8 @@ export function AdminPage() {
   const [roster, setRoster] = useState<Reviewee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  /** A failed mark. Apart from error, which replaces the table it arose in. */
+  const [markError, setMarkError] = useState("");
   const [notice, setNotice] = useState("");
   const [statusFilter, setStatusFilter] = useState<ReadinessStatus | "ALL">(
     "ALL",
@@ -754,6 +756,15 @@ export function AdminPage() {
             className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
           >
             {notice}
+          </p>
+        )}
+
+        {markError && (
+          <p
+            role="alert"
+            className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
+          >
+            {markError}
           </p>
         )}
 
@@ -1031,7 +1042,10 @@ export function AdminPage() {
                                 revieweeName={row.name}
                                 examType={examType}
                                 mark={row.results[examType]}
-                                onError={setError}
+                                onError={(message) => {
+                                  setNotice("");
+                                  setMarkError(message);
+                                }}
                                 onChange={(results, message) => {
                                   setRoster((current) =>
                                     current.map((item) =>
@@ -1040,7 +1054,7 @@ export function AdminPage() {
                                         : item,
                                     ),
                                   );
-                                  setError("");
+                                  setMarkError("");
                                   setNotice(message);
                                 }}
                               />
