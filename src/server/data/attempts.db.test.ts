@@ -14,6 +14,7 @@ import {
   findOpenAttempt,
   listAttemptAnswers,
   listCompletedSittings,
+  listFinishedAttempts,
   openAttempt,
   recordExamAnswer,
 } from "./attempts";
@@ -184,6 +185,29 @@ describe("reading a sitting", () => {
     expect(await listCompletedSittings(me.id)).toEqual([
       { examType: "VUL", passed: false, score: 3, totalItems: 4, completedAt: at("2026-10-01T00:00:00.000Z") },
       { examType: "VUL", passed: true, score: 3, totalItems: 4, completedAt: at("2026-10-02T00:00:00.000Z") },
+    ]);
+  });
+
+  // The past-exams list: one track, newest first, each with the id that opens it.
+  it("lists one track's finished sittings newest first, with their ids", async () => {
+    const me = await user();
+    const at = (iso: string) => new Date(iso);
+    const older = await prisma.examAttempt.create({
+      data: { userId: me.id, examType: "VUL", score: 2, totalItems: 4, passed: false, completedAt: at("2026-10-01T00:00:00.000Z") },
+    });
+    const newer = await prisma.examAttempt.create({
+      data: { userId: me.id, examType: "VUL", score: 4, totalItems: 4, passed: true, completedAt: at("2026-10-03T00:00:00.000Z") },
+    });
+    await prisma.examAttempt.create({
+      data: { userId: me.id, examType: "IIAP_A", score: 1, totalItems: 1, passed: true, completedAt: at("2026-10-02T00:00:00.000Z") },
+    });
+    await prisma.examAttempt.create({
+      data: { userId: me.id, examType: "VUL", score: 0, totalItems: 0, passed: false },
+    });
+
+    expect(await listFinishedAttempts(me.id, "VUL")).toEqual([
+      { id: newer.id, score: 4, totalItems: 4, passed: true, completedAt: at("2026-10-03T00:00:00.000Z") },
+      { id: older.id, score: 2, totalItems: 4, passed: false, completedAt: at("2026-10-01T00:00:00.000Z") },
     ]);
   });
 });

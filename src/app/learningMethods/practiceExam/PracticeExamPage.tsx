@@ -1,12 +1,9 @@
 "use client";
 
 import { Spinner } from "@/components/ui/spinner";
-import { AppNav } from "@/components/ui/app-nav";
-import { BackLink } from "@/components/ui/back-link";
 import { Result } from "@/components/ui/result";
 import type { Eligibility } from "@/lib/types/eligibility";
 import { lockReason } from "@/lib/helper/eligibility";
-import { splitStatements } from "@/lib/helper/question-text";
 import {
   PASSING_PERCENTAGE,
   hasPassedTrack,
@@ -14,7 +11,10 @@ import {
 } from "@/lib/helper/practice-exam";
 import { examLabels, parseExamType } from "@/lib/types/common";
 import type { Question } from "@/lib/types/questions";
-import { Award, Lock } from "lucide-react";
+import { Award, CheckCircle2, Lock } from "lucide-react";
+import { PASSED_LOCK_MESSAGE } from "@/lib/helper/licensing";
+import { practiceEntry, readCompletion } from "@/lib/helper/practice-gate";
+import type { ExamResults } from "@/lib/types/exam-results";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -25,6 +25,9 @@ import {
   useState,
 } from "react";
 import { PracticeExamBodySkeleton } from "./PracticeExamSkeleton";
+import { Frame } from "./frame";
+import { PastSittings } from "./PastSittings";
+import { QuestionText, ReviewChoices } from "./review-choices";
 import { fresh } from "@/lib/helper/fetch-fresh";
 import { resendAnswers } from "@/lib/helper/exam-submit";
 
@@ -55,99 +58,6 @@ function dealt(
   return order
     .map((id) => byId.get(id))
     .filter((item): item is Question => Boolean(item));
-}
-
-/**
- * A question, with any roman-numeral statements set out as their own lines.
- *
- * These questions enumerate "I. … II. … III." inside the sentence, and run
- * together they read as one wall of text the learner has to parse before they
- * can even look at the choices. Flashcards and memorization already break them
- * out; this is the same split, so a question reads the same way in all three.
- */
-function QuestionText({ text }: { text: string }) {
-  const { prompt, statements } = splitStatements(text);
-
-  return (
-    <>
-      <h2 className="mt-2 font-bold leading-7">{prompt}</h2>
-      {statements.length > 0 && (
-        <div className="mt-2.5 flex flex-col gap-1.5">
-          {statements.map((statement) => (
-            <p
-              key={statement}
-              className="rounded-lg bg-muted px-3 py-2 text-sm leading-6"
-            >
-              {statement}
-            </p>
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
-/**
- * A question's choices, read rather than answered.
- *
- * Used by the screen after a sitting and by the review a passed track opens
- * into, so the two mark a paper the same way: the right answer always carries
- * its own colour, and a wrong pick is marked beside it when there is one.
- * `chosen` is undefined in a review that belongs to no sitting.
- */
-function ReviewChoices({
-  question,
-  chosen,
-}: {
-  question: Question;
-  chosen: string | undefined;
-}) {
-  return (
-    <div className="mt-4 flex flex-col gap-2.5">
-      {question.choices.map((choice, choiceIndex) => {
-        const picked = chosen === choice.id;
-        const pickedWrong = picked && !choice.is_correct;
-
-        return (
-          <div
-            key={choice.id}
-            className={`flex items-center gap-4 rounded-lg border-2 px-4 py-3 text-left text-sm ${
-              choice.is_correct
-                ? "border-[#0F7B52] bg-[#0F7B52]/10"
-                : pickedWrong
-                  ? "border-[#C91D1D] bg-[#C91D1D]/10"
-                  : "border-border"
-            }`}
-          >
-            <span
-              className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
-                choice.is_correct
-                  ? "border-[#0F7B52] bg-[#0F7B52] text-white"
-                  : pickedWrong
-                    ? "border-[#C91D1D] bg-[#C91D1D] text-white"
-                    : "border-border text-muted-foreground"
-              }`}
-            >
-              {String.fromCharCode(65 + choiceIndex)}
-            </span>
-
-            <span className="flex-1">{choice.text}</span>
-
-            {choice.is_correct && (
-              <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-[#0F7B52]">
-                {picked ? "Your answer · Correct" : "Correct answer"}
-              </span>
-            )}
-            {pickedWrong && (
-              <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-[#C91D1D]">
-                Your answer
-              </span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
 }
 
 /**
@@ -186,6 +96,10 @@ function PracticeExamContent() {
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [eligibility, setEligibility] = useState<Eligibility | null>(null);
+  /** Staff recorded a pass on the real exam: no new sittings here. */
+  const [licensed, setLicensed] = useState(false);
+  /** The pass itself, which keeps the review open past the study lock. */
+  const [passedMark, setPassedMark] = useState(false);
   const [error, setError] = useState("");
   /**
    * The verdict the server gave this sitting, plus where the track stands
@@ -218,14 +132,39 @@ function PracticeExamContent() {
 
     (async () => {
       try {
-        const check: Eligibility = await fetch(
-          `/api/attempts/eligibility?exam_type=${encodeURIComponent(type)}`,
-        ).then((response) => response.json());
+        const [check, exams] = await Promise.all([
+          fetch(
+            `/api/attempts/eligibility?exam_type=${encodeURIComponent(type)}`,
+          ).then((response) => response.json() as Promise<Eligibility>),
+          fetch("/api/user/exam-results")
+            .then(
+              (response) =>
+                response.json() as Promise<{ results?: ExamResults }>,
+            )
+            .catch(() => ({ results: {} as ExamResults })),
+        ]);
 
         if (!active) return;
         setEligibility(check);
 
-        if (!check.eligible) {
+        // Someone who passed the real exam is told that, not that their
+        // decks are unfinished; the answer-key review stays open to them
+        // either way. Only a new sitting is closed.
+        const passed = exams.results?.[type] === "PASSED";
+        setPassedMark(passed);
+        const entry = practiceEntry({
+          passed,
+          reviewing: openedForReview,
+          eligible: check.eligible,
+        });
+
+        if (entry === "licensed") {
+          setLicensed(true);
+          setLoading(false);
+          return;
+        }
+
+        if (entry === "locked") {
           setLoading(false);
           return;
         }
@@ -256,6 +195,13 @@ function PracticeExamContent() {
         ]);
 
         if (!active) return;
+        // The server has the final say: a mark recorded since this page last
+        // asked still closes the sitting.
+        if (attempt?.licensed) {
+          setLicensed(true);
+          setLoading(false);
+          return;
+        }
         setQuestions(dealt(Array.isArray(items) ? items : [], attempt));
         setFinished(false);
         setAttemptId(attempt?.id ?? null);
@@ -422,18 +368,29 @@ function PracticeExamContent() {
         return;
       }
 
-      const completed = (await fetch(`/api/attempts/${attemptId}/complete`, {
+      const response = await fetch(`/api/attempts/${attemptId}/complete`, {
         method: "POST",
-      }).then((response) => response.json())) as {
-        passed?: boolean;
-        passes?: number;
-        certificate?: { id?: string } | null;
-      };
+      });
+      const completed = readCompletion(
+        response.ok,
+        await response.json().catch(() => null),
+      );
+
+      // A pass recorded while this sitting was open closes it; that is the
+      // passed screen, not a failed result.
+      if (completed.kind === "licensed") {
+        setLicensed(true);
+        return;
+      }
+      if (completed.kind === "error") {
+        setError(completed.message);
+        return;
+      }
 
       setOutcome({
-        passed: Boolean(completed?.passed),
-        passes: Number(completed?.passes ?? 0),
-        certificateId: completed?.certificate?.id ?? null,
+        passed: completed.passed,
+        passes: completed.passes,
+        certificateId: completed.certificateId,
       });
       setFinished(true);
     } catch (submitError) {
@@ -459,6 +416,11 @@ function PracticeExamContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ exam_type: type }),
       }).then((response) => response.json());
+
+      if (attempt?.licensed) {
+        setLicensed(true);
+        return;
+      }
 
       if (!attempt?.id) {
         setError(attempt?.error ?? "Could not start another exam.");
@@ -493,7 +455,38 @@ function PracticeExamContent() {
     );
   }
 
-  if (eligibility && !eligibility.eligible) {
+  if (licensed) {
+    return (
+      <Frame title={`${examLabels[type]} Practice Exam`}>
+        <section className="rv-card mx-auto w-full max-w-xl p-[clamp(1.25rem,5vw,1.75rem)]">
+          <span className="flex size-11 items-center justify-center rounded-full bg-[#E7F4EE]">
+            <CheckCircle2 className="size-5 text-[#0F7B52]" />
+          </span>
+          <h2 className="mt-4 text-xl font-extrabold">Exam passed</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {PASSED_LOCK_MESSAGE}
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href={`/learningMethods/practiceExam?exam_type=${type}&mode=history`}
+              className="rounded-lg border-2 border-[#0F7B52] px-4 py-2.5 text-sm font-bold text-[#0F7B52] transition hover:bg-[#E7F4EE]"
+            >
+              Review past exams
+            </Link>
+          </div>
+        </section>
+      </Frame>
+    );
+  }
+
+  if (
+    eligibility &&
+    practiceEntry({
+      passed: passedMark,
+      reviewing,
+      eligible: eligibility.eligible,
+    }) === "locked"
+  ) {
     return (
       <Frame title="Practice exam locked">
         <section className="rv-card mx-auto w-full max-w-xl p-[clamp(1.25rem,5vw,1.75rem)]">
@@ -812,45 +805,18 @@ function Meter({
   );
 }
 
-function Frame({
-  title,
-  children,
-  /**
-   * Drops the way back and the heading. The result screen leads with its own
-   * verdict, and a title repeating the track above it only pushes the thing
-   * the learner opened the page for further down.
-   */
-  bare = false,
-}: {
-  title: string;
-  children: React.ReactNode;
-  bare?: boolean;
-}) {
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <AppNav />
-      <main className="rv-shell py-[clamp(1.5rem,4vw,2.5rem)]">
-        {/* One column for the whole screen: the way back, the title and the
-            questions share an edge and centre together, instead of the heading
-            hugging the shell while the cards sat in a narrower column of their
-            own. */}
-        <div className="mx-auto w-full max-w-3xl">
-          {!bare && (
-            <>
-              <BackLink />
-              {/* Fluid rather than a jump at md: the title is the tallest
-                  thing here, and on a short window that jump costs a
-                  question. */}
-              <h1 className="mb-[clamp(1rem,3vw,1.5rem)] text-[clamp(1.75rem,5.5vw,3rem)] font-extrabold leading-tight">
-                {title}
-              </h1>
-            </>
-          )}
-          {children}
-        </div>
-      </main>
-    </div>
-  );
+/**
+ * A sitting, or the record of past ones.
+ *
+ * Chosen above the sitting so opening the history never runs the sitting's
+ * load: that deals a paper, and reading old results must not start a new one.
+ */
+function PracticeExamRoute() {
+  const searchParams = useSearchParams();
+  if (searchParams.get("mode") === "history") {
+    return <PastSittings type={parseExamType(searchParams.get("exam_type"))} />;
+  }
+  return <PracticeExamContent />;
 }
 
 export function PracticeExamPage() {
@@ -862,7 +828,7 @@ export function PracticeExamPage() {
         </Frame>
       }
     >
-      <PracticeExamContent />
+      <PracticeExamRoute />
     </Suspense>
   );
 }

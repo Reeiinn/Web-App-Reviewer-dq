@@ -3,6 +3,8 @@ import { attemptJson, certificateJson } from "@/lib/helper/exam-json";
 import { PASSES_REQUIRED, cappedPasses } from "@/lib/helper/practice-exam";
 import { completeAttempt, findAttemptOwner } from "@/server/data/attempts";
 import { issueCertificate } from "@/server/data/certificates";
+import { licensedOnAttempt } from "@/server/data/exam-results";
+import { PASSED_LOCK_BODY } from "@/lib/helper/licensing";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -26,6 +28,12 @@ export async function POST(
 
     if (owner !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // A sitting left open when the pass was recorded cannot be finished: its
+    // pass would still count toward a certificate.
+    if (await licensedOnAttempt(attemptId)) {
+      return NextResponse.json(PASSED_LOCK_BODY, { status: 403 });
     }
 
     const { attempt, passes: counted } = await completeAttempt(attemptId);
