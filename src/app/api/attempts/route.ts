@@ -4,8 +4,6 @@ import { attemptJson } from "@/lib/helper/exam-json";
 import { fetchEligibility } from "@/app/api/_lib/mastery";
 import { isExamType } from "@/lib/types/common";
 import { openAttempt } from "@/server/data/attempts";
-import { outcomeFor } from "@/server/data/exam-results";
-import { PASSED_LOCK_BODY, practiceLocked } from "@/lib/helper/licensing";
 import { NextResponse } from "next/server";
 
 /**
@@ -34,13 +32,6 @@ export async function POST(req: Request) {
         { error: "exam_type is invalid" },
         { status: 400 },
       );
-    }
-
-    // Ahead of the study gate: a reviewee who passed the real exam is told so,
-    // not that their decks are unfinished. It also stops an open sitting
-    // being resumed once the pass is recorded.
-    if (practiceLocked(await outcomeFor(session.user.id, exam_type))) {
-      return NextResponse.json(PASSED_LOCK_BODY, { status: 403 });
     }
 
     // The UI locks the entry point, but the gate has to live here too — the

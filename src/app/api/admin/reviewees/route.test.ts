@@ -1,19 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, listReviewees, getTrackCountsFor, touchLastSeen, getFocusTracksFor, resultsFor } = vi.hoisted(() => ({
+const { auth, listReviewees, getTrackCountsFor, touchLastSeen } = vi.hoisted(() => ({
   auth: vi.fn(),
   listReviewees: vi.fn(),
   getTrackCountsFor: vi.fn(),
   touchLastSeen: vi.fn(),
-  getFocusTracksFor: vi.fn(),
-  resultsFor: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("@/server/data/mastery", () => ({ getTrackCountsFor }));
 vi.mock("@/server/data/staff", () => ({ listReviewees, touchLastSeen }));
-vi.mock("@/server/data/focus-tracks", () => ({ getFocusTracksFor }));
-vi.mock("@/server/data/exam-results", () => ({ resultsFor }));
 
 import { buildTrackCounts, type ProgressRow } from "@/lib/helper/track-counts";
 import { examTypes, type ExamType } from "@/lib/types/common";
@@ -39,46 +35,9 @@ beforeEach(() => {
   auth.mockResolvedValue({ user: { id: "admin", role: "ADMIN" } });
   listReviewees.mockResolvedValue([reviewee]);
   getTrackCountsFor.mockResolvedValue(new Map([["r1", []]]));
-  getFocusTracksFor.mockImplementation(async (ids: string[]) =>
-    new Map(ids.map((id) => [id, { tracks: [...examTypes], chosen: false }])),
-  );
-  resultsFor.mockResolvedValue(new Map());
 });
 
 describe("GET /api/admin/reviewees", () => {
-  it("scores a VUL-only reviewee on VUL alone", async () => {
-    getFocusTracksFor.mockResolvedValue(new Map([["r1", { tracks: ["VUL"], chosen: true }]]));
-    const done: ProgressRow = {
-      user_id: "r1", exam_type: "VUL", flashcards_mastered: 1, memorization_mastered: 1,
-      memorization_answered: 1, memorization_correct: 1, questions_mastered: 1,
-      attempts_taken: 5, passing_attempts: 5, last_reviewed_at: null, last_answer_at: null,
-    };
-    getTrackCountsFor.mockImplementation(async (ids: string[], tracks: ExamType[]) =>
-      new Map([[ids[0], tracks.map((t) =>
-        buildTrackCounts(t, totals(t), t === "VUL" ? done : undefined))]]),
-    );
-
-    const [row] = await roster();
-
-    expect(row.readiness).toBe(100);
-    expect(row.status).toBe("EXAM_READY");
-    expect(row.byExam.map((e: { examType: string }) => e.examType)).toEqual(["VUL"]);
-    expect(row.practiceExam).toMatchObject({ passedTracks: 1, taken: 5 });
-    expect(row.practiceExam.tracks).toHaveLength(1);
-    expect(row.flashcards).toEqual({ total: 1, mastered: 1 });
-    expect(row.focusTracks).toEqual({ tracks: ["VUL"], chosen: true });
-  });
-
-  it("zooms every row to ?exam_type, in focus or not", async () => {
-    getFocusTracksFor.mockResolvedValue(new Map([["r1", { tracks: ["VUL"], chosen: true }]]));
-    getTrackCountsFor.mockImplementation(async (ids: string[], tracks: ExamType[]) =>
-      new Map([[ids[0], tracks.map((t) => buildTrackCounts(t, totals(t), undefined))]]),
-    );
-    const [row] = await roster("?exam_type=IIAP_B");
-    expect(row.byExam.map((e: { examType: string }) => e.examType)).toEqual(["IIAP_B"]);
-    expect(row.focusTracks.tracks).toEqual(["VUL"]);
-  });
-
   it("scores each track from the mastery module", async () => {
     getTrackCountsFor.mockImplementation(async (ids: string[], tracks: ExamType[]) =>
       new Map([[ids[0], tracks.map((t) => buildTrackCounts(t, totals(t), progress(t, null)))]]),
@@ -139,17 +98,6 @@ describe("GET /api/admin/reviewees", () => {
     listReviewees.mockResolvedValue([]);
     expect(await roster()).toEqual([]);
     expect(getTrackCountsFor).not.toHaveBeenCalled();
-  });
-
-  it("carries each reviewee's licensing results, empty when unmarked", async () => {
-    const mark = { outcome: "PASSED", markedAt: "2026-10-30T00:00:00.000Z", markedBy: "Ann", markedByRole: "ADMIN" };
-    resultsFor.mockResolvedValue(new Map([["r1", { VUL: mark }]]));
-    const [row] = await roster();
-    expect(row.results).toEqual({ VUL: mark });
-    expect(resultsFor).toHaveBeenCalledWith(["r1"]);
-
-    resultsFor.mockResolvedValue(new Map());
-    expect((await roster())[0].results).toEqual({});
   });
 
   it("refuses a reviewee", async () => {

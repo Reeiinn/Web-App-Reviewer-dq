@@ -2,10 +2,7 @@
 
 import { AppNav } from "@/components/ui/app-nav";
 import { GlossaryBodySkeleton } from "./GlossarySkeleton";
-import { examLabels, type ExamType } from "@/lib/types/common";
-import { tracksFor } from "@/lib/helper/exam-choice";
-import { isStaff } from "@/lib/helper/roles";
-import { useSession } from "next-auth/react";
+import { examLabels, examTypes, type ExamType } from "@/lib/types/common";
 import type { GlossaryTerm } from "@/lib/types/glossary";
 import { Search } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
@@ -29,15 +26,6 @@ export function GlossaryPage() {
   const [query, setQuery] = useState("");
   const [track, setTrack] = useState<TrackFilter>("ALL");
   const [loading, setLoading] = useState(true);
-
-  // A reviewee reads the vocabulary of the exams they are taking. Staff read
-  // the glossary as reference for everyone, so they keep all four.
-  const { data: session } = useSession();
-  const role = session?.user?.role;
-  const shown = useMemo(
-    () => (isStaff(role) ? tracksFor(null) : tracksFor(session?.user?.focusTracks)),
-    [role, session?.user?.focusTracks],
-  );
 
   useEffect(() => {
     let active = true;
@@ -91,11 +79,9 @@ export function GlossaryPage() {
       filterSearch(
         index,
         searchNeedle(deferredQuery),
-        (item) =>
-          shown.includes(item.exam_type) &&
-          (track === "ALL" || item.exam_type === track),
+        (item) => track === "ALL" || item.exam_type === track,
       ),
-    [index, deferredQuery, track, shown],
+    [index, deferredQuery, track],
   );
 
   // Anchors come from the whole glossary, not the filtered view, so a term
@@ -104,12 +90,12 @@ export function GlossaryPage() {
 
   const countFor = (filter: TrackFilter) =>
     filter === "ALL"
-      ? terms.filter((item) => shown.includes(item.exam_type)).length
+      ? terms.length
       : terms.filter((item) => item.exam_type === filter).length;
 
   const filters: { value: TrackFilter; label: string }[] = [
     { value: "ALL", label: "All Tracks" },
-    ...shown.map((type) => ({ value: type, label: examLabels[type] })),
+    ...examTypes.map((type) => ({ value: type, label: examLabels[type] })),
   ];
 
   return (

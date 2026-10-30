@@ -1,16 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, fetchEligibility, openAttempt, outcomeFor } = vi.hoisted(() => ({
+const { auth, fetchEligibility, openAttempt } = vi.hoisted(() => ({
   auth: vi.fn(),
   fetchEligibility: vi.fn(),
   openAttempt: vi.fn(),
-  outcomeFor: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("@/app/api/_lib/mastery", () => ({ fetchEligibility }));
 vi.mock("@/server/data/attempts", () => ({ openAttempt }));
-vi.mock("@/server/data/exam-results", () => ({ outcomeFor }));
 
 import * as route from "./route";
 
@@ -49,7 +47,6 @@ beforeEach(() => {
   auth.mockResolvedValue({ user: { id: "u1", role: "USER" } });
   fetchEligibility.mockResolvedValue(eligible);
   openAttempt.mockResolvedValue({ attempt, created: true });
-  outcomeFor.mockResolvedValue(undefined);
 });
 
 describe("POST /api/attempts", () => {
@@ -93,28 +90,6 @@ describe("POST /api/attempts", () => {
     expect(invalid.status).toBe(400);
     expect(await invalid.json()).toEqual({ error: "exam_type is invalid" });
     expect(openAttempt).not.toHaveBeenCalled();
-  });
-
-  // Ahead of the study gate, and before the open sitting is looked for, so a
-  // pass recorded mid-sitting closes it too.
-  it("refuses a new or resumed sitting on an exam passed for real", async () => {
-    outcomeFor.mockResolvedValue("PASSED");
-    fetchEligibility.mockResolvedValue({ ...eligible, eligible: false });
-    const response = await post({ exam_type: "VUL" });
-
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({
-      error: "You've passed this exam. Past sittings stay available to review.",
-      licensed: true,
-    });
-    expect(outcomeFor).toHaveBeenCalledWith("u1", "VUL");
-    expect(openAttempt).not.toHaveBeenCalled();
-  });
-
-  it("keeps sittings open after a failed real exam", async () => {
-    outcomeFor.mockResolvedValue("FAILED");
-    openAttempt.mockResolvedValue({ attempt, created: true });
-    expect((await post({ exam_type: "VUL" })).status).toBe(201);
   });
 
   it("answers 401 without a session", async () => {

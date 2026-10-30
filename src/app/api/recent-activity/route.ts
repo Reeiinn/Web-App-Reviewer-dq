@@ -1,5 +1,4 @@
 import { auth } from "@/lib/auth";
-import { getFocusTracks } from "@/server/data/focus-tracks";
 import { fetchRecent } from "@/server/data/progress";
 import { NextResponse } from "next/server";
 
@@ -12,9 +11,8 @@ export async function GET() {
   }
 
   try {
-    const focus = await getFocusTracks(session.user.id);
     return NextResponse.json(
-      await fetchRecent(session.user.id, QUICK_ACCESS_LIMIT, focus.tracks),
+      await fetchRecent(session.user.id, QUICK_ACCESS_LIMIT),
     );
   } catch (error) {
     console.error("Error fetching recent activity:", error);
