@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, listReviewees, getTrackCountsFor, touchLastSeen, getFocusTracksFor } = vi.hoisted(() => ({
+const { auth, listReviewees, getTrackCountsFor, touchLastSeen, getFocusTracksFor, resultsFor } = vi.hoisted(() => ({
   auth: vi.fn(),
   listReviewees: vi.fn(),
   getTrackCountsFor: vi.fn(),
   touchLastSeen: vi.fn(),
   getFocusTracksFor: vi.fn(),
+  resultsFor: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("@/server/data/mastery", () => ({ getTrackCountsFor }));
 vi.mock("@/server/data/staff", () => ({ listReviewees, touchLastSeen }));
 vi.mock("@/server/data/focus-tracks", () => ({ getFocusTracksFor }));
+vi.mock("@/server/data/exam-results", () => ({ resultsFor }));
 
 import { buildTrackCounts, type ProgressRow } from "@/lib/helper/track-counts";
 import { examTypes, type ExamType } from "@/lib/types/common";
@@ -40,6 +42,7 @@ beforeEach(() => {
   getFocusTracksFor.mockImplementation(async (ids: string[]) =>
     new Map(ids.map((id) => [id, { tracks: [...examTypes], chosen: false }])),
   );
+  resultsFor.mockResolvedValue(new Map());
 });
 
 describe("GET /api/admin/reviewees", () => {
@@ -136,6 +139,17 @@ describe("GET /api/admin/reviewees", () => {
     listReviewees.mockResolvedValue([]);
     expect(await roster()).toEqual([]);
     expect(getTrackCountsFor).not.toHaveBeenCalled();
+  });
+
+  it("carries each reviewee's licensing results, empty when unmarked", async () => {
+    const mark = { outcome: "PASSED", markedAt: "2026-10-30T00:00:00.000Z", markedBy: "Ann", markedByRole: "ADMIN" };
+    resultsFor.mockResolvedValue(new Map([["r1", { VUL: mark }]]));
+    const [row] = await roster();
+    expect(row.results).toEqual({ VUL: mark });
+    expect(resultsFor).toHaveBeenCalledWith(["r1"]);
+
+    resultsFor.mockResolvedValue(new Map());
+    expect((await roster())[0].results).toEqual({});
   });
 
   it("refuses a reviewee", async () => {

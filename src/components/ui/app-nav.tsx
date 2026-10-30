@@ -53,6 +53,7 @@ const learnerLinks: NavLink[] = [
 // what the console is for.
 const staffLinks: NavLink[] = [
   { href: "/admin", label: "Admin Console" },
+  { href: "/admin/results", label: "Exam Results" },
   { href: "/glossary", label: "Glossary", tour: "tour-glossary" },
 ];
 
@@ -63,6 +64,7 @@ const staffLinks: NavLink[] = [
 // that would bounce them.
 const adminLinks: NavLink[] = [
   { href: "/admin", label: "Admin Console" },
+  { href: "/admin/results", label: "Exam Results" },
   {
     href: "/admin/field-managers",
     label: "Unit Managers",

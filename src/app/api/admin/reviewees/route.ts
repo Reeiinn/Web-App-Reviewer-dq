@@ -13,6 +13,7 @@ import {
 } from "@/lib/helper/practice-exam";
 import { latestActivity } from "@/lib/helper/track-counts";
 import { getFocusTracksFor } from "@/server/data/focus-tracks";
+import { resultsFor } from "@/server/data/exam-results";
 import { getTrackCountsFor } from "@/server/data/mastery";
 import { NextResponse } from "next/server";
 
@@ -68,9 +69,10 @@ export async function GET(req: Request) {
     // Every track is counted once for everybody; each reviewee is then scored
     // on their own focus tracks. A ?exam_type zoom overrides focus, so staff
     // can look at one track across the whole roster.
-    const [countsByUser, focusByUser] = await Promise.all([
+    const [countsByUser, focusByUser, marksByUser] = await Promise.all([
       getTrackCountsFor(userIds, tracks),
       getFocusTracksFor(userIds),
+      resultsFor(userIds),
     ]);
 
     const roster = users.map((user) => {
@@ -178,6 +180,8 @@ export async function GET(req: Request) {
         // Which tracks this row is scored on, and whether the reviewee chose
         // them (false means none chosen yet, so all four).
         focusTracks: focus,
+        // The real licensing exam's outcome per exam, as staff recorded it.
+        results: marksByUser.get(user.id) ?? {},
       };
     });
 
