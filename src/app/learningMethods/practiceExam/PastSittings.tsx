@@ -163,12 +163,15 @@ function SittingDetail({
 
       // The paper is read from the sitting's own track, not the URL's, so a
       // link edited by hand cannot mark one exam's answers against another.
-      const questions = await fetch(
+      const reply = await fetch(
         `/api/questions?exam_type=${encodeURIComponent(attempt.exam_type)}`,
         fresh,
-      ).then((reply) => reply.json() as Promise<Question[]>);
+      );
+      const questions = await reply.json();
+      // Without this check an empty paper reads as every question removed.
+      if (!reply.ok) throw new Error(questions.error ?? "Failed to load");
 
-      return [attempt, questions] as const;
+      return [attempt, questions as Question[]] as const;
     })()
       .then(([attempt, questions]) => {
         if (!active) return;
@@ -176,13 +179,7 @@ function SittingDetail({
           ? (attempt.question_order as string[])
           : null;
         setSitting(attempt);
-        setRows(
-          reviewRows(
-            order,
-            attempt.answers ?? [],
-            Array.isArray(questions) ? questions : [],
-          ),
-        );
+        setRows(reviewRows(order, attempt.answers ?? [], questions));
       })
       .catch((loadError) => active && setError(loadError.message));
 

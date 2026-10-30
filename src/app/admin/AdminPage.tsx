@@ -742,7 +742,7 @@ export function AdminPage() {
             </div>
             <p className="mt-1.5 text-sm text-muted-foreground">
               {examType === "ALL"
-                ? "Live performance tracking of every candidate, scored across all licensing tracks."
+                ? "Live performance tracking of every candidate, scored on the exams they chose."
                 : `Live performance tracking of every candidate, scored on ${examLabels[examType]} only.`}
             </p>
           </div>
