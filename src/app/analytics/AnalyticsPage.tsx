@@ -2,9 +2,7 @@
 
 import { AppNav } from "@/components/ui/app-nav";
 import { AnalyticsBodySkeleton } from "./AnalyticsSkeleton";
-import { type ExamType } from "@/lib/types/common";
-import { tracksFor } from "@/lib/helper/exam-choice";
-import { useSession } from "next-auth/react";
+import { examTypes, type ExamType } from "@/lib/types/common";
 import { hasPassedTrack, passesLabel } from "@/lib/helper/practice-exam";
 import { useEffect, useState } from "react";
 
@@ -114,7 +112,6 @@ export function AnalyticsPage() {
     IIAP_B: emptyRow("IIAP_B"),
   });
   const [loading, setLoading] = useState(true);
-  const { data: session } = useSession();
 
   useEffect(() => {
     let active = true;
@@ -151,7 +148,7 @@ export function AnalyticsPage() {
           <AnalyticsBodySkeleton />
         ) : (
           <div className="mt-9 grid gap-6 lg:grid-cols-2">
-            {tracksFor(session?.user?.focusTracks).map((type) => {
+            {examTypes.map((type) => {
               const row = rows[type];
               // The badge used to call VUL "Active" and everything else
               // "Foundation", which was a two-track assumption rather than

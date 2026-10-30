@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth";
 import { trackRecord, type Sitting } from "@/lib/helper/certificate-record";
 import { isStaff } from "@/lib/helper/roles";
-import { inFocus, needsExamChoice } from "@/lib/helper/exam-choice";
 import { examTypes, type ExamType } from "@/lib/types/common";
 import { listCompletedSittings } from "@/server/data/attempts";
 import { listCertificates } from "@/server/data/certificates";
@@ -22,12 +21,6 @@ export default async function Page() {
   // ever be empty for them — the same reason the study screens turn them away.
   if (isStaff(session.user.role)) {
     redirect("/admin");
-  }
-
-  // Not in the middleware's learner list, so the picker is asked for here.
-  const { focusTracks } = session.user;
-  if (needsExamChoice(session.user.role, focusTracks)) {
-    redirect("/choose-exams");
   }
 
   // The certificates say which tracks were cleared; the sittings say what each
@@ -56,15 +49,7 @@ export default async function Page() {
     sittings.set(row.examType, track);
   }
 
-  // The exams they picked, plus any they earned a certificate on before
-  // dropping it: an earned certificate is never hidden from its owner.
-  const shown = examTypes.filter(
-    (examType) =>
-      inFocus(focusTracks, examType) ||
-      certificates.some((one) => one.exam_type === examType),
-  );
-
-  const standings: TrackStanding[] = shown.map((examType) => ({
+  const standings: TrackStanding[] = examTypes.map((examType) => ({
     exam_type: examType,
     record: trackRecord(sittings.get(examType) ?? []),
     certificate: certificates.find((one) => one.exam_type === examType) ?? null,

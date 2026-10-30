@@ -180,30 +180,6 @@ export async function listCompletedSittings(userId: string): Promise<CompletedSi
   }));
 }
 
-export type FinishedAttempt = {
-  id: string;
-  score: number;
-  totalItems: number;
-  passed: boolean;
-  completedAt: Date;
-};
-
-/**
- * One track's finished sittings, newest first, for the past-exams list. An
- * unfinished sitting has no score yet and is left out.
- */
-export async function listFinishedAttempts(
-  userId: string,
-  examType: ExamType,
-): Promise<FinishedAttempt[]> {
-  const rows = await prisma.examAttempt.findMany({
-    where: { userId, examType, completedAt: { not: null } },
-    orderBy: { completedAt: "desc" },
-    select: { id: true, score: true, totalItems: true, passed: true, completedAt: true },
-  });
-  return rows.map((row) => ({ ...row, completedAt: row.completedAt as Date }));
-}
-
 /** Who an attempt belongs to; null if there is no such attempt. */
 export async function findAttemptOwner(attemptId: string): Promise<string | null> {
   const row = await prisma.examAttempt.findUnique({

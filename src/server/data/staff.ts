@@ -47,11 +47,7 @@ export async function touchLastSeen(userId: string): Promise<void> {
  * Writing a record must never be the reason an action fails, so a failure here
  * is logged and swallowed. It is a record, not a gate.
  */
-export type AdminAction =
-  | "reviewee.removed"
-  | "reviewee.restored"
-  | "reviewee.result_marked"
-  | "reviewee.result_cleared";
+export type AdminAction = "reviewee.removed" | "reviewee.restored";
 
 export async function recordAdminAction(entry: {
   actor: { id: string; email: string; role: string };
@@ -264,28 +260,4 @@ export async function markNudgesRead(userId: string, id: string | null): Promise
     where: { userId, readAt: null, ...(id === null ? {} : { id }) },
     data: { readAt: new Date() },
   });
-}
-
-/** The live accounts among these ids, for a removal of several at once. */
-export async function findActiveAccounts(ids: string[]): Promise<StaffTarget[]> {
-  if (ids.length === 0) return [];
-  return prisma.user.findMany({
-    where: { id: { in: ids }, deletedAt: null },
-    select: { id: true, name: true, email: true, role: true, managerId: true },
-  });
-}
-
-/**
- * Removes several reviewees in one statement, the same soft delete as
- * removeReviewee. Returns the ids this call stamped: one removed by another
- * request in the meantime is not among them, so it is not recorded twice.
- */
-export async function removeReviewees(ids: string[]): Promise<string[]> {
-  if (ids.length === 0) return [];
-  const rows = await prisma.$queryRaw<{ id: string }[]>`
-    UPDATE users SET deleted_at = now()
-     WHERE id = ANY(${ids}::uuid[]) AND deleted_at IS NULL
-     RETURNING id`;
-  const stamped = new Set(rows.map((row) => row.id));
-  return ids.filter((id) => stamped.has(id));
 }
