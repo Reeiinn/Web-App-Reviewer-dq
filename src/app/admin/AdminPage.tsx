@@ -655,6 +655,12 @@ export function AdminPage() {
     };
   }, [examType]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
   const counts = useMemo(
     () => ({
       total: roster.length,
@@ -750,23 +756,34 @@ export function AdminPage() {
           <Invite />
         </div>
 
-        {notice && (
-          <p
-            role="status"
-            className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
-          >
-            {notice}
-          </p>
-        )}
+        {/* Pinned to the screen: the row being marked can be a long way down
+            the roster, well out of sight of the top of the page. */}
+        <div className="fixed inset-x-4 bottom-5 z-40 flex flex-col items-center gap-2 sm:inset-x-auto sm:right-6 sm:items-end">
+          {notice && (
+            <p
+              role="status"
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-lg"
+            >
+              {notice}
+            </p>
+          )}
 
-        {markError && (
-          <p
-            role="alert"
-            className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
-          >
-            {markError}
-          </p>
-        )}
+          {markError && (
+            <div
+              role="alert"
+              className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 shadow-lg"
+            >
+              {markError}
+              <button
+                type="button"
+                onClick={() => setMarkError("")}
+                className="font-bold underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* The counts are tallied from the roster, so until it lands they
             would every one of them read a confident nought. */}

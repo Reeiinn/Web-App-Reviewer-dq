@@ -47,7 +47,7 @@ beforeEach(() => {
   auth.mockResolvedValue({ user: { id: "admin", role: "ADMIN", email: "a@example.test" } });
   findActiveAccount.mockResolvedValue(reviewee);
   getFocusTracks.mockResolvedValue({ tracks: ["VUL", "IIAP_A"], chosen: true });
-  markResult.mockResolvedValue(null);
+  markResult.mockResolvedValue({ previous: null });
   clearResult.mockResolvedValue("FAILED");
   resultsFor.mockResolvedValue(new Map([["r1", { VUL: mark }]]));
 });
@@ -76,7 +76,7 @@ describe("PUT /api/admin/reviewees/[id]/results", () => {
   });
 
   it("records a pass, audits what it replaced and answers the row's marks", async () => {
-    markResult.mockResolvedValue("FAILED");
+    markResult.mockResolvedValue({ previous: "FAILED" });
     const { status, body } = await put(`{"examType":"VUL","outcome":"PASSED"}`);
 
     expect(status).toBe(200);
@@ -153,6 +153,14 @@ describe("PUT /api/admin/reviewees/[id]/results", () => {
   it("refuses a reviewee who has not picked yet", async () => {
     getFocusTracks.mockResolvedValue({ tracks: ["VUL", "TRADITIONAL_LIFE", "IIAP_A", "IIAP_B"], chosen: false });
     expect((await put(`{"examType":"VUL","outcome":"PASSED"}`)).status).toBe(409);
+  });
+
+  it("refuses when the reviewee drops the exam as the mark lands", async () => {
+    markResult.mockResolvedValue(null);
+    const { status, body } = await put(`{"examType":"VUL","outcome":"PASSED"}`);
+    expect(status).toBe(409);
+    expect(body).toEqual({ error: "This reviewee isn't taking that exam." });
+    expect(recordAdminAction).not.toHaveBeenCalled();
   });
 
   it("answers 500 when saving fails", async () => {

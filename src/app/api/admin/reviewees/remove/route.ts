@@ -1,5 +1,10 @@
 import { auth } from "@/lib/auth";
-import { isUuid, planRemoval, removeIdsSchema } from "@/lib/helper/removal";
+import {
+  isUuid,
+  planRemoval,
+  removeIdsError,
+  removeIdsSchema,
+} from "@/lib/helper/removal";
 import {
   findActiveAccounts,
   recordAdminAction,
@@ -34,7 +39,7 @@ export async function POST(req: Request) {
   const body = removeIdsSchema.safeParse(await req.json().catch(() => null));
   if (!body.success) {
     return NextResponse.json(
-      { error: "Select at least one reviewee to remove." },
+      { error: removeIdsError(body.error) },
       { status: 400 },
     );
   }

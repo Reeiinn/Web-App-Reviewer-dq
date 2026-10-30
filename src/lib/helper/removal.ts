@@ -56,6 +56,19 @@ export const removeIdsSchema = z.object({
   ids: z.array(z.string()).min(1).max(REMOVE_BATCH_SIZE),
 });
 
+/** What a refused selection is told; the console batches, so a script hits this. */
+export const removeIdsError = (error: z.ZodError) =>
+  error.issues[0]?.code === "too_big"
+    ? `Remove at most ${REMOVE_BATCH_SIZE} reviewees at a time.`
+    : "Select at least one reviewee to remove.";
+
+/**
+ * Whether the removal dialog stays up after a run. It closes only on a clean
+ * finish: anything skipped, or a batch that failed, has to stay on screen.
+ */
+export const removalLeftWork = (skipped: number, failed: boolean) =>
+  skipped > 0 || failed;
+
 /** An id that could name an account; anything else names nobody. */
 export const isUuid = (value: string) => z.guid().safeParse(value).success;
 

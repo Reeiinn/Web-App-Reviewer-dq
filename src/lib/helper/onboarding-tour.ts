@@ -21,7 +21,7 @@ export const ONBOARDING_TOURS: Partial<
     {
       target: "tour-tracks",
       title: "This is home base",
-      body: "Pick VUL, Traditional Life, or IIAP, then start with Flashcards, Memorize, or a Practice Exam.",
+      body: "Pick one of your exams, then start with Flashcards, Memorize, or a Practice Exam.",
     },
     {
       target: "tour-quick",

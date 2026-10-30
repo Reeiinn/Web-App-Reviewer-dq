@@ -9,6 +9,7 @@ import {
   outcomesFor,
   resultsFor,
 } from "./exam-results";
+import { setFocusTracks } from "./focus-tracks";
 
 let reviewee: string;
 let other: string;
@@ -18,6 +19,13 @@ beforeAll(async () => {
   reviewee = (await createUser()).id;
   other = (await createUser()).id;
   marker = (await createUser({ role: "ADMIN" })).id;
+  await prisma.userFocusTrack.createMany({
+    data: [
+      { userId: reviewee, examType: "VUL" },
+      { userId: other, examType: "VUL" },
+      { userId: other, examType: "IIAP_A" },
+    ],
+  });
 });
 
 afterAll(async () => {
@@ -33,12 +41,44 @@ describe("exam results", () => {
   it("records a mark and hands back what it replaced", async () => {
     expect(
       await markResult({ userId: reviewee, examType: "VUL", outcome: "FAILED", markedBy: marker }),
-    ).toBeNull();
+    ).toEqual({ previous: null });
     expect(
       await markResult({ userId: reviewee, examType: "VUL", outcome: "PASSED", markedBy: marker }),
-    ).toBe("FAILED");
+    ).toEqual({ previous: "FAILED" });
     expect(await outcomeFor(reviewee, "VUL")).toBe("PASSED");
     expect(await prisma.examResult.count({ where: { userId: reviewee } })).toBe(1);
+  });
+
+  it("saves nothing on an exam the reviewee has not picked", async () => {
+    expect(
+      await markResult({ userId: reviewee, examType: "IIAP_B", outcome: "FAILED", markedBy: marker }),
+    ).toBeNull();
+    expect(await outcomeFor(reviewee, "IIAP_B")).toBeUndefined();
+  });
+
+  it("cannot be lost to a change of pick at the same moment", async () => {
+    const racer = (await createUser()).id;
+    await prisma.userFocusTrack.createMany({
+      data: [
+        { userId: racer, examType: "VUL" },
+        { userId: racer, examType: "IIAP_B" },
+      ],
+    });
+
+    await Promise.all([
+      markResult({ userId: racer, examType: "IIAP_B", outcome: "PASSED", markedBy: marker }),
+      setFocusTracks(racer, ["VUL"]),
+    ]);
+
+    // Whichever ran first, a result never outlives its exam.
+    const picks = await prisma.userFocusTrack.findMany({
+      where: { userId: racer },
+      select: { examType: true },
+    });
+    const outcome = await outcomeFor(racer, "IIAP_B");
+    expect(Boolean(outcome)).toBe(picks.some((row) => row.examType === "IIAP_B"));
+
+    await deleteUsers(racer);
   });
 
   it("reads every reviewee's marks with who made them", async () => {

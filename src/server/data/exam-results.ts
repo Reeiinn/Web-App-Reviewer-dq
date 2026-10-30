@@ -92,15 +92,23 @@ export async function licensedOnAttempt(attemptId: string): Promise<boolean> {
   );
 }
 
-/** Records or replaces a mark; returns the outcome it replaced, if any. */
+/**
+ * Records or replaces a mark, and returns what it replaced. Null when the
+ * reviewee has not picked that exam, which saves nothing. The pick is read
+ * under the lock setFocusTracks takes, so it cannot change underneath the mark.
+ */
 export async function markResult(input: {
   userId: string;
   examType: ExamType;
   outcome: LicensingOutcome;
   markedBy: string;
-}): Promise<LicensingOutcome | null> {
+}): Promise<{ previous: LicensingOutcome | null } | null> {
   const key = { userId: input.userId, examType: input.examType };
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT 1 FROM users WHERE id = ${input.userId}::uuid FOR UPDATE`;
+    const picked = await tx.userFocusTrack.findFirst({ where: key });
+    if (!picked) return null;
+
     const previous = await tx.examResult.findUnique({
       where: { userId_examType: key },
       select: { outcome: true },
@@ -114,7 +122,9 @@ export async function markResult(input: {
         markedAt: new Date(),
       },
     });
-    return (previous?.outcome as LicensingOutcome | undefined) ?? null;
+    return {
+      previous: (previous?.outcome as LicensingOutcome | undefined) ?? null,
+    };
   });
 }
 

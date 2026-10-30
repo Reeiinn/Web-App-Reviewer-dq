@@ -1,5 +1,9 @@
 import { auth } from "@/lib/auth";
-import { canMarkResult, resultMarkSchema } from "@/lib/helper/licensing";
+import {
+  NOT_TAKING_EXAM,
+  canMarkResult,
+  resultMarkSchema,
+} from "@/lib/helper/licensing";
 import { clearResult, markResult, resultsFor } from "@/server/data/exam-results";
 import { getFocusTracks } from "@/server/data/focus-tracks";
 import {
@@ -69,15 +73,21 @@ export async function PUT(
       );
     }
 
-    const previous =
+    const marked =
       outcome === null
-        ? await clearResult(id, examType)
+        ? { previous: await clearResult(id, examType) }
         : await markResult({
             userId: id,
             examType,
             outcome,
             markedBy: currentUserId,
           });
+
+    // The reviewee dropped the exam since the check above.
+    if (!marked) {
+      return NextResponse.json({ error: NOT_TAKING_EXAM }, { status: 409 });
+    }
+    const { previous } = marked;
 
     // Clearing a mark that was not there changed nothing worth recording.
     if (outcome !== null || previous !== null) {
