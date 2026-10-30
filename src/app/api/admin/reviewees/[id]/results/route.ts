@@ -60,6 +60,7 @@ export async function PUT(
           }
         : undefined,
       examType,
+      { clearing: outcome === null },
     );
     if (!verdict.ok || !user) {
       return NextResponse.json(
@@ -78,17 +79,20 @@ export async function PUT(
             markedBy: currentUserId,
           });
 
-    await recordAdminAction({
-      actor: {
-        id: currentUserId,
-        email: session.user.email ?? "unknown",
-        role,
-      },
-      action:
-        outcome === null ? "reviewee.result_cleared" : "reviewee.result_marked",
-      target: { id: user.id, email: user.email, name: user.name },
-      detail: { examType, outcome, previous },
-    });
+    // Clearing a mark that was not there changed nothing worth recording.
+    if (outcome !== null || previous !== null) {
+      await recordAdminAction({
+        actor: {
+          id: currentUserId,
+          email: session.user.email ?? "unknown",
+          role,
+        },
+        action:
+          outcome === null ? "reviewee.result_cleared" : "reviewee.result_marked",
+        target: { id: user.id, email: user.email, name: user.name },
+        detail: { examType, outcome, previous },
+      });
+    }
 
     return NextResponse.json({
       results: (await resultsFor([id])).get(id) ?? {},

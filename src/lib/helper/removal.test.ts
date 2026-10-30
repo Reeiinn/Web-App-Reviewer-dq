@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   chunk,
+  isUuid,
   planRemoval,
   removalDecision,
   removeIdsSchema,
@@ -81,6 +82,20 @@ describe("planRemoval", () => {
       { id: two, name: two, reason: "You can only remove reviewees you manage." },
       { id: "not-a-uuid", reason: "That reviewee no longer exists." },
     ]);
+  });
+});
+
+describe("isUuid", () => {
+  // Postgres takes any 8-4-4-4-12 hex id; a hand-seeded account need not
+  // carry an RFC version nibble, and must still be removable.
+  it("accepts any id Postgres would", () => {
+    expect(isUuid("11111111-1111-1111-1111-111111111111")).toBe(true);
+    expect(isUuid("6F9619FF-8B86-D011-B42D-00C04FC964FF")).toBe(true);
+  });
+
+  it("refuses anything that is not one", () => {
+    expect(isUuid("not-a-uuid")).toBe(false);
+    expect(isUuid("11111111-1111-1111-1111-11111111111")).toBe(false);
   });
 });
 

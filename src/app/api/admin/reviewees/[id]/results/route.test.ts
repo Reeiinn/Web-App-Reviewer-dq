@@ -109,6 +109,17 @@ describe("PUT /api/admin/reviewees/[id]/results", () => {
     );
   });
 
+  it("clears a mark left on an exam outside the pick", async () => {
+    expect((await put(`{"examType":"IIAP_B","outcome":null}`)).status).toBe(200);
+    expect(clearResult).toHaveBeenCalledWith("r1", "IIAP_B");
+  });
+
+  it("records nothing when there was no mark to clear", async () => {
+    clearResult.mockResolvedValue(null);
+    expect((await put(`{"examType":"VUL","outcome":null}`)).status).toBe(200);
+    expect(recordAdminAction).not.toHaveBeenCalled();
+  });
+
   it("lets a unit manager mark their own recruit", async () => {
     auth.mockResolvedValue({ user: { id: "m1", role: "MANAGER", email: "m@example.test" } });
     expect((await put(`{"examType":"VUL","outcome":"FAILED"}`)).status).toBe(200);

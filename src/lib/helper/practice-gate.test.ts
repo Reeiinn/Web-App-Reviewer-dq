@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { practiceEntry, readCompletion } from "./practice-gate";
+import { isLicensedRefusal, practiceEntry, readCompletion } from "./practice-gate";
 
 describe("practiceEntry", () => {
   it("closes a new sitting once the real exam is passed", () => {
@@ -25,6 +25,20 @@ describe("practiceEntry", () => {
     expect(
       practiceEntry({ passed: false, reviewing: false, eligible: true }),
     ).toBe("open");
+  });
+});
+
+describe("isLicensedRefusal", () => {
+  // An answer refused because the real exam was passed meanwhile is not a
+  // failed save: re-sending it can never succeed.
+  it("recognises the passed lock", () => {
+    expect(isLicensedRefusal({ error: "passed", licensed: true })).toBe(true);
+  });
+
+  it("does not mistake any other refusal for it", () => {
+    expect(isLicensedRefusal({ error: "Choice not found" })).toBe(false);
+    expect(isLicensedRefusal(null)).toBe(false);
+    expect(isLicensedRefusal("licensed")).toBe(false);
   });
 });
 

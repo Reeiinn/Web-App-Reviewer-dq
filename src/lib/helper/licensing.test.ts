@@ -50,6 +50,18 @@ describe("canMarkResult", () => {
     });
   });
 
+  // A mark and a change of pick can land together, leaving a result on an
+  // exam the reviewee no longer has. Staff must still be able to clear it.
+  it("lets staff clear a mark on an exam outside the pick", () => {
+    expect(canMarkResult(admin, recruit, "IIAP_A", { clearing: true }).ok).toBe(true);
+  });
+
+  it("still checks who may clear it", () => {
+    expect(
+      canMarkResult(unitManager, { ...recruit, managerId: "x" }, "IIAP_A", { clearing: true }),
+    ).toMatchObject({ ok: false, status: 403 });
+  });
+
   it("refuses a reviewee who has not chosen yet", () => {
     expect(
       canMarkResult(admin, { ...recruit, examTracks: null }, "VUL"),

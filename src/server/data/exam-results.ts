@@ -130,7 +130,8 @@ export async function clearResult(
       select: { outcome: true },
     });
     if (previous) {
-      await tx.examResult.delete({ where: { userId_examType: key } });
+      // deleteMany: a clear racing this one may have removed it already.
+      await tx.examResult.deleteMany({ where: key });
     }
     return (previous?.outcome as LicensingOutcome | undefined) ?? null;
   });

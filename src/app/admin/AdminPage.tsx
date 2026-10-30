@@ -113,6 +113,17 @@ type SentNudge = {
 
 const PAGE_SIZE = 15;
 
+/**
+ * The exams a row shows a result chip for: the ones picked, plus any carrying
+ * a mark. A mark left on an exam the reviewee has since dropped has to be on
+ * screen to be cleared.
+ */
+const chipTracks = (row: Reviewee) =>
+  examTypes.filter(
+    (examType) =>
+      row.focusTracks.tracks.includes(examType) || row.results[examType],
+  );
+
 const sorts = {
   readiness_desc: "Overall Readiness (High to Low)",
   readiness_asc: "Overall Readiness (Low to High)",
@@ -1013,7 +1024,7 @@ export function AdminPage() {
                       <td className="px-5 py-4">
                         {row.focusTracks.chosen ? (
                           <div className="flex max-w-64 flex-wrap gap-1.5">
-                            {row.focusTracks.tracks.map((examType) => (
+                            {chipTracks(row).map((examType) => (
                               <ResultChip
                                 key={examType}
                                 revieweeId={row.id}

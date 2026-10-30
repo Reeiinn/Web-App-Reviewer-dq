@@ -57,7 +57,7 @@ export const removeIdsSchema = z.object({
 });
 
 /** An id that could name an account; anything else names nobody. */
-export const isUuid = (value: string) => z.uuid().safeParse(value).success;
+export const isUuid = (value: string) => z.guid().safeParse(value).success;
 
 /**
  * Splits a selection into the accounts to remove and the ones to report back.

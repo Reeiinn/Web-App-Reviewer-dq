@@ -13,7 +13,11 @@ import { examLabels, parseExamType } from "@/lib/types/common";
 import type { Question } from "@/lib/types/questions";
 import { Award, CheckCircle2, Lock } from "lucide-react";
 import { PASSED_LOCK_MESSAGE } from "@/lib/helper/licensing";
-import { practiceEntry, readCompletion } from "@/lib/helper/practice-gate";
+import {
+  isLicensedRefusal,
+  practiceEntry,
+  readCompletion,
+} from "@/lib/helper/practice-gate";
 import type { ExamResults } from "@/lib/types/exam-results";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -302,11 +306,16 @@ function PracticeExamContent() {
         selected_choice_id: choiceId,
       }),
     })
-      .then((response) => {
+      .then(async (response) => {
         // Only clear it if this is still the answer that was saved: a quick
         // second click must not be marked saved by the first request.
         if (response.ok && answersRef.current[questionId] === choiceId) {
           unsaved.current.delete(questionId);
+        }
+        // A pass recorded mid-sitting closes it; every later save would be
+        // refused, so the page says so now rather than at submit.
+        if (!response.ok && isLicensedRefusal(await response.json().catch(() => null))) {
+          setLicensed(true);
         }
       })
       .catch((error) => console.error("Failed to save answer:", error));
@@ -346,6 +355,7 @@ function PracticeExamContent() {
         .filter((question) => unsaved.current.has(question.id))
         .map((question) => question.id);
 
+      let closed = false;
       const stillUnsaved = await resendAnswers(pending, async (questionId) => {
         const response = await fetch(`/api/attempts/${attemptId}/answers`, {
           method: "POST",
@@ -356,8 +366,18 @@ function PracticeExamContent() {
           }),
         });
         if (response.ok) unsaved.current.delete(questionId);
+        else if (isLicensedRefusal(await response.json().catch(() => null))) {
+          closed = true;
+        }
         return response.ok;
       });
+
+      // Refused because the real exam was passed meanwhile: no retry can
+      // save these, so this is the passed screen, not a connection problem.
+      if (closed) {
+        setLicensed(true);
+        return;
+      }
 
       // Scoring now would count these as blank, so the sitting stays open
       // and the learner is asked to submit again.

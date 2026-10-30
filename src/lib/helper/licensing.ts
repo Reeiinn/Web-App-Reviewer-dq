@@ -27,6 +27,7 @@ export function canMarkResult(
   actor: Actor,
   target: MarkTarget,
   examType: ExamType,
+  { clearing = false }: { clearing?: boolean } = {},
 ): { ok: true } | Refusal {
   if (!target) {
     return { ok: false, status: 404, error: "That reviewee no longer exists." };
@@ -47,7 +48,9 @@ export function canMarkResult(
   }
   // A result has to belong to an exam the reviewee is actually taking, or it
   // would sit on a track that appears nowhere on their side of the app.
-  if (!target.examTracks?.includes(examType)) {
+  // Clearing is the exception: a mark that raced a change of pick must still
+  // be removable.
+  if (!clearing && !target.examTracks?.includes(examType)) {
     return {
       ok: false,
       status: 409,

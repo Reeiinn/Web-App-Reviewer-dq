@@ -23,6 +23,19 @@ export function practiceEntry({
   return eligible ? "open" : "locked";
 }
 
+/**
+ * Whether a refused request was refused because the real exam has been
+ * passed. Re-sending it can never succeed, so the page shows the passed
+ * screen rather than asking for another try.
+ */
+export function isLicensedRefusal(body: unknown): boolean {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    (body as { licensed?: unknown }).licensed === true
+  );
+}
+
 export type Completion =
   | { kind: "scored"; passed: boolean; passes: number; certificateId: string | null }
   | { kind: "licensed" }
