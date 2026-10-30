@@ -193,8 +193,10 @@ in the five passing sittings a certificate needs.
 
 **Apply pending migrations before the build goes live.** A build reads every
 table its migrations create, so one deployed ahead of
-`20261030000100_exam_results` fails on the staff roster, the exam results page
-and the practice exam. The checklist is in
+`20261014000200_user_focus_tracks` and `20261030000100_exam_results` breaks
+sign-in for everyone, along with the staff roster and the practice exam. The
+previous build runs fine on the migrated schema, so migrate first. The checklist
+is in
 `docs/superpowers/specs/2026-10-30-exam-choice-results-bulk-remove-design.md`.
 
 Set `APP_URL` in the production environment to the address the app is served at:

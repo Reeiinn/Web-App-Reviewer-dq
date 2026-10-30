@@ -477,14 +477,29 @@ above:
   and additive: one new, empty table. `exam_results` joins the
   delete-a-user test.
 
-## Production checklist (Nelson runs this, after merge)
+## Production checklist (Nelson runs this, before merging to `main`)
+
+Merging to `main` is the live deploy, so the migrations come first. The build
+at `e82ba0e` runs fine on the migrated schema. This build without the two new
+tables breaks sign-in for everyone.
 
 1. Take a Railway backup.
-2. With `MIGRATE_DATABASE_URL=<Railway URL>` and `ALLOW_REMOTE_MIGRATE=1` set
-   for this command only, `prisma migrate deploy` applies
-   `20261030000100_exam_results`, which only creates an empty table.
-3. Deploy. Every existing reviewee has no focus pick, so each is asked which
-   exams they are taking on their next visit; nothing else changes until
-   staff record a result.
+2. From a checkout of `dev` (`main` has neither migration folder since the
+   revert), set `MIGRATE_DATABASE_URL=<Railway URL>` and
+   `ALLOW_REMOTE_MIGRATE=1` for these commands only.
+3. `prisma migrate status` must list exactly
+   `20261014000200_user_focus_tracks` and `20261030000100_exam_results` as
+   pending. If `0_init` is unrecorded, do the Wave 0 baseline in
+   `2026-10-14-prisma-migration-design.md` first. If either shows as already
+   applied, stop and reconcile it.
+4. `prisma migrate deploy`, then `prisma migrate status` again, then unset both
+   variables. Each migration only creates one new, empty table.
+5. Revert PR 95 (`da9583d`) on `dev` and merge that to `main`. A plain `dev` to
+   `main` merge treats this work as already merged and leaves it out.
+6. On production: sign in as a reviewee, pick exams, reach the dashboard, then
+   open the roster and `/admin/results`. Every existing reviewee has no focus
+   pick, so each is asked which exams they are taking on their next visit;
+   nothing else changes until staff record a result.
 
-Rollback is `DROP TABLE exam_results;`, which touches no other table.
+Rollback is to redeploy the `e82ba0e` code and leave both tables in place, which
+keeps reviewees' picks and staff marks. Dropping the tables would delete those.
