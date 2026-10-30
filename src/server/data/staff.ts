@@ -47,7 +47,11 @@ export async function touchLastSeen(userId: string): Promise<void> {
  * Writing a record must never be the reason an action fails, so a failure here
  * is logged and swallowed. It is a record, not a gate.
  */
-export type AdminAction = "reviewee.removed" | "reviewee.restored";
+export type AdminAction =
+  | "reviewee.removed"
+  | "reviewee.restored"
+  | "reviewee.result_marked"
+  | "reviewee.result_cleared";
 
 export async function recordAdminAction(entry: {
   actor: { id: string; email: string; role: string };

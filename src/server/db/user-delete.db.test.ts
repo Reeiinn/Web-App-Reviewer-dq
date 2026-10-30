@@ -20,6 +20,7 @@ const CASCADE_TABLES = [
   "recent_activity",
   "password_reset_tokens",
   "user_focus_tracks",
+  "exam_results",
 ] as const;
 
 describe("deleting a user", () => {
@@ -73,6 +74,9 @@ describe("deleting a user", () => {
     await prisma.studyStreak.create({ data: { userId: user.id, examType: "VUL" } });
     await prisma.recentActivity.create({ data: { userId: user.id, examType: "VUL", mode: "flashcards" } });
     await prisma.userFocusTrack.create({ data: { userId: user.id, examType: "VUL" } });
+    await prisma.examResult.create({
+      data: { userId: user.id, examType: "VUL", outcome: "PASSED", markedBy: bystander },
+    });
     await prisma.passwordResetToken.create({
       data: { userId: user.id, tokenHash: `h-${s}`, expiresAt: later() },
     });
