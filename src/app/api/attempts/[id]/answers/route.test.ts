@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, findAttemptOwner, choiceCorrectness, recordExamAnswer } = vi.hoisted(() => ({
+const { auth, findAttemptOwner, choiceCorrectness, recordExamAnswer, licensedOnAttempt } = vi.hoisted(() => ({
   auth: vi.fn(),
   findAttemptOwner: vi.fn(),
   choiceCorrectness: vi.fn(),
   recordExamAnswer: vi.fn(),
+  licensedOnAttempt: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
@@ -13,6 +14,7 @@ vi.mock("@/server/data/attempts", () => ({
   choiceCorrectness,
   recordExamAnswer,
 }));
+vi.mock("@/server/data/exam-results", () => ({ licensedOnAttempt }));
 
 import { POST } from "./route";
 
@@ -31,6 +33,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   auth.mockResolvedValue({ user: { id: "u1", role: "USER" } });
   findAttemptOwner.mockResolvedValue("u1");
+  licensedOnAttempt.mockResolvedValue(false);
   choiceCorrectness.mockResolvedValue(true);
   recordExamAnswer.mockResolvedValue({
     id: "x1",
@@ -91,6 +94,16 @@ describe("POST /api/attempts/[id]/answers", () => {
     const response = await post(body);
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "Choice not found for this question" });
+    expect(recordExamAnswer).not.toHaveBeenCalled();
+  });
+
+  it("refuses an answer once the real exam is passed", async () => {
+    licensedOnAttempt.mockResolvedValue(true);
+    const response = await post(body);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ licensed: true });
+    expect(choiceCorrectness).not.toHaveBeenCalled();
     expect(recordExamAnswer).not.toHaveBeenCalled();
   });
 

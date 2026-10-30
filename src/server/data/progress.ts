@@ -78,9 +78,12 @@ export async function applyStreak(
   };
 }
 
-export async function fetchStreaks(userId: string): Promise<StreakRow[]> {
+export async function fetchStreaks(
+  userId: string,
+  tracks: readonly ExamType[],
+): Promise<StreakRow[]> {
   const rows = await prisma.studyStreak.findMany({
-    where: { userId },
+    where: { userId, examType: { in: [...tracks] } },
     select: { examType: true, currentStreak: true, bestStreak: true, lastAnswerAt: true },
   });
 
@@ -115,9 +118,11 @@ export async function recordVisit(
 export async function fetchRecent(
   userId: string,
   limit: number,
+  /** Only these tracks; filtered before the limit so Quick Access still fills. */
+  tracks: readonly ExamType[],
 ): Promise<RecentActivityRow[]> {
   const rows = await prisma.recentActivity.findMany({
-    where: { userId },
+    where: { userId, examType: { in: [...tracks] } },
     orderBy: { visitedAt: "desc" },
     take: limit,
     select: { examType: true, mode: true, visitedAt: true },

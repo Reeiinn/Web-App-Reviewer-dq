@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import prisma from "@/server/db/prisma";
+import { examTypes } from "@/lib/types/common";
 import {
   createFlashcard,
   createMemorization,
@@ -63,7 +64,7 @@ describe("applyStreak", () => {
 
     await Promise.all([applyStreak(me.id, "VUL", true), applyStreak(me.id, "VUL", true)]);
 
-    const [row] = await fetchStreaks(me.id);
+    const [row] = await fetchStreaks(me.id, examTypes);
     expect(row).toMatchObject({ current_streak: 2, best_streak: 2 });
   });
 
@@ -71,7 +72,7 @@ describe("applyStreak", () => {
     const me = await user();
     await applyStreak(me.id, "VUL", true);
 
-    const rows = await fetchStreaks(me.id);
+    const rows = await fetchStreaks(me.id, examTypes);
 
     expect(rows).toEqual([
       { exam_type: "VUL", current_streak: 1, best_streak: 1, last_answer_at: expect.any(String) },
@@ -80,7 +81,40 @@ describe("applyStreak", () => {
   });
 });
 
+describe("fetchStreaks", () => {
+  it("returns only the tracks asked for", async () => {
+    const me = await user();
+    await applyStreak(me.id, "VUL", true);
+    await applyStreak(me.id, "IIAP_A", true);
+
+    const rows = await fetchStreaks(me.id, ["IIAP_A"]);
+    expect(rows.map((r) => r.exam_type)).toEqual(["IIAP_A"]);
+  });
+});
+
 describe("recent activity", () => {
+  it("filters to focus tracks before the limit", async () => {
+    const me = await user();
+    const at = (minute: number) => new Date(Date.UTC(2026, 9, 14, 9, minute));
+    // Three older VUL visits, then two newer visits on other tracks.
+    await prisma.recentActivity.createMany({
+      data: [
+        { userId: me.id, examType: "VUL", mode: "flashcard", visitedAt: at(1) },
+        { userId: me.id, examType: "VUL", mode: "memorize", visitedAt: at(2) },
+        { userId: me.id, examType: "VUL", mode: "practice", visitedAt: at(3) },
+        { userId: me.id, examType: "IIAP_A", mode: "flashcard", visitedAt: at(4) },
+        { userId: me.id, examType: "IIAP_B", mode: "flashcard", visitedAt: at(5) },
+      ],
+    });
+
+    const focused = await fetchRecent(me.id, 3, ["VUL"]);
+    expect(focused.map((r) => r.exam_type)).toEqual(["VUL", "VUL", "VUL"]);
+    expect(focused.map((r) => r.mode)).toEqual(["practice", "memorize", "flashcard"]);
+
+    const all = await fetchRecent(me.id, 3, examTypes);
+    expect(all.map((r) => r.exam_type)).toEqual(["IIAP_B", "IIAP_A", "VUL"]);
+  });
+
   it("bumps a revisited mode to the top and honours the limit", async () => {
     const me = await user();
 
@@ -89,7 +123,7 @@ describe("recent activity", () => {
     await recordVisit(me.id, "IIAP_A", "practice");
     await recordVisit(me.id, "VUL", "flashcard");
 
-    const rows = await fetchRecent(me.id, 2);
+    const rows = await fetchRecent(me.id, 2, examTypes);
     expect(rows.map((r) => [r.exam_type, r.mode])).toEqual([
       ["VUL", "flashcard"],
       ["IIAP_A", "practice"],

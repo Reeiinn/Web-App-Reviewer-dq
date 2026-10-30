@@ -13,6 +13,7 @@ export function RosterTableSkeleton({ isAdmin }: { isAdmin: boolean }) {
   const headings = [
     "Reviewee / Candidate",
     ...(isAdmin ? ["Recruited By"] : []),
+    "Exams · Real Exam Result",
     "Overall Readiness",
     "Mastery by Exam",
     "Memorize Acc.",
@@ -27,11 +28,12 @@ export function RosterTableSkeleton({ isAdmin }: { isAdmin: boolean }) {
       <div className="overflow-x-auto">
         <table
           className={`w-full text-left text-sm ${
-            isAdmin ? "min-w-[1320px]" : "min-w-[1100px]"
+            isAdmin ? "min-w-[1560px]" : "min-w-[1340px]"
           }`}
         >
           <thead className="bg-[#0B2340] text-white">
             <tr>
+              <th scope="col" className="w-12 px-5 py-4" aria-label="Select" />
               {headings.map((heading) => (
                 <th
                   key={heading}
@@ -47,6 +49,9 @@ export function RosterTableSkeleton({ isAdmin }: { isAdmin: boolean }) {
           <tbody>
             {Array.from({ length: 8 }, (_, row) => (
               <tr key={row} className="border-t border-border align-top">
+                <td className="px-5 py-4">
+                  <Skeleton className="mt-3 size-4 rounded" />
+                </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-3">
                     <Skeleton className="size-10 shrink-0 rounded-full" />
@@ -68,6 +73,13 @@ export function RosterTableSkeleton({ isAdmin }: { isAdmin: boolean }) {
                     </div>
                   </td>
                 )}
+
+                <td className="px-5 py-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    <Skeleton className="h-6 w-28 rounded-full" />
+                    <Skeleton className="h-6 w-24 rounded-full" />
+                  </div>
+                </td>
 
                 {Array.from({ length: 4 }, (_, meter) => (
                   <td key={meter} className="px-5 py-4">
