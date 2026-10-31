@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, findAttemptOwner, completeAttempt, issueCertificate } = vi.hoisted(() => ({
+const { auth, findAttemptOwner, completeAttempt, issueCertificate, licensedOnAttempt } = vi.hoisted(() => ({
   auth: vi.fn(),
   findAttemptOwner: vi.fn(),
   completeAttempt: vi.fn(),
   issueCertificate: vi.fn(),
+  licensedOnAttempt: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("@/server/data/attempts", () => ({ findAttemptOwner, completeAttempt }));
 vi.mock("@/server/data/certificates", () => ({ issueCertificate }));
+vi.mock("@/server/data/exam-results", () => ({ licensedOnAttempt }));
 
 import { POST } from "./route";
 
@@ -37,6 +39,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   auth.mockResolvedValue({ user: { id: "u1", role: "USER" } });
   findAttemptOwner.mockResolvedValue("u1");
+  licensedOnAttempt.mockResolvedValue(false);
   completeAttempt.mockResolvedValue({ attempt, passes: 2 });
 });
 
@@ -90,6 +93,24 @@ describe("POST /api/attempts/[id]/complete", () => {
     expect((await post()).status).toBe(403);
 
     expect(completeAttempt).not.toHaveBeenCalled();
+  });
+
+  // Finishing would still count a pass toward a certificate on an exam that
+  // is already behind them.
+  it("refuses to score a sitting once the real exam is passed", async () => {
+    licensedOnAttempt.mockResolvedValue(true);
+    const response = await post();
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ licensed: true });
+    expect(completeAttempt).not.toHaveBeenCalled();
+    expect(issueCertificate).not.toHaveBeenCalled();
+  });
+
+  it("asks about the real exam only after checking the sitting is theirs", async () => {
+    findAttemptOwner.mockResolvedValue("u2");
+    expect((await post()).status).toBe(403);
+    expect(licensedOnAttempt).not.toHaveBeenCalled();
   });
 
   it("answers 401 without a session", async () => {

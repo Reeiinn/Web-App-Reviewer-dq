@@ -14,8 +14,10 @@ import {
   findOpenAttempt,
   listAttemptAnswers,
   listCompletedSittings,
+  listFinishedAttempts,
   openAttempt,
   recordExamAnswer,
+  sittingStanding,
 } from "./attempts";
 
 // Users go first: their attempts' answers point at the questions with no
@@ -133,6 +135,27 @@ describe("openAttempt", () => {
 });
 
 describe("reading a sitting", () => {
+  it("tells whether a sitting is open and how many are finished", async () => {
+    const me = await user();
+    await question();
+    expect(await sittingStanding(me.id, "IIAP_B")).toEqual({
+      openSitting: false,
+      finishedSittings: 0,
+    });
+
+    const { attempt } = await openAttempt(me.id, "IIAP_B");
+    expect(await sittingStanding(me.id, "IIAP_B")).toEqual({
+      openSitting: true,
+      finishedSittings: 0,
+    });
+
+    await completeAttempt(attempt.id);
+    expect(await sittingStanding(me.id, "IIAP_B")).toEqual({
+      openSitting: false,
+      finishedSittings: 1,
+    });
+  });
+
   it("finds an attempt by id, and null for one that does not exist", async () => {
     const me = await user();
     await question();
@@ -186,6 +209,29 @@ describe("reading a sitting", () => {
       { examType: "VUL", passed: true, score: 3, totalItems: 4, completedAt: at("2026-10-02T00:00:00.000Z") },
     ]);
   });
+
+  // The past-exams list: one track, newest first, each with the id that opens it.
+  it("lists one track's finished sittings newest first, with their ids", async () => {
+    const me = await user();
+    const at = (iso: string) => new Date(iso);
+    const older = await prisma.examAttempt.create({
+      data: { userId: me.id, examType: "VUL", score: 2, totalItems: 4, passed: false, completedAt: at("2026-10-01T00:00:00.000Z") },
+    });
+    const newer = await prisma.examAttempt.create({
+      data: { userId: me.id, examType: "VUL", score: 4, totalItems: 4, passed: true, completedAt: at("2026-10-03T00:00:00.000Z") },
+    });
+    await prisma.examAttempt.create({
+      data: { userId: me.id, examType: "IIAP_A", score: 1, totalItems: 1, passed: true, completedAt: at("2026-10-02T00:00:00.000Z") },
+    });
+    await prisma.examAttempt.create({
+      data: { userId: me.id, examType: "VUL", score: 0, totalItems: 0, passed: false },
+    });
+
+    expect(await listFinishedAttempts(me.id, "VUL")).toEqual([
+      { id: newer.id, score: 4, totalItems: 4, passed: true, completedAt: at("2026-10-03T00:00:00.000Z") },
+      { id: older.id, score: 2, totalItems: 4, passed: false, completedAt: at("2026-10-01T00:00:00.000Z") },
+    ]);
+  });
 });
 
 /** A sitting on a fresh track of `n` questions, with each question's right and wrong choice. */
@@ -232,6 +278,8 @@ describe("answers", () => {
     const s = await sitting(1);
     expect(await findAttemptOwner(s.attempt.id)).toBe(s.me.id);
     expect(await findAttemptOwner("00000000-0000-4000-8000-000000000000")).toBeNull();
+    expect(await findAttemptOwner("not-a-uuid")).toBeNull();
+    expect(await findAttempt("not-a-uuid")).toBeNull();
   });
 
   it("says whether a choice is right, and null for another question's choice", async () => {

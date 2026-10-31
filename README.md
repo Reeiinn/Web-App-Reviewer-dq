@@ -28,12 +28,20 @@ a manager working through a deck would build a learner record nobody can see.
 
 ### Studying
 
+- **Exam choice** — after signing in, a reviewee who has never picked is asked
+  which of the four exams they are taking (one or more), saved as their focus
+  tracks. Only those appear on their dashboard, analytics, glossary and
+  certificates, and the staff roster scores them on those alone. It can be
+  changed later from **Edit exams** on the dashboard. Focus is a lens, not a
+  lock: any track can still be opened and studied.
 - **Flashcards** — front/back recall, rated known or not, with the deck order
   and position saved so a sitting resumes on any device
 - **Memorization** — multiple-choice items with instant feedback, the same
   resume behaviour, and a mastery panel that agrees with the dashboard
 - **Practice Exams** — a paper dealt once per attempt and kept with it, scored
   per question, reviewable afterwards, with a retake beside the review
+- **Past exams** — every finished sitting on a track, each opening on the paper
+  as it was dealt with the reviewee's own answers marked against the right ones
 - **Glossary** — searchable key terms per track
 - **Streaks** — a run of correct answers per track, with a best-ever high-water
   mark and celebrations at 5, 10 and 25
@@ -50,8 +58,15 @@ a manager working through a deck would build a learner record nobody can see.
 
 ### Staff console
 
-- **Roster** (`/admin`) — readiness per reviewee, status filters, search,
-  per-track practice exam results, and removal behind a typed confirmation
+- **Roster** (`/admin`) — readiness per reviewee on the exams they chose,
+  status filters, search, per-track practice exam results, and select-and-remove:
+  tick one or more reviewees, confirm once against the listed names
+- **Licensing results** — the real exam is sat outside the app, so staff record
+  each chosen exam as Passed or Failed from the roster. A failed reviewee keeps
+  studying for the retake; a passed exam turns view-only, its past sittings
+  still open for review but no new ones started
+- **Exam Results** (`/admin/results`) — everyone marked, filterable by result
+  and exam, with who recorded each mark and when
 - **Unit Managers** (`/admin/field-managers`) — a ranked console of recruiters,
   their intake, and how recently each was active
 - **Invitations** — a signup link a reviewee can be handed, or an addressed
@@ -176,6 +191,14 @@ in the five passing sittings a certificate needs.
 
 ## Deployment
 
+**Apply pending migrations before the build goes live.** A build reads every
+table its migrations create, so one deployed ahead of
+`20261014000200_user_focus_tracks` and `20261030000100_exam_results` breaks
+sign-in for everyone, along with the staff roster and the practice exam. The
+previous build runs fine on the migrated schema, so migrate first. The checklist
+is in
+`docs/superpowers/specs/2026-10-30-exam-choice-results-bulk-remove-design.md`.
+
 Set `APP_URL` in the production environment to the address the app is served at:
 
     APP_URL="https://insureph.app"
@@ -197,7 +220,8 @@ Everything else from `.env.local` belongs in the production environment too.
     src/
       app/
         (auth)/           → signup, forgot-password, reset-password
-        admin/            → staff roster and the Unit Manager console
+        admin/            → staff roster, exam results and the Unit Manager console
+        choose-exams/     → the reviewee's exam picker
         analytics/        → a reviewee's own progress across tracks
         certificates/     → issued certificates, and one certificate's page
         dashboard/        → track cards, study modes, quick access

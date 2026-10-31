@@ -5,6 +5,7 @@ import { createUser, deleteUsers } from "@/test/db-fixtures";
 import {
   deleteNudge,
   findActiveAccount,
+  findActiveAccounts,
   findNudge,
   lastNudgeSentAt,
   listManagers,
@@ -13,6 +14,7 @@ import {
   markNudgesRead,
   recordAdminAction,
   removeReviewee,
+  removeReviewees,
   sendNudge,
   touchLastSeen,
   unreadNudgeCount,
@@ -206,6 +208,10 @@ describe("listManagers", () => {
 });
 
 describe("findActiveAccount", () => {
+  it("finds nobody for an id that is not a uuid", async () => {
+    expect(await findActiveAccount("nope")).toBeNull();
+  });
+
   it("reads what a staff action checks, and nothing for a removed account", async () => {
     const boss = await user({ role: "MANAGER" });
     const me = await named("Rae", { managerId: boss.id });
@@ -217,6 +223,35 @@ describe("findActiveAccount", () => {
     await prisma.user.update({ where: { id: me.id }, data: { deletedAt: new Date() } });
     expect(await findActiveAccount(me.id)).toBeNull();
     expect(await findActiveAccount(randomUUID())).toBeNull();
+  });
+});
+
+describe("findActiveAccounts", () => {
+  it("reads every live account asked for and skips the rest", async () => {
+    const boss = await user({ role: "MANAGER" });
+    const live = await named("Lee", { managerId: boss.id });
+    const gone = await user();
+    await prisma.user.update({ where: { id: gone.id }, data: { deletedAt: new Date() } });
+
+    const found = await findActiveAccounts([live.id, gone.id, randomUUID()]);
+    expect(found).toEqual([
+      { id: live.id, name: "Lee", email: live.email, role: "USER", managerId: boss.id },
+    ]);
+    expect(await findActiveAccounts([])).toEqual([]);
+  });
+});
+
+describe("removeReviewees", () => {
+  it("stamps every live one once and names only those this call stamped", async () => {
+    const a = await user();
+    const b = await user();
+    await prisma.user.update({ where: { id: b.id }, data: { deletedAt: new Date() } });
+
+    expect(await removeReviewees([a.id, b.id])).toEqual([a.id]);
+    expect(await removeReviewees([a.id])).toEqual([]);
+    const rows = await prisma.user.findMany({ where: { id: { in: [a.id, b.id] } }, select: { deletedAt: true } });
+    expect(rows.every((row) => row.deletedAt !== null)).toBe(true);
+    expect(await removeReviewees([])).toEqual([]);
   });
 });
 

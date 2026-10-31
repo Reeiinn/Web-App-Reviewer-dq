@@ -5,10 +5,6 @@ import { DialogPanel } from "@/components/ui/dialog-panel";
 import { AppNav } from "@/components/ui/app-nav";
 import { OnboardingTour } from "@/components/ui/onboarding-tour";
 import { Avatar } from "@/components/ui/avatar";
-import {
-  ButtonHoldAndRelease,
-  type HoldHandle,
-} from "@/components/ui/hold-and-release-button";
 import { Invite } from "@/components/ui/invite";
 import { FilterSelect, type SelectOption } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
@@ -42,6 +38,10 @@ import {
   Zap,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
+import type { ResultMark } from "@/lib/types/exam-results";
+import { ResultChip } from "./ResultChip";
+import { RemoveSelected } from "./RemoveSelected";
+import { pageCheckState, pruneSelection, togglePage } from "./roster-selection";
 import { useSearchParams } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
@@ -95,6 +95,10 @@ type Reviewee = {
     tracks: ExamTrackResult[];
   };
   activity: { lastActivity: string | null };
+  /** The exams the row is scored on; chosen is false until they pick. */
+  focusTracks: { tracks: ExamType[]; chosen: boolean };
+  /** Real licensing exam results staff have recorded, by exam. */
+  results: Partial<Record<ExamType, ResultMark>>;
 };
 
 /** One reminder already sitting in a reviewee's bell. */
@@ -108,6 +112,17 @@ type SentNudge = {
 };
 
 const PAGE_SIZE = 15;
+
+/**
+ * The exams a row shows a result chip for: the ones picked, plus any carrying
+ * a mark. A mark left on an exam the reviewee has since dropped has to be on
+ * screen to be cleared.
+ */
+const chipTracks = (row: Reviewee) =>
+  examTypes.filter(
+    (examType) =>
+      row.focusTracks.tracks.includes(examType) || row.results[examType],
+  );
 
 const sorts = {
   readiness_desc: "Overall Readiness (High to Low)",
@@ -317,27 +332,6 @@ function Meter({
     </div>
   );
 }
-
-/**
- * What the admin has to type before the delete button turns on. Naming the
- * person rather than a fixed word means a phrase copied from one dialog cannot
- * confirm the removal of somebody else.
- */
-const deletePhrase = (name: string) => `Delete ${name}`;
-
-/**
- * Spacing, case and the quotes the label puts around the phrase should not
- * stand between an admin and a deliberate delete.
- */
-const tidy = (value: string) =>
-  value
-    .trim()
-    .replace(/^["'“”]+|["'“”]+$/g, "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-
-const samePhrase = (a: string, b: string) => tidy(a) === tidy(b);
 
 /**
  * Sends a reviewee a reminder without leaving the roster.
@@ -608,164 +602,6 @@ function NudgeReviewee({
   );
 }
 
-/**
- * Removing a reviewee destroys their history, and the delete cascades from
- * users.id through progress, attempts, streaks and sessions. A trash icon is
- * too cheap for that, so the row only opens a dialog that names the person,
- * unlocks once the phrase is typed, and sends the request on a held press.
- * Opening the dialog stays a plain click: the weight belongs on the action,
- * not on reading who is about to be removed.
- *
- * Managers see this control on the same terms admins do: the roster is filtered
- * to their own reviewees, but the row itself is not role-gated.
- */
-function RemoveReviewee({
-  reviewee,
-  onRemoved,
-}: {
-  reviewee: Reviewee;
-  onRemoved: (id: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [typed, setTyped] = useState("");
-  const [removing, setRemoving] = useState(false);
-  const [error, setError] = useState("");
-  /** Lets a held Enter in the confirm field drive the hold button's fill. */
-  const hold = useRef<HoldHandle>(null);
-
-  const phrase = deletePhrase(reviewee.name);
-  const confirmed = samePhrase(typed, phrase);
-
-  function close(next: boolean) {
-    if (removing) return; // never yank the dialog out from under a request
-    setOpen(next);
-    if (!next) {
-      setTyped("");
-      setError("");
-    }
-  }
-
-  async function remove() {
-    if (!confirmed || removing) return;
-
-    setRemoving(true);
-    setError("");
-
-    try {
-      const response = await fetch(`/api/admin/reviewees/${reviewee.id}`, {
-        method: "DELETE",
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        setError(data.error ?? "Could not remove this reviewee.");
-        setRemoving(false);
-        return;
-      }
-
-      setRemoving(false);
-      setOpen(false);
-      setTyped("");
-      onRemoved(reviewee.id);
-    } catch {
-      setError("Could not reach the server.");
-      setRemoving(false);
-    }
-  }
-
-  return (
-    <AlertDialog.Root open={open} onOpenChange={close}>
-      <AlertDialog.Trigger
-        aria-label={`Remove ${reviewee.name}`}
-        className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
-      >
-        <Trash2 className="size-3.5" />
-        Remove
-      </AlertDialog.Trigger>
-
-      <AlertDialog.Portal>
-        <DialogPanel animated>
-          <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-700">
-              <AlertTriangle className="size-5" />
-            </span>
-            <div className="min-w-0">
-              <AlertDialog.Title className="text-lg font-extrabold">
-                Remove {reviewee.name}?
-              </AlertDialog.Title>
-              <AlertDialog.Description className="mt-1 text-sm text-muted-foreground">
-                {reviewee.email}
-              </AlertDialog.Description>
-            </div>
-          </div>
-
-          <p className="mt-4 text-sm leading-6">
-            This deletes the account together with every flashcard and
-            memorization rating, practice exam attempt, streak and saved study
-            session. It cannot be undone.
-          </p>
-
-          <label
-            htmlFor={`confirm-${reviewee.id}`}
-            className="mt-5 block text-sm font-semibold"
-          >
-            Type <span className="font-mono">&quot;{phrase}&quot;</span> to
-            confirm
-          </label>
-          <input
-            id={`confirm-${reviewee.id}`}
-            value={typed}
-            onChange={(event) => setTyped(event.target.value)}
-            // Enter is a hold here too: tapping it does nothing, holding it
-            // fills the button's bar and only then removes the account.
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              if (event.repeat || !confirmed || removing) return;
-              hold.current?.startHold();
-            }}
-            onKeyUp={(event) => {
-              if (event.key === "Enter") hold.current?.endHold();
-            }}
-            onBlur={() => hold.current?.endHold()}
-            disabled={removing}
-            autoComplete="off"
-            placeholder={phrase}
-            className="mt-2 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
-          />
-
-          {error && (
-            <p className="mt-3 text-sm font-semibold text-destructive">
-              {error}
-            </p>
-          )}
-
-          <div className="mt-6 flex justify-end gap-2">
-            <AlertDialog.Close
-              disabled={removing}
-              className="rounded-lg border border-border px-3 py-2 text-sm font-bold transition hover:border-[#C9A227] disabled:opacity-60"
-            >
-              Cancel
-            </AlertDialog.Close>
-            {/* The phrase says who is being removed; the hold says the admin
-                meant it. A stray click cannot reach the request. */}
-            <ButtonHoldAndRelease
-              ref={hold}
-              holdDuration={2000}
-              onHoldComplete={remove}
-              disabled={!confirmed || removing}
-              busy={removing}
-              idleLabel={removing ? "Removing…" : "Hold to remove"}
-              holdingLabel="Keep holding…"
-              className="h-9 px-3 text-sm"
-            />
-          </div>
-        </DialogPanel>
-      </AlertDialog.Portal>
-    </AlertDialog.Root>
-  );
-}
-
 export function AdminPage() {
   const { data: session } = useSession();
   // Only an admin sees more than one recruiter's reviewees, so only an admin
@@ -782,6 +618,8 @@ export function AdminPage() {
   const [roster, setRoster] = useState<Reviewee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  /** A failed mark. Apart from error, which replaces the table it arose in. */
+  const [markError, setMarkError] = useState("");
   const [notice, setNotice] = useState("");
   const [statusFilter, setStatusFilter] = useState<ReadinessStatus | "ALL">(
     "ALL",
@@ -790,6 +628,8 @@ export function AdminPage() {
   const [search, setSearch] = useState(managerFilter);
   const [page, setPage] = useState(1);
   const [examType, setExamType] = useState<ExamType | "ALL">("ALL");
+  /** Ticked rows, by reviewee id, across every page of the filtered list. */
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     let active = true;
@@ -814,6 +654,12 @@ export function AdminPage() {
       active = false;
     };
   }, [examType]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const counts = useMemo(
     () => ({
@@ -858,12 +704,30 @@ export function AdminPage() {
     });
   }, [index, statusFilter, sort, deferredSearch]);
 
+  // A filter, a search or a refetch can take rows out of view; their ticks go
+  // with them, so a removal never covers a row nobody can see. Adjusted during
+  // render rather than in an effect, so the stale selection is never painted.
+  const [selectionBasis, setSelectionBasis] = useState(visible);
+  if (selectionBasis !== visible) {
+    setSelectionBasis(visible);
+    setSelected((current) =>
+      pruneSelection(
+        current,
+        visible.map((row) => row.id),
+      ),
+    );
+  }
+
   const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const rows = visible.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   );
+
+  const pageIds = rows.map((row) => row.id);
+  const pageState = pageCheckState(selected, pageIds);
+  const selectedRows = visible.filter((row) => selected.has(row.id));
 
   const share = (part: number) =>
     counts.total ? `${((part / counts.total) * 100).toFixed(1)}%` : "0%";
@@ -884,7 +748,7 @@ export function AdminPage() {
             </div>
             <p className="mt-1.5 text-sm text-muted-foreground">
               {examType === "ALL"
-                ? "Live performance tracking of every candidate, scored across all licensing tracks."
+                ? "Live performance tracking of every candidate, scored on the exams they chose."
                 : `Live performance tracking of every candidate, scored on ${examLabels[examType]} only.`}
             </p>
           </div>
@@ -892,14 +756,34 @@ export function AdminPage() {
           <Invite />
         </div>
 
-        {notice && (
-          <p
-            role="status"
-            className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
-          >
-            {notice}
-          </p>
-        )}
+        {/* Pinned to the screen: the row being marked can be a long way down
+            the roster, well out of sight of the top of the page. */}
+        <div className="fixed inset-x-4 bottom-5 z-40 flex flex-col items-center gap-2 sm:inset-x-auto sm:right-6 sm:items-end">
+          {notice && (
+            <p
+              role="status"
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-lg"
+            >
+              {notice}
+            </p>
+          )}
+
+          {markError && (
+            <div
+              role="alert"
+              className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 shadow-lg"
+            >
+              {markError}
+              <button
+                type="button"
+                onClick={() => setMarkError("")}
+                className="-my-3 -mr-2 min-h-11 px-2 font-bold underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* The counts are tallied from the roster, so until it lands they
             would every one of them read a confident nought. */}
@@ -1032,18 +916,59 @@ export function AdminPage() {
           </div>
         ) : (
           <div data-tour="tour-roster" className="rv-card mt-6 overflow-hidden">
+            {selected.size > 0 && (
+              <div className="flex flex-wrap items-center gap-3 bg-[#0B2340] px-5 py-3 text-sm font-bold text-white">
+                <span>{selected.size} selected</span>
+                <button
+                  type="button"
+                  onClick={() => setSelected(new Set())}
+                  className="rounded-lg border border-white/30 px-3 py-1.5 transition hover:bg-white/10"
+                >
+                  Clear
+                </button>
+                <RemoveSelected
+                  reviewees={selectedRows.map(({ id, name }) => ({ id, name }))}
+                  onRemoved={(removedIds) => {
+                    const gone = new Set(removedIds);
+                    setRoster((current) =>
+                      current.filter((item) => !gone.has(item.id)),
+                    );
+                    setNotice(
+                      `${removedIds.length} account${removedIds.length === 1 ? "" : "s"} removed`,
+                    );
+                  }}
+                />
+              </div>
+            )}
             <div className="overflow-x-auto">
               {/* The Sales Manager's table carries an extra Recruited By
                   column, so it needs the wider floor before the cells start
                   wrapping mid-phrase. */}
               <table
-                className={`w-full text-left text-sm ${isAdmin ? "min-w-[1320px]" : "min-w-[1100px]"}`}
+                className={`w-full text-left text-sm ${isAdmin ? "min-w-[1560px]" : "min-w-[1340px]"}`}
               >
                 <thead className="bg-[#0B2340] text-white">
                   <tr>
+                    <th scope="col" className="w-12 px-5 py-4">
+                      <input
+                        type="checkbox"
+                        aria-label="Select every reviewee on this page"
+                        checked={pageState === "all"}
+                        ref={(box) => {
+                          if (box) box.indeterminate = pageState === "some";
+                        }}
+                        onChange={(event) =>
+                          setSelected((current) =>
+                            togglePage(current, pageIds, event.target.checked),
+                          )
+                        }
+                        className="size-4 cursor-pointer accent-[#FFD400]"
+                      />
+                    </th>
                     {[
                       "Reviewee / Candidate",
                       ...(isAdmin ? ["Recruited By"] : []),
+                      "Exams · Real Exam Result",
                       "Overall Readiness",
                       "Mastery by Exam",
                       "Memorize Acc.",
@@ -1067,8 +992,24 @@ export function AdminPage() {
                   {rows.map((row, rowIndex) => (
                     <tr
                       key={row.id}
-                      className="border-t border-border align-top"
+                      className={`border-t border-border align-top ${
+                        selected.has(row.id) ? "bg-[#FFFBE6]" : ""
+                      }`}
                     >
+                      <td className="px-5 py-4">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${row.name}`}
+                          checked={selected.has(row.id)}
+                          onChange={(event) =>
+                            setSelected((current) =>
+                              togglePage(current, [row.id], event.target.checked),
+                            )
+                          }
+                          className="mt-3 size-4 cursor-pointer accent-[#0B2340]"
+                        />
+                      </td>
+
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <Avatar name={row.name} image={row.image} />
@@ -1107,6 +1048,41 @@ export function AdminPage() {
                           )}
                         </td>
                       )}
+
+                      <td className="px-5 py-4">
+                        {row.focusTracks.chosen ? (
+                          <div className="flex max-w-64 flex-wrap gap-1.5">
+                            {chipTracks(row).map((examType) => (
+                              <ResultChip
+                                key={examType}
+                                revieweeId={row.id}
+                                revieweeName={row.name}
+                                examType={examType}
+                                mark={row.results[examType]}
+                                onError={(message) => {
+                                  setNotice("");
+                                  setMarkError(message);
+                                }}
+                                onChange={(results, message) => {
+                                  setRoster((current) =>
+                                    current.map((item) =>
+                                      item.id === row.id
+                                        ? { ...item, results }
+                                        : item,
+                                    ),
+                                  );
+                                  setMarkError("");
+                                  setNotice(message);
+                                }}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Hasn&apos;t chosen exams yet
+                          </p>
+                        )}
+                      </td>
 
                       <td className="px-5 py-4">
                         <div className="flex items-baseline gap-2">
@@ -1161,15 +1137,6 @@ export function AdminPage() {
                             reviewee={row}
                             tourTarget={rowIndex === 0}
                             onSent={(message) => setNotice(message)}
-                          />
-                          <RemoveReviewee
-                            reviewee={row}
-                            onRemoved={(id) => {
-                              setRoster((current) =>
-                                current.filter((item) => item.id !== id),
-                              );
-                              setNotice(`${row.name} has been removed.`);
-                            }}
                           />
                         </div>
                       </td>

@@ -1,5 +1,9 @@
 import { auth } from "@/lib/auth";
-import { attemptJson, reviewedAnswerJson } from "@/lib/helper/exam-json";
+import {
+  attemptJson,
+  openAnswerJson,
+  reviewedAnswerJson,
+} from "@/lib/helper/exam-json";
 import { findAttempt, listAttemptAnswers } from "@/server/data/attempts";
 import { isActiveRecruit } from "@/server/data/users";
 import { NextResponse } from "next/server";
@@ -39,7 +43,9 @@ export async function GET(
 
     return NextResponse.json({
       ...attemptJson(attempt),
-      answers: answers.map(reviewedAnswerJson),
+      answers: answers.map(
+        attempt.completedAt ? reviewedAnswerJson : openAnswerJson,
+      ),
     });
   } catch (error) {
     console.error("Error fetching attempt:", error);

@@ -3,6 +3,7 @@ import prisma from "@/server/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ExamType } from "@/lib/types/common";
 import { sittingPassed } from "@/lib/helper/practice-exam";
+import { isUuid } from "@/lib/helper/removal";
 
 /**
  * Practice-exam sittings: dealing a paper, resuming it, the answers saved
@@ -117,7 +118,23 @@ export async function openAttempt(
   return { attempt: asAttempt(started), created: true };
 }
 
+/** Whether a sitting is open on a track, and how many have been finished. */
+export async function sittingStanding(
+  userId: string,
+  examType: ExamType,
+): Promise<{ openSitting: boolean; finishedSittings: number }> {
+  const [open, finishedSittings] = await Promise.all([
+    prisma.examAttempt.count({ where: { userId, examType, completedAt: null } }),
+    prisma.examAttempt.count({
+      where: { userId, examType, completedAt: { not: null } },
+    }),
+  ]);
+  return { openSitting: open > 0, finishedSittings };
+}
+
+/** An id that is not a uuid names no sitting: the column would refuse it. */
 export async function findAttempt(id: string): Promise<AttemptRecord | null> {
+  if (!isUuid(id)) return null;
   const row = await prisma.examAttempt.findUnique({
     where: { id },
     select: attemptSelect,
@@ -180,8 +197,33 @@ export async function listCompletedSittings(userId: string): Promise<CompletedSi
   }));
 }
 
+export type FinishedAttempt = {
+  id: string;
+  score: number;
+  totalItems: number;
+  passed: boolean;
+  completedAt: Date;
+};
+
+/**
+ * One track's finished sittings, newest first, for the past-exams list. An
+ * unfinished sitting has no score yet and is left out.
+ */
+export async function listFinishedAttempts(
+  userId: string,
+  examType: ExamType,
+): Promise<FinishedAttempt[]> {
+  const rows = await prisma.examAttempt.findMany({
+    where: { userId, examType, completedAt: { not: null } },
+    orderBy: { completedAt: "desc" },
+    select: { id: true, score: true, totalItems: true, passed: true, completedAt: true },
+  });
+  return rows.map((row) => ({ ...row, completedAt: row.completedAt as Date }));
+}
+
 /** Who an attempt belongs to; null if there is no such attempt. */
 export async function findAttemptOwner(attemptId: string): Promise<string | null> {
+  if (!isUuid(attemptId)) return null;
   const row = await prisma.examAttempt.findUnique({
     where: { id: attemptId },
     select: { userId: true },

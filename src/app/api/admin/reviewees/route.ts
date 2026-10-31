@@ -12,6 +12,8 @@ import {
   hasPassedTrack,
 } from "@/lib/helper/practice-exam";
 import { latestActivity } from "@/lib/helper/track-counts";
+import { getFocusTracksFor } from "@/server/data/focus-tracks";
+import { resultsFor } from "@/server/data/exam-results";
 import { getTrackCountsFor } from "@/server/data/mastery";
 import { NextResponse } from "next/server";
 
@@ -25,7 +27,8 @@ const pct = (part: number, whole: number) =>
  * deliberately absent.
  *
  * Accepts ?exam_type=<track> to scope every number to one track. Without it,
- * readiness is the mean of the per-track readiness scores, so a track counts
+ * readiness is the mean of the per-track readiness scores over the
+ * reviewee's focus tracks (all four until they choose), so a track counts
  * the same whether it holds 20 items or 200 — seeding a new track then moves
  * the score by a known fraction rather than by however large the seed was.
  * The count columns still show totals summed across tracks.
@@ -63,27 +66,38 @@ export async function GET(req: Request) {
 
     // Counts per reviewee and track come from the mastery views, the same
     // ones the dashboard reads, so the two can no longer disagree.
-    const countsByUser = await getTrackCountsFor(userIds, tracks);
+    // Every track is counted once for everybody; each reviewee is then scored
+    // on their own focus tracks. A ?exam_type zoom overrides focus, so staff
+    // can look at one track across the whole roster.
+    const [countsByUser, focusByUser, marksByUser] = await Promise.all([
+      getTrackCountsFor(userIds, tracks),
+      getFocusTracksFor(userIds),
+      resultsFor(userIds),
+    ]);
 
     const roster = users.map((user) => {
-      const perTrack = (countsByUser.get(user.id) ?? []).map((t) => ({
-        track: t.examType,
-        readiness: trackReadiness({
+      const focus = focusByUser.get(user.id)!;
+      const scored = selected ? [selected] : focus.tracks;
+      const perTrack = (countsByUser.get(user.id) ?? [])
+        .filter((t) => scored.includes(t.examType))
+        .map((t) => ({
+          track: t.examType,
+          readiness: trackReadiness({
+            flashcards: t.flashcards,
+            memorization: t.memorization,
+            practice: t.practice,
+          }),
           flashcards: t.flashcards,
           memorization: t.memorization,
           practice: t.practice,
-        }),
-        flashcards: t.flashcards,
-        memorization: t.memorization,
-        practice: t.practice,
-        answered: t.memorizationAnswered,
-        correct: t.memorizationCorrect,
-        taken: t.attemptsTaken,
-        passes: cappedPasses(t.passingAttempts),
-        // study_streaks is the one table that records when a learner last
-        // answered anything on a track.
-        lastActivity: t.lastAnswerAt,
-      }));
+          answered: t.memorizationAnswered,
+          correct: t.memorizationCorrect,
+          taken: t.attemptsTaken,
+          passes: cappedPasses(t.passingAttempts),
+          // study_streaks is the one table that records when a learner last
+          // answered anything on a track.
+          lastActivity: t.lastAnswerAt,
+        }));
 
       const sum = (pick: (row: (typeof perTrack)[number]) => number) =>
         perTrack.reduce((running, row) => running + pick(row), 0);
@@ -163,6 +177,11 @@ export async function GET(req: Request) {
           tracks: examTracks,
         },
         activity: { lastActivity },
+        // Which tracks this row is scored on, and whether the reviewee chose
+        // them (false means none chosen yet, so all four).
+        focusTracks: focus,
+        // The real licensing exam's outcome per exam, as staff recorded it.
+        results: marksByUser.get(user.id) ?? {},
       };
     });
 

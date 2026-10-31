@@ -11,6 +11,7 @@ import next from "eslint-config-next";
 const config = [
   {
     ignores: [
+      ".agents/**",
       ".next/**",
       "node_modules/**",
       "next-env.d.ts",

@@ -34,9 +34,9 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
+    }).catch(() => null);
+    const data = (await response?.json().catch(() => ({}))) ?? {};
+    if (!response?.ok) {
       setError(
         data.error ?? "Unable to create your account. Please try again.",
       );
@@ -51,7 +51,8 @@ export function SignupPage({ initialCode }: { initialCode: string }) {
       password: payload.password,
       signupGrant: data.signupGrant ?? "",
       redirect: false,
-    });
+      // signIn throws on a reply that isn't Auth.js's own, such as the limiter's.
+    }).catch(() => ({ error: "unavailable" }));
     if (signInResult?.error) {
       setIsSubmitting(false);
       setError(

@@ -295,11 +295,7 @@ function MemorizationContent() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            selected_choice_id: selected,
-            is_correct: isCorrect,
-            mastered: isCorrect,
-          }),
+          body: JSON.stringify({ selected_choice_id: selected }),
         },
       );
 

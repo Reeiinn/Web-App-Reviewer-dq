@@ -315,7 +315,10 @@ model User {
   actionsReceived      AdminAction[]          @relation("AdminActionTarget")
   certificates         Certificate[]
   examAttempts         ExamAttempt[]
+  examResults          ExamResult[]           @relation("ExamResultReviewee")
+  resultsMarked        ExamResult[]           @relation("ExamResultMarker")
   flashcardProgress    FlashcardProgress[]
+  focusTracks          UserFocusTrack[]
   memorizationProgress MemorizationProgress[]
   nudgesSent           Nudge[]                @relation("NudgeSender")
   nudgesReceived       Nudge[]                @relation("NudgeRecipient")
@@ -363,4 +366,31 @@ enum UserRole {
   MANAGER
 
   @@map("user_role")
+}
+
+/// Tracks a reviewee is focused on. No rows means all four.
+model UserFocusTrack {
+  userId    String   @map("user_id") @db.Uuid
+  examType  ExamType @map("exam_type")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([userId, examType])
+  @@map("user_focus_tracks")
+}
+
+/// How a reviewee did on the real licensing exam, recorded by staff. One
+/// current mark per exam; every change is also written to admin_actions.
+model ExamResult {
+  userId   String   @map("user_id") @db.Uuid
+  examType ExamType @map("exam_type")
+  /// PASSED or FAILED; a check constraint in the migration holds it to those.
+  outcome  String
+  markedBy String?  @map("marked_by") @db.Uuid
+  markedAt DateTime @default(now()) @map("marked_at") @db.Timestamptz(6)
+  user     User     @relation("ExamResultReviewee", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  marker   User?    @relation("ExamResultMarker", fields: [markedBy], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@id([userId, examType])
+  @@map("exam_results")
 }

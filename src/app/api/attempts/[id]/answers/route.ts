@@ -5,6 +5,8 @@ import {
   findAttemptOwner,
   recordExamAnswer,
 } from "@/server/data/attempts";
+import { licensedOnAttempt } from "@/server/data/exam-results";
+import { PASSED_LOCK_BODY } from "@/lib/helper/licensing";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -28,6 +30,10 @@ export async function POST(
 
     if (userId !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (await licensedOnAttempt(attemptId)) {
+      return NextResponse.json(PASSED_LOCK_BODY, { status: 403 });
     }
 
     const body = await req.json();

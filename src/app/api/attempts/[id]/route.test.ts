@@ -50,8 +50,17 @@ describe("GET /api/attempts/[id]", () => {
     expect(await response.text()).toBe(
       '{"id":"a1","user_id":"owner","exam_type":"VUL","score":0,"total_items":0,"passed":false,' +
         '"started_at":"2026-10-14T01:00:00.000Z","completed_at":null,"question_order":["q1"],' +
-        '"answers":[{"id":"x1","question_id":"q1","selected_choice_id":"c1","is_correct":true,"question_text":"Q?"}]}',
+        '"answers":[{"id":"x1","question_id":"q1","selected_choice_id":"c1","question_text":"Q?"}]}',
     );
+  });
+
+  it("says which answers were right only once the sitting is finished", async () => {
+    findAttempt.mockResolvedValue({
+      ...attempt,
+      completedAt: new Date("2026-10-14T02:00:00.000Z"),
+    });
+    const { answers } = await (await get()).json();
+    expect(answers[0].is_correct).toBe(true);
   });
 
   it("answers 404 for an attempt that does not exist", async () => {

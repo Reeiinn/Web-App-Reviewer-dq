@@ -5,6 +5,7 @@ import {
   removeReviewee,
   touchLastSeen,
 } from "@/server/data/staff";
+import { removalDecision } from "@/lib/helper/removal";
 import { NextResponse } from "next/server";
 
 /**
@@ -33,33 +34,16 @@ export async function DELETE(
 
   const { id } = await params;
 
-  if (id === currentUserId) {
-    return NextResponse.json(
-      { error: "You cannot remove your own account." },
-      { status: 400 },
-    );
-  }
-
   try {
     const user = await findActiveAccount(id);
-    if (!user) {
-      return NextResponse.json(
-        { error: "That reviewee no longer exists." },
-        { status: 404 },
-      );
-    }
 
-    if (user.role !== "USER") {
+    // Shared with removing a ticked selection, so one row and many answer
+    // to exactly the same rule.
+    const decision = removalDecision({ id: currentUserId, role }, id, user ?? undefined);
+    if (!decision.ok || !user) {
       return NextResponse.json(
-        { error: "Only reviewee accounts can be removed here." },
-        { status: 403 },
-      );
-    }
-
-    if (role === "MANAGER" && user.managerId !== currentUserId) {
-      return NextResponse.json(
-        { error: "You can only remove reviewees you manage." },
-        { status: 403 },
+        { error: decision.ok ? "That reviewee no longer exists." : decision.reason },
+        { status: decision.ok ? 404 : decision.status },
       );
     }
 

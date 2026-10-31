@@ -47,6 +47,7 @@ describe("sign-in reads", () => {
       role: "MANAGER",
       managerId: null,
       onboardingToursSeen: [],
+      focusTracks: null,
     });
   });
 
@@ -58,7 +59,29 @@ describe("sign-in reads", () => {
       role: "USER",
       managerId: manager.id,
       onboardingToursSeen: [],
+      focusTracks: null,
     });
+  });
+
+  // The middleware sends a reviewee with no pick to the picker, so the claim
+  // has to tell "never picked" (null) from a pick, in the standard order.
+  it("carries the exam pick, in order, on sign-in and refresh", async () => {
+    const reviewee = await user();
+    await prisma.userFocusTrack.createMany({
+      data: [
+        { userId: reviewee.id, examType: "IIAP_B" },
+        { userId: reviewee.id, examType: "VUL" },
+      ],
+    });
+
+    expect((await findSignInAccount(reviewee.email))?.focusTracks).toEqual([
+      "VUL",
+      "IIAP_B",
+    ]);
+    expect((await getSessionClaims(reviewee.id))?.focusTracks).toEqual([
+      "VUL",
+      "IIAP_B",
+    ]);
   });
 
   it("treats a soft-deleted account as gone", async () => {

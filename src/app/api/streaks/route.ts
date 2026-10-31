@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { getFocusTracks } from "@/server/data/focus-tracks";
 import { fetchStreaks } from "@/server/data/progress";
 import { NextResponse } from "next/server";
 
@@ -9,7 +10,8 @@ export async function GET() {
   }
 
   try {
-    return NextResponse.json(await fetchStreaks(session.user.id));
+    const focus = await getFocusTracks(session.user.id);
+    return NextResponse.json(await fetchStreaks(session.user.id, focus.tracks));
   } catch (error) {
     console.error("Error fetching streaks:", error);
     return NextResponse.json(

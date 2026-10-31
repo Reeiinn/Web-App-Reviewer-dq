@@ -21,6 +21,8 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
+  /** Bumped to remount the widget, which has it issue a new token. */
+  const [turnstileRun, setTurnstileRun] = useState(0);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -33,22 +35,37 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
-    const result = await signIn("credentials", {
-      email: formData.get("email"),
-      password: formData.get("password"),
-      turnstileToken,
-      redirect: false,
-    });
-
-    if (result?.error) {
+    const refused = (message: string) => {
       setIsSubmitting(false);
-      setError("Invalid email or password. Please try again.");
+      setError(message);
+      // A token is good for one attempt, so the next one needs a fresh widget.
+      setTurnstileToken("");
+      setTurnstileRun((run) => run + 1);
+    };
+
+    const formData = new FormData(event.currentTarget);
+    let result;
+    try {
+      result = await signIn("credentials", {
+        email: formData.get("email"),
+        password: formData.get("password"),
+        turnstileToken,
+        redirect: false,
+      });
+    } catch {
+      // signIn throws on a reply that isn't Auth.js's own, which is what the
+      // per-address limit in the middleware sends, as does a dropped connection.
+      refused("We couldn't sign you in just now. Please wait a moment and try again.");
       return;
     }
 
-    if (result?.code === "rate_limit") {
-      setError("Too many login attempts. Please try again later.");
+    if (result?.error) {
+      refused(
+        result.code === "rate_limit"
+          ? "Too many login attempts. Please try again later."
+          : "Invalid email or password. Please try again.",
+      );
+      return;
     }
 
     const session = await getSession();
@@ -178,6 +195,7 @@ export default function LoginPage() {
             </div>
 
             <Turnstile
+              key={turnstileRun}
               sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
               onVerify={(token) => setTurnstileToken(token)}
               onExpire={() => setTurnstileToken("")}
