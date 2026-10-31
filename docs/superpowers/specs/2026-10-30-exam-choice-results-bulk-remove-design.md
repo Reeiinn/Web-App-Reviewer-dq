@@ -516,6 +516,34 @@ Testing the real login screen turned up four faults, all fixed in this release:
 - A limiter that could not answer stopped every login. `authorize()` now fails
   open, as the middleware does. Sign-in is slow while Upstash's client retries.
 
+## Amendment: signing up again after removal (2026-10-31)
+
+Found in production: `users.email` is unique across removed accounts, so signing
+up with a removed reviewee's address answered 409 "Email already registered"
+even though the account could no longer be seen or used.
+
+- Signing up through an invite addressed to a removed account's email restores
+  that account. Its work, certificates and licensing results come back with it,
+  on the new password and name, under whoever sent the invite.
+- An open link is refused for a removed account's address (403, "This email
+  belongs to a removed account. Ask your manager to send an invitation to it."),
+  and stays unspent.
+- Any reset link still open for the account stops working.
+- Each restore writes a `reviewee.restored` row to `admin_actions`.
+- A live account's address still answers 409.
+- `POST /api/invites` refuses only live accounts' addresses, so staff can invite
+  a removed reviewee. `emailHasAccount` is gone, replaced by `findActiveUserId`.
+- The "Invite a reviewee" card has an optional email field. Left empty, it makes
+  an open link as before. Filled in, it makes an addressed invite and emails it.
+
+An open link does not restore because signup does not verify the address:
+anyone holding one who knows a removed reviewee's email could take over that
+history. An addressed invite is bound to the email staff typed, and the link
+goes to that inbox when a mailer is configured. Without one, staff hand the link
+over themselves, so they vouch for who receives it. Restoring was chosen over
+making removal a permanent delete, because removal is now a single click across
+many accounts.
+
 ## Production checklist (done 2026-10-31)
 
 Kept for the rollback notes and for future releases. The migrations finished at

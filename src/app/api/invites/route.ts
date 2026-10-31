@@ -10,7 +10,7 @@ import {
 } from "@/lib/helper/invites";
 import { staffTitleFor } from "@/lib/helper/roles";
 import { mailerConfigured, sendMail } from "@/lib/mailer";
-import { createInvite, emailHasAccount } from "@/server/data/users";
+import { createInvite, findActiveUserId } from "@/server/data/users";
 import { NextResponse } from "next/server";
 
 /**
@@ -70,7 +70,9 @@ export async function POST(req: Request) {
   await touchLastSeen(currentUserId);
 
   try {
-    if (email && (await emailHasAccount(email))) {
+    // A removed account does not count: an invite addressed to it is how that
+    // person comes back.
+    if (email && (await findActiveUserId(email))) {
       return NextResponse.json(
         { error: "That email already has an account." },
         { status: 409 },

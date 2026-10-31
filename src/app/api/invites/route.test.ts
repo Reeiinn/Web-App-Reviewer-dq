@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, emailHasAccount, createInvite, sendMail, mailerConfigured } =
+const { auth, findActiveUserId, createInvite, sendMail, mailerConfigured } =
   vi.hoisted(() => ({
     auth: vi.fn(),
-    emailHasAccount: vi.fn(),
+    findActiveUserId: vi.fn(),
     createInvite: vi.fn(),
     sendMail: vi.fn(),
     mailerConfigured: vi.fn(),
@@ -11,7 +11,7 @@ const { auth, emailHasAccount, createInvite, sendMail, mailerConfigured } =
 
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("@/server/data/staff", () => ({ touchLastSeen: vi.fn() }));
-vi.mock("@/server/data/users", () => ({ emailHasAccount, createInvite }));
+vi.mock("@/server/data/users", () => ({ findActiveUserId, createInvite }));
 vi.mock("@/lib/mailer", () => ({ sendMail, mailerConfigured }));
 
 import { POST } from "./route";
@@ -31,7 +31,7 @@ beforeEach(() => {
   auth.mockResolvedValue({
     user: { id: "admin-1", role: "ADMIN", name: "Sam" },
   });
-  emailHasAccount.mockResolvedValue(false);
+  findActiveUserId.mockResolvedValue(null);
   createInvite.mockImplementation(
     async (input: { code: string; role: string; email: string | null }) => ({
       code: input.code,
@@ -83,7 +83,7 @@ describe("POST /api/invites", () => {
     const body = await response.json();
 
     expect(response.status).toBe(201);
-    expect(emailHasAccount).toHaveBeenCalledWith("lead@example.com");
+    expect(findActiveUserId).toHaveBeenCalledWith("lead@example.com");
     expect(sendMail).toHaveBeenCalledTimes(1);
     expect(body).toMatchObject({
       role: "MANAGER",
@@ -94,7 +94,7 @@ describe("POST /api/invites", () => {
   });
 
   it("refuses an address that already has an account", async () => {
-    emailHasAccount.mockResolvedValue(true);
+    findActiveUserId.mockResolvedValue("user-1");
 
     const response = await POST(
       request({ role: "MANAGER", email: "taken@example.com" }),

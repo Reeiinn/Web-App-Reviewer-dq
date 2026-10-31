@@ -194,11 +194,6 @@ export async function resetPassword(
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Whether any account, removed or not, holds this (normalised) address. */
-export async function emailHasAccount(email: string): Promise<boolean> {
-  return (await prisma.user.count({ where: { email } })) > 0;
-}
-
 export type CreatedInvite = {
   code: string;
   expiresAt: Date;
@@ -277,6 +272,12 @@ async function explainUnusableInvite(
  * same transaction means a link can never be spent twice, and any refusal —
  * someone else's addressed invite, an address already registered — releases
  * it instead of burning it. `email` and `name` arrive normalised.
+ *
+ * users.email stays unique across removed accounts, so a removed reviewee
+ * comes back on that same account, with their work, on the new password and
+ * under whoever invited them. Only an invite addressed to them does this: staff
+ * named that person, whereas an open link proves nothing about who is typing
+ * the address, and would hand a stranger the old account.
  */
 export async function registerWithInvite(input: {
   code: string;
@@ -307,23 +308,65 @@ export async function registerWithInvite(input: {
       }
 
       const role: InviteRole = isInviteRole(invite.role) ? invite.role : "USER";
-      const user = await tx.user.create({
-        data: {
-          email: input.email,
-          password: input.passwordHash,
-          name: input.name,
-          role,
-          managerId: managerForInvite(role, invite.createdBy),
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          managerId: true,
-          createdAt: true,
-        },
+      const account = {
+        password: input.passwordHash,
+        name: input.name,
+        role,
+        managerId: managerForInvite(role, invite.createdBy),
+      };
+      const select = {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        managerId: true,
+        createdAt: true,
+      };
+
+      const removedAccount = { email: input.email, deletedAt: { not: null } };
+
+      if (!invite.email && (await tx.user.count({ where: removedAccount })) > 0) {
+        throw new Refused({
+          ok: false,
+          reason: "claimant",
+          error:
+            "This email belongs to a removed account. Ask your manager to send an invitation to it.",
+        });
+      }
+
+      const [restored] = await tx.user.updateManyAndReturn({
+        where: removedAccount,
+        data: { ...account, deletedAt: null },
+        select,
       });
+
+      if (restored) {
+        // A reset link from before the removal must not outlive the new password.
+        await tx.passwordResetToken.updateMany({
+          where: { userId: restored.id, usedAt: null },
+          data: { usedAt: now },
+        });
+        // A removed account coming back is left on the record for support.
+        await tx.adminAction.create({
+          data: {
+            actorId: restored.id,
+            actorEmail: restored.email,
+            actorRole: restored.role,
+            action: "reviewee.restored",
+            targetId: restored.id,
+            targetEmail: restored.email,
+            targetName: restored.name,
+            detail: { via: "signup", invitedBy: invite.createdBy },
+          },
+        });
+      }
+
+      const user =
+        restored ??
+        (await tx.user.create({
+          data: { email: input.email, ...account },
+          select,
+        }));
 
       return { ok: true as const, user };
     }, TRANSACTION_OPTIONS);
