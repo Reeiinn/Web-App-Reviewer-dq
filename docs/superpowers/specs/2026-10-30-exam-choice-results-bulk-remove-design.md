@@ -477,14 +477,57 @@ above:
   and additive: one new, empty table. `exam_results` joins the
   delete-a-user test.
 
-## Production checklist (Nelson runs this, after merge)
+## Amendment: answers stay on the server during a sitting (2026-10-31)
+
+Found in the pre-production check: `/api/questions` sent every option's
+`is_correct`, and `GET /api/attempts/[id]` and `POST .../answers` said whether an
+answer was right, all during an open sitting.
+
+- `GET /api/questions` never carries `is_correct` or `explanation`.
+- `GET /api/questions/answers?exam_type=` is the answer key. A reviewee may read
+  it with no sitting open on that track and at least one finished, or with a
+  Passed mark. Staff may always read it.
+- `GET /api/attempts/[id]` reports `is_correct` only on a finished sitting, and
+  `POST .../answers` never does.
+- The result screen's score comes from the server. Its paper is marked from the
+  key, which is read once the sitting is closed.
+- While a sitting is open, past sittings and the review are refused with
+  "Finish your open practice exam before reviewing the answers."
+
+This protects the exam in progress. Flashcards and memorization still teach the
+same material, so studying a track still shows its answers.
+
+Mastery opens the practice exam, so `POST /api/memorization/[id]/progress` now
+marks the answer itself and ignores any `is_correct` or `mastered` it is sent.
+Flashcards stay self-rated: "Got it" is the reviewee's own call, with nothing
+for the server to check.
+
+## Production checklist (Nelson runs this, before merging to `main`)
+
+Merging to `main` is the live deploy, so the migrations come first. The build
+at `e82ba0e` runs fine on the migrated schema. This build without the two new
+tables breaks sign-in for everyone.
 
 1. Take a Railway backup.
-2. With `MIGRATE_DATABASE_URL=<Railway URL>` and `ALLOW_REMOTE_MIGRATE=1` set
-   for this command only, `prisma migrate deploy` applies
-   `20261030000100_exam_results`, which only creates an empty table.
-3. Deploy. Every existing reviewee has no focus pick, so each is asked which
-   exams they are taking on their next visit; nothing else changes until
-   staff record a result.
+2. From a checkout of `dev` (`main` has neither migration folder since the
+   revert), set `MIGRATE_DATABASE_URL=<Railway URL>` and
+   `ALLOW_REMOTE_MIGRATE=1` for these commands only.
+3. `prisma migrate status` must list exactly
+   `20261014000200_user_focus_tracks` and `20261030000100_exam_results` as
+   pending. If `0_init` is unrecorded, do the Wave 0 baseline in
+   `2026-10-14-prisma-migration-design.md` first. If either shows as already
+   applied, stop and reconcile it.
+4. `prisma migrate deploy`, then `prisma migrate status` again, then unset both
+   variables. Each migration only creates one new, empty table.
+5. From a new branch off `main`, run `git revert -m 1 2c56e7f` to undo PR 95,
+   merge `dev` into that branch, and open that PR to `main`. `dev` never had the
+   revert, so it can't be undone there, and a plain `dev` to `main` merge treats
+   this work as already merged and leaves it out. The result should match `dev`
+   exactly: `git diff --quiet HEAD dev` on that branch.
+6. On production: sign in as a reviewee, pick exams, reach the dashboard, then
+   open the roster and `/admin/results`. Every existing reviewee has no focus
+   pick, so each is asked which exams they are taking on their next visit;
+   nothing else changes until staff record a result.
 
-Rollback is `DROP TABLE exam_results;`, which touches no other table.
+Rollback is to redeploy the `e82ba0e` code and leave both tables in place, which
+keeps reviewees' picks and staff marks. Dropping the tables would delete those.

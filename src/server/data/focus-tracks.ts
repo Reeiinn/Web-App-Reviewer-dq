@@ -1,5 +1,6 @@
 import "server-only";
 import prisma from "@/server/db/prisma";
+import { markedTrackDropped } from "@/lib/helper/exam-choice";
 import { resolveFocusTracks, type FocusTracks } from "@/lib/helper/focus-tracks";
 import type { ExamType } from "@/lib/types/common";
 
@@ -39,17 +40,33 @@ export async function getFocusTracksFor(
  * The user's row is locked first, so two saves at once (two tabs) run one
  * after the other and the last one wins, rather than each deleting only the
  * rows it can see and leaving a mix of both picks.
+ *
+ * A track carrying a licensing result cannot be dropped, and comes back as
+ * `dropped` with nothing saved. That is checked under the same lock markResult
+ * takes, so a mark and a change of pick cannot pass each other.
  */
 export async function setFocusTracks(
   userId: string,
   tracks: ExamType[],
-): Promise<FocusTracks> {
-  await prisma.$transaction(async (tx) => {
+): Promise<FocusTracks | { dropped: ExamType }> {
+  const dropped = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT 1 FROM users WHERE id = ${userId}::uuid FOR UPDATE`;
+
+    const marks = await tx.examResult.findMany({
+      where: { userId },
+      select: { examType: true, outcome: true },
+    });
+    const marked = markedTrackDropped(
+      tracks,
+      Object.fromEntries(marks.map((row) => [row.examType, row.outcome])),
+    );
+    if (marked) return marked;
+
     await tx.userFocusTrack.deleteMany({ where: { userId } });
     await tx.userFocusTrack.createMany({
       data: tracks.map((examType) => ({ userId, examType })),
     });
+    return null;
   });
-  return resolveFocusTracks(tracks);
+  return dropped ? { dropped } : resolveFocusTracks(tracks);
 }

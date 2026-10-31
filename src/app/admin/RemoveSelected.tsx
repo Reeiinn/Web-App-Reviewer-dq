@@ -3,7 +3,7 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { DialogPanel } from "@/components/ui/dialog-panel";
 import { Spinner } from "@/components/ui/spinner";
-import { REMOVE_BATCH_SIZE, chunk } from "@/lib/helper/removal";
+import { REMOVE_BATCH_SIZE, chunk, removalLeftWork } from "@/lib/helper/removal";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -50,6 +50,7 @@ export function RemoveSelected({
 
     const removed: string[] = [];
     const left: Skipped[] = [];
+    let failed = false;
 
     try {
       // One request carries at most a batch; a larger selection goes in turn
@@ -71,6 +72,7 @@ export function RemoveSelected({
         left.push(...(data.skipped ?? []));
       }
     } catch (removeError) {
+      failed = true;
       setError(
         removeError instanceof Error
           ? removeError.message
@@ -83,11 +85,8 @@ export function RemoveSelected({
     if (removed.length > 0) onRemoved(removed);
 
     // Whatever could not go stays ticked and stays on screen, with why.
-    if (left.length > 0) {
-      setSkipped(left);
-    } else if (removed.length > 0) {
-      setOpen(false);
-    }
+    setSkipped(left);
+    if (!removalLeftWork(left.length, failed)) setOpen(false);
   }
 
   const nameFor = (row: Skipped) =>

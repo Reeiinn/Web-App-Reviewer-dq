@@ -37,7 +37,14 @@ export function isLicensedRefusal(body: unknown): boolean {
 }
 
 export type Completion =
-  | { kind: "scored"; passed: boolean; passes: number; certificateId: string | null }
+  | {
+      kind: "scored";
+      passed: boolean;
+      passes: number;
+      score: number;
+      total: number;
+      certificateId: string | null;
+    }
   | { kind: "licensed" }
   | { kind: "error"; message: string };
 
@@ -52,6 +59,8 @@ export function readCompletion(ok: boolean, body: unknown): Completion {
   const reply = (body ?? {}) as {
     passed?: boolean;
     passes?: number;
+    score?: number;
+    total_items?: number;
     certificate?: { id?: string } | null;
     licensed?: boolean;
     error?: string;
@@ -70,6 +79,8 @@ export function readCompletion(ok: boolean, body: unknown): Completion {
     kind: "scored",
     passed: Boolean(reply.passed),
     passes: Number(reply.passes ?? 0),
+    score: Number(reply.score ?? 0),
+    total: Number(reply.total_items ?? 0),
     certificateId: reply.certificate?.id ?? null,
   };
 }

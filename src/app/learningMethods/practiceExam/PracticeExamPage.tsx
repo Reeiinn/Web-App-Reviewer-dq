@@ -37,6 +37,9 @@ import { resendAnswers } from "@/lib/helper/exam-submit";
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5);
 
+const answerKeyUrl = (type: string) =>
+  `/api/questions/answers?exam_type=${encodeURIComponent(type)}`;
+
 /**
  * The paper this sitting was dealt, in the order the attempt recorded.
  *
@@ -113,9 +116,13 @@ function PracticeExamContent() {
   const [outcome, setOutcome] = useState<{
     passed: boolean;
     passes: number;
+    score: number;
+    total: number;
     /** Set on the sitting that clears the track, and on every one after. */
     certificateId: string | null;
   } | null>(null);
+  /** Whether the finished paper has its answers to mark it against. */
+  const [marked, setMarked] = useState(false);
 
   /** Questions a submit found blank, marked until they are answered. */
   const [missing, setMissing] = useState<Set<string>>(new Set());
@@ -175,13 +182,16 @@ function PracticeExamContent() {
 
         // A review reads the paper and records nothing, so it deals no attempt.
         if (openedForReview) {
-          const items = await fetch(
-            `/api/questions?exam_type=${encodeURIComponent(type)}`,
-            fresh,
-          ).then((response) => response.json() as Promise<Question[]>);
+          const response = await fetch(answerKeyUrl(type), fresh);
+          const items = await response.json();
 
           if (!active) return;
-          setQuestions(Array.isArray(items) ? items : []);
+          // Refused while a sitting is open, or before the first one.
+          if (!response.ok) {
+            setError(items.error ?? "Could not load the answers.");
+          } else {
+            setQuestions(items as Question[]);
+          }
           setLoading(false);
           return;
         }
@@ -270,13 +280,6 @@ function PracticeExamContent() {
 
   const correctIdOf = (question: Question) =>
     question.choices.find((choice) => choice.is_correct)?.id;
-
-  const score = questions.filter(
-    (question) => answers[question.id] === correctIdOf(question),
-  ).length;
-  const wrongQuestions = questions.filter(
-    (question) => answers[question.id] !== correctIdOf(question),
-  );
 
   /**
    * Records a choice against the attempt as it is made.
@@ -410,8 +413,23 @@ function PracticeExamContent() {
       setOutcome({
         passed: completed.passed,
         passes: completed.passes,
+        score: completed.score,
+        total: completed.total,
         certificateId: completed.certificateId,
       });
+
+      // The sitting is closed now, so its answers can be read. The score above
+      // does not depend on this: without the key the paper just isn't marked.
+      const key = await fetch(answerKeyUrl(type), fresh)
+        .then((reply) => (reply.ok ? (reply.json() as Promise<Question[]>) : null))
+        .catch(() => null);
+      setMarked(Boolean(key));
+      if (key) {
+        const byId = new Map(key.map((item) => [item.id, item]));
+        setQuestions((current) =>
+          current.map((question) => byId.get(question.id) ?? question),
+        );
+      }
       setFinished(true);
     } catch (submitError) {
       console.error("Failed to submit practice exam:", submitError);
@@ -431,11 +449,16 @@ function PracticeExamContent() {
     setSubmitting(true);
 
     try {
-      const attempt = await fetch(`/api/attempts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ exam_type: type }),
-      }).then((response) => response.json());
+      const [items, attempt] = await Promise.all([
+        fetch(`/api/questions?exam_type=${encodeURIComponent(type)}`, fresh).then(
+          (response) => response.json() as Promise<Question[]>,
+        ),
+        fetch(`/api/attempts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ exam_type: type }),
+        }).then((response) => response.json()),
+      ]);
 
       if (attempt?.licensed) {
         setLicensed(true);
@@ -450,7 +473,7 @@ function PracticeExamContent() {
       setAttemptId(attempt.id);
       // A new sitting is a new paper: the server dealt one with the attempt,
       // and that is the only point at which the order changes.
-      setQuestions((current) => dealt(current, attempt));
+      setQuestions(dealt(Array.isArray(items) ? items : [], attempt));
       setAnswers({});
       unsaved.current.clear();
       setOutcome(null);
@@ -674,14 +697,28 @@ function PracticeExamContent() {
             </section>
           )}
           <Result
-            correct={score}
-            wrong={wrongQuestions.length}
+            correct={outcome?.score ?? 0}
+            wrong={(outcome?.total ?? 0) - (outcome?.score ?? 0)}
             onTryAgain={retake}
             accent="exam"
           />
 
+          {!marked && (
+            <p className="mt-6 text-sm text-muted-foreground">
+              Your score is saved, but the answers could not be loaded. See them
+              under{" "}
+              <Link
+                href={`/learningMethods/practiceExam?exam_type=${type}&mode=history`}
+                className="font-bold text-[#8A6D0B] hover:text-[#0B2340]"
+              >
+                past exams
+              </Link>
+              .
+            </p>
+          )}
+
           <div className="mt-6 flex flex-col gap-4">
-            {questions.map((question, index) => {
+            {(marked ? questions : []).map((question, index) => {
               const chosen = answers[question.id];
               const correctId = correctIdOf(question);
               const wasRight = chosen === correctId;

@@ -1,15 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, getFocusTracks, setFocusTracks, outcomesFor } = vi.hoisted(() => ({
+const { auth, getFocusTracks, setFocusTracks } = vi.hoisted(() => ({
   auth: vi.fn(),
   getFocusTracks: vi.fn(),
   setFocusTracks: vi.fn(),
-  outcomesFor: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("@/server/data/focus-tracks", () => ({ getFocusTracks, setFocusTracks }));
-vi.mock("@/server/data/exam-results", () => ({ outcomesFor }));
 
 import { GET, PUT } from "./route";
 
@@ -25,7 +23,6 @@ const put = (body: string) =>
 beforeEach(() => {
   vi.clearAllMocks();
   auth.mockResolvedValue({ user: { id: "u1", role: "USER" } });
-  outcomesFor.mockResolvedValue({});
 });
 
 describe("/api/user/focus-tracks", () => {
@@ -75,19 +72,12 @@ describe("/api/user/focus-tracks", () => {
 
   // A recorded result has to keep pointing at an exam the reviewee still has.
   it("refuses to drop an exam that has a recorded result", async () => {
-    outcomesFor.mockResolvedValue({ IIAP_A: "FAILED" });
+    setFocusTracks.mockResolvedValue({ dropped: "IIAP_A" });
     const response = await put(`{"tracks":["VUL"]}`);
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
       error: "IIAP (Set A) has a recorded exam result and can't be removed.",
     });
-    expect(setFocusTracks).not.toHaveBeenCalled();
-  });
-
-  it("keeps a marked exam when it stays in the pick", async () => {
-    outcomesFor.mockResolvedValue({ VUL: "PASSED" });
-    setFocusTracks.mockResolvedValue({ tracks: ["VUL", "IIAP_B"], chosen: true });
-    expect((await put(`{"tracks":["VUL","IIAP_B"]}`)).status).toBe(200);
   });
 
   it("answers 500 when saving fails", async () => {

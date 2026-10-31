@@ -50,6 +50,21 @@ describe("focus tracks", () => {
     expect([["VUL"], ["IIAP_A"]]).toContainEqual((await getFocusTracks(a)).tracks);
   });
 
+  it("refuses to drop an exam with a result, and saves nothing", async () => {
+    const { id: marker } = await createUser({ role: "ADMIN" });
+    await setFocusTracks(b, ["VUL", "IIAP_A"]);
+    await prisma.examResult.create({
+      data: { userId: b, examType: "IIAP_A", outcome: "FAILED", markedBy: marker },
+    });
+
+    expect(await setFocusTracks(b, ["VUL"])).toEqual({ dropped: "IIAP_A" });
+    expect((await getFocusTracks(b)).tracks).toEqual(["VUL", "IIAP_A"]);
+
+    await prisma.examResult.deleteMany({ where: { userId: b } });
+    await prisma.userFocusTrack.deleteMany({ where: { userId: b } });
+    await deleteUsers(marker);
+  });
+
   it("answers for every user in one call", async () => {
     await setFocusTracks(a, ["VUL"]);
     const map = await getFocusTracksFor([a, b]);

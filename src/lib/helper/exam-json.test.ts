@@ -59,7 +59,7 @@ describe("exam JSON shapes", () => {
         }),
       ),
     ).toBe(
-      '{"id":"x1","attempt_id":"a1","question_id":"q1","selected_choice_id":"c1","is_correct":false}',
+      '{"id":"x1","attempt_id":"a1","question_id":"q1","selected_choice_id":"c1"}',
     );
   });
 

@@ -23,6 +23,8 @@ export type MarkTarget =
 
 type Refusal = { ok: false; status: 403 | 404 | 409; error: string };
 
+export const NOT_TAKING_EXAM = "This reviewee isn't taking that exam.";
+
 export function canMarkResult(
   actor: Actor,
   target: MarkTarget,
@@ -51,11 +53,7 @@ export function canMarkResult(
   // Clearing is the exception: a mark that raced a change of pick must still
   // be removable.
   if (!clearing && !target.examTracks?.includes(examType)) {
-    return {
-      ok: false,
-      status: 409,
-      error: "This reviewee isn't taking that exam.",
-    };
+    return { ok: false, status: 409, error: NOT_TAKING_EXAM };
   }
   return { ok: true };
 }

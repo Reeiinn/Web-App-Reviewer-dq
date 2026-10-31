@@ -9,7 +9,6 @@ import type { FocusTracks } from "@/lib/helper/focus-tracks";
 import type { ExamResults } from "@/lib/types/exam-results";
 import { Check, Lock } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 /**
@@ -20,7 +19,6 @@ import { useEffect, useState } from "react";
  * locked: dropping it would leave the result pointing at nothing.
  */
 export function ChooseExamsPage() {
-  const router = useRouter();
   const { status, update } = useSession();
 
   const [picked, setPicked] = useState<Set<ExamType>>(new Set());
@@ -91,9 +89,12 @@ export function ChooseExamsPage() {
       }
 
       // The middleware reads the choice off the token. Navigating before the
-      // token carries it would send the reviewee straight back here.
+      // token carries it would send the reviewee straight back here. A full
+      // load, because the nav's prefetch of /dashboard ran on the old token and
+      // the client router would replay its redirect back to this page.
       await update();
-      router.replace("/dashboard");
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign("/dashboard");
     } catch {
       setError("Could not save your exams.");
       setSaving(false);

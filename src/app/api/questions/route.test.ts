@@ -19,7 +19,13 @@ const get = (query = "") =>
 beforeEach(() => {
   vi.clearAllMocks();
   auth.mockResolvedValue({ user: { id: "u1", role: "USER" } });
-  listQuestions.mockResolvedValue([{ id: "f1" }]);
+  listQuestions.mockResolvedValue([
+    {
+      id: "f1",
+      explanation: "Because A.",
+      choices: [{ id: "c1", text: "A", is_correct: true }],
+    },
+  ]);
 });
 
 describe("GET /api/questions", () => {
@@ -37,8 +43,15 @@ describe("GET /api/questions", () => {
 
   it("passes the track and category through and returns the rows", async () => {
     const response = await get("?exam_type=VUL&category=Basics");
-    expect(await response.json()).toEqual([{ id: "f1" }]);
+    expect(await response.json()).toEqual([
+      { id: "f1", explanation: null, choices: [{ id: "c1", text: "A" }] },
+    ]);
     expect(listQuestions).toHaveBeenCalledWith({ examType: "VUL", category: "Basics" });
+  });
+
+  it("never says which option is right, even to staff", async () => {
+    auth.mockResolvedValue({ user: { id: "a1", role: "ADMIN" } });
+    expect(await (await get("?exam_type=VUL")).text()).not.toContain("is_correct");
   });
 
   it("lists every track when none is asked for", async () => {

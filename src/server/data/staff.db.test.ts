@@ -208,6 +208,10 @@ describe("listManagers", () => {
 });
 
 describe("findActiveAccount", () => {
+  it("finds nobody for an id that is not a uuid", async () => {
+    expect(await findActiveAccount("nope")).toBeNull();
+  });
+
   it("reads what a staff action checks, and nothing for a removed account", async () => {
     const boss = await user({ role: "MANAGER" });
     const me = await named("Rae", { managerId: boss.id });

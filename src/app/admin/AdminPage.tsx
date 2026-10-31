@@ -618,6 +618,8 @@ export function AdminPage() {
   const [roster, setRoster] = useState<Reviewee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  /** A failed mark. Apart from error, which replaces the table it arose in. */
+  const [markError, setMarkError] = useState("");
   const [notice, setNotice] = useState("");
   const [statusFilter, setStatusFilter] = useState<ReadinessStatus | "ALL">(
     "ALL",
@@ -652,6 +654,12 @@ export function AdminPage() {
       active = false;
     };
   }, [examType]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const counts = useMemo(
     () => ({
@@ -740,7 +748,7 @@ export function AdminPage() {
             </div>
             <p className="mt-1.5 text-sm text-muted-foreground">
               {examType === "ALL"
-                ? "Live performance tracking of every candidate, scored across all licensing tracks."
+                ? "Live performance tracking of every candidate, scored on the exams they chose."
                 : `Live performance tracking of every candidate, scored on ${examLabels[examType]} only.`}
             </p>
           </div>
@@ -748,14 +756,34 @@ export function AdminPage() {
           <Invite />
         </div>
 
-        {notice && (
-          <p
-            role="status"
-            className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
-          >
-            {notice}
-          </p>
-        )}
+        {/* Pinned to the screen: the row being marked can be a long way down
+            the roster, well out of sight of the top of the page. */}
+        <div className="fixed inset-x-4 bottom-5 z-40 flex flex-col items-center gap-2 sm:inset-x-auto sm:right-6 sm:items-end">
+          {notice && (
+            <p
+              role="status"
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-lg"
+            >
+              {notice}
+            </p>
+          )}
+
+          {markError && (
+            <div
+              role="alert"
+              className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 shadow-lg"
+            >
+              {markError}
+              <button
+                type="button"
+                onClick={() => setMarkError("")}
+                className="-my-3 -mr-2 min-h-11 px-2 font-bold underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* The counts are tallied from the roster, so until it lands they
             would every one of them read a confident nought. */}
@@ -1031,7 +1059,10 @@ export function AdminPage() {
                                 revieweeName={row.name}
                                 examType={examType}
                                 mark={row.results[examType]}
-                                onError={setError}
+                                onError={(message) => {
+                                  setNotice("");
+                                  setMarkError(message);
+                                }}
                                 onChange={(results, message) => {
                                   setRoster((current) =>
                                     current.map((item) =>
@@ -1040,7 +1071,7 @@ export function AdminPage() {
                                         : item,
                                     ),
                                   );
-                                  setError("");
+                                  setMarkError("");
                                   setNotice(message);
                                 }}
                               />

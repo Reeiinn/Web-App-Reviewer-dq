@@ -10,7 +10,7 @@ import {
 } from "@/test/db-fixtures";
 import {
   applyStreak,
-  choiceBelongsTo,
+  memorizationChoiceCorrectness,
   clearSession,
   fetchRecent,
   fetchStreaks,
@@ -214,14 +214,23 @@ describe("flashcard reviews", () => {
 });
 
 describe("memorization answers", () => {
-  it("checks that a choice belongs to the item", async () => {
-    const item = await createMemorization({ choices: [{ text: "A", sortOrder: 1 }] });
+  it("marks a choice, and refuses one from another item", async () => {
+    const item = await createMemorization({
+      choices: [
+        { text: "A", isCorrect: true, sortOrder: 1 },
+        { text: "A2", sortOrder: 2 },
+      ],
+    });
     const other = await createMemorization({ choices: [{ text: "B", sortOrder: 1 }] });
     content.memorization.push(item.id, other.id);
 
     expect(await findMemorizationTrack(item.id)).toBe("VUL");
-    expect(await choiceBelongsTo(item.choices[0].id, item.id)).toBe(true);
-    expect(await choiceBelongsTo(other.choices[0].id, item.id)).toBe(false);
+    const right = item.choices.find((c) => c.isCorrect)!;
+    const wrong = item.choices.find((c) => !c.isCorrect)!;
+    expect(await memorizationChoiceCorrectness(right.id, item.id)).toBe(true);
+    expect(await memorizationChoiceCorrectness(wrong.id, item.id)).toBe(false);
+    expect(await memorizationChoiceCorrectness(other.choices[0].id, item.id)).toBeNull();
+    expect(await memorizationChoiceCorrectness("nope", item.id)).toBeNull();
   });
 
   it("records the last answer but never takes mastery back", async () => {

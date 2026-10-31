@@ -48,12 +48,16 @@ describe("readCompletion", () => {
       readCompletion(true, {
         passed: true,
         passes: 3,
+        score: 38,
+        total_items: 50,
         certificate: { id: "c1" },
       }),
     ).toEqual({
       kind: "scored",
       passed: true,
       passes: 3,
+      score: 38,
+      total: 50,
       certificateId: "c1",
     });
   });

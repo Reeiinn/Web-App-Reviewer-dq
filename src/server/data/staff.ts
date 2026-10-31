@@ -1,6 +1,7 @@
 import "server-only";
 import prisma from "@/server/db/prisma";
 import type { Prisma } from "@/generated/prisma/client";
+import { isUuid } from "@/lib/helper/removal";
 
 /**
  * Staff: the console's roster and managers list, removing a reviewee,
@@ -162,6 +163,7 @@ export type StaffTarget = {
 
 /** The account a staff action is aimed at, or null if unknown or removed. */
 export async function findActiveAccount(id: string): Promise<StaffTarget | null> {
+  if (!isUuid(id)) return null;
   return prisma.user.findFirst({
     where: { id, deletedAt: null },
     select: { id: true, name: true, email: true, role: true, managerId: true },

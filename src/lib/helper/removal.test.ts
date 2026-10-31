@@ -4,6 +4,8 @@ import {
   isUuid,
   planRemoval,
   removalDecision,
+  removalLeftWork,
+  removeIdsError,
   removeIdsSchema,
   type RemovalTarget,
 } from "./removal";
@@ -109,6 +111,40 @@ describe("removeIdsSchema", () => {
       removeIdsSchema.safeParse({ ids: Array.from({ length: 201 }, String) })
         .success,
     ).toBe(false);
+  });
+});
+
+describe("removeIdsError", () => {
+  const errorFor = (ids: string[]) => {
+    const parsed = removeIdsSchema.safeParse({ ids });
+    if (parsed.success) throw new Error("expected a refusal");
+    return removeIdsError(parsed.error);
+  };
+
+  it("asks for a selection when there is none", () => {
+    expect(errorFor([])).toBe("Select at least one reviewee to remove.");
+  });
+
+  it("names the limit when there are too many", () => {
+    expect(errorFor(Array.from({ length: 201 }, String))).toBe(
+      "Remove at most 200 reviewees at a time.",
+    );
+  });
+});
+
+describe("removalLeftWork", () => {
+  it("is done only on a clean finish", () => {
+    expect(removalLeftWork(0, false)).toBe(false);
+  });
+
+  // A later batch failing after an earlier one worked used to close the
+  // dialog and hide the error behind the count of those removed.
+  it.each([
+    [1, false],
+    [0, true],
+    [2, true],
+  ])("keeps the dialog up for %i skipped, failed %s", (skipped, failed) => {
+    expect(removalLeftWork(skipped, failed)).toBe(true);
   });
 });
 
