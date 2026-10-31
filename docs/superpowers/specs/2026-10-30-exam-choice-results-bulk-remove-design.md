@@ -519,8 +519,11 @@ tables breaks sign-in for everyone.
    applied, stop and reconcile it.
 4. `prisma migrate deploy`, then `prisma migrate status` again, then unset both
    variables. Each migration only creates one new, empty table.
-5. Revert PR 95 (`da9583d`) on `dev` and merge that to `main`. A plain `dev` to
-   `main` merge treats this work as already merged and leaves it out.
+5. From a new branch off `main`, run `git revert -m 1 2c56e7f` to undo PR 95,
+   merge `dev` into that branch, and open that PR to `main`. `dev` never had the
+   revert, so it can't be undone there, and a plain `dev` to `main` merge treats
+   this work as already merged and leaves it out. The result should match `dev`
+   exactly: `git diff --quiet HEAD dev` on that branch.
 6. On production: sign in as a reviewee, pick exams, reach the dashboard, then
    open the roster and `/admin/results`. Every existing reviewee has no focus
    pick, so each is asked which exams they are taking on their next visit;
