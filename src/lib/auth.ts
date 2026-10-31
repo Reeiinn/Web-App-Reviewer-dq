@@ -64,7 +64,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        const { success } = await authEmailLimiter.limit(normalizedEmail);
+        // Fails open as the middleware's limiters do: a limiter that cannot
+        // answer must not turn into nobody being able to sign in.
+        const { success } = await authEmailLimiter
+          .limit(normalizedEmail)
+          .catch((error: unknown) => {
+            console.error("Rate limiter check failed, failing open:", error);
+            return { success: true };
+          });
 
         if (!success) {
           throw new RateLimitError();

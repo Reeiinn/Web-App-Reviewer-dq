@@ -777,7 +777,7 @@ export function AdminPage() {
               <button
                 type="button"
                 onClick={() => setMarkError("")}
-                className="font-bold underline"
+                className="-my-3 -mr-2 min-h-11 px-2 font-bold underline"
               >
                 Dismiss
               </button>
