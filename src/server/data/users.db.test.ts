@@ -3,7 +3,6 @@ import prisma, { POOL_MAX } from "@/server/db/prisma";
 import { createUser, deleteUsers, uniqueSuffix } from "@/test/db-fixtures";
 import {
   createInvite,
-  emailHasAccount,
   findActiveUserId,
   findResetToken,
   findSignInAccount,
@@ -228,14 +227,6 @@ describe("invites", () => {
     expect((await inviteBy(first)).usedAt).toBeInstanceOf(Date);
     expect((await inviteBy(second)).usedAt).toBeNull();
   });
-
-  it("counts a soft-deleted account's address as taken", async () => {
-    const gone = await user();
-    await softDelete(gone.id);
-
-    expect(await emailHasAccount(gone.email)).toBe(true);
-    expect(await emailHasAccount(`free-${uniqueSuffix()}@example.test`)).toBe(false);
-  });
 });
 
 describe("registerWithInvite", () => {
@@ -327,6 +318,69 @@ describe("registerWithInvite", () => {
     expect(await register(c, existing.email)).toEqual({
       ok: false, reason: "email-taken",
     });
+    expect((await inviteBy(c)).usedAt).toBeNull();
+  });
+
+  it("brings a removed reviewee back on their old account, through an invite to that address", async () => {
+    const before = await user({ role: "MANAGER" });
+    const after = await user({ role: "MANAGER" });
+    const gone = await user({ managerId: before.id });
+    await softDelete(gone.id);
+    const c = code();
+    await createInvite({ code: c, createdBy: after.id, role: "USER", email: gone.email });
+
+    const outcome = await register(c, gone.email);
+
+    expect(outcome).toMatchObject({
+      ok: true,
+      user: { id: gone.id, name: "New Person", managerId: after.id },
+    });
+    expect((await findSignInAccount(gone.email))?.password).toBe("hash");
+    expect((await inviteBy(c)).usedAt).toBeInstanceOf(Date);
+  });
+
+  it("ends a reset link issued before the account came back", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const gone = await user();
+    const tokenHash = `hash-${uniqueSuffix()}`;
+    await issueResetToken(gone.id, tokenHash, new Date(Date.now() + 60_000));
+    await softDelete(gone.id);
+    const c = code();
+    await createInvite({ code: c, createdBy: admin.id, role: "USER", email: gone.email });
+
+    await register(c, gone.email);
+
+    expect((await findResetToken(tokenHash))?.usedAt).toBeInstanceOf(Date);
+  });
+
+  it("records that a removed account came back", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const gone = await user();
+    await softDelete(gone.id);
+    const c = code();
+    await createInvite({ code: c, createdBy: admin.id, role: "USER", email: gone.email });
+
+    await register(c, gone.email);
+
+    expect(
+      await prisma.adminAction.count({
+        where: { action: "reviewee.restored", targetId: gone.id, targetEmail: gone.email },
+      }),
+    ).toBe(1);
+  });
+
+  it("refuses an open link for a removed account and leaves both as they were", async () => {
+    const admin = await user({ role: "ADMIN" });
+    const gone = await user();
+    await softDelete(gone.id);
+    const c = code();
+    await createInvite({ code: c, createdBy: admin.id, role: "USER", email: null });
+
+    expect(await register(c, gone.email)).toEqual({
+      ok: false, reason: "claimant",
+      error: "This email belongs to a removed account. Ask your manager to send an invitation to it.",
+    });
+    expect(await findSignInAccount(gone.email)).toBeNull();
     expect((await inviteBy(c)).usedAt).toBeNull();
   });
 

@@ -8,6 +8,8 @@ import { useState } from "react";
 export function Invite() {
   const { data: session } = useSession();
   const [link, setLink] = useState("");
+  const [email, setEmail] = useState("");
+  const [emailedTo, setEmailedTo] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [error, setError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -22,7 +24,17 @@ export function Invite() {
     setIsCreating(true);
 
     try {
-      const response = await fetch("/api/invites", { method: "POST" });
+      const address = email.trim();
+      const response = await fetch(
+        "/api/invites",
+        address
+          ? {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: address }),
+            }
+          : { method: "POST" },
+      );
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -42,6 +54,7 @@ export function Invite() {
       }
 
       setLink(data.link);
+      setEmailedTo(data.sent ? address : "");
       setExpiresAt(new Date(data.expires_at).toLocaleDateString());
     } catch {
       setError("Could not reach the server. Please try again.");
@@ -68,11 +81,33 @@ export function Invite() {
 
       <p className="mt-1.5 text-sm text-muted-foreground">
         Share a signup link so a new account is created under you. Each link
-        works for one signup only and expires after 7 days.
+        works for one signup only and expires after 7 days. To bring back a
+        removed reviewee, enter their email: their account returns with its
+        history.
       </p>
+
+      <label
+        htmlFor="invite-email"
+        className="mt-4 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground"
+      >
+        Email address (optional)
+      </label>
+      <input
+        id="invite-email"
+        type="email"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+        disabled={isCreating}
+        className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-[#C9A227] disabled:opacity-60"
+      />
 
       {link && (
         <div className="mt-4 rounded-lg bg-muted p-4">
+          {emailedTo && (
+            <p className="mb-2 text-xs font-semibold" role="status">
+              Emailed to {emailedTo}.
+            </p>
+          )}
           <p className="break-all font-mono text-xs">{link}</p>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">

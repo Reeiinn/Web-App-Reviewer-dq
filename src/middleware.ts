@@ -160,7 +160,7 @@ function applyStaticHeaders(res: NextResponse, isDev: boolean) {
   // Nothing here asks for a camera, a microphone or a location, so nothing may.
   res.headers.set(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+    "camera=(), microphone=(), geolocation=()",
   );
   // frame-ancestors covers modern browsers; this covers the rest.
   res.headers.set("X-Frame-Options", "DENY");
