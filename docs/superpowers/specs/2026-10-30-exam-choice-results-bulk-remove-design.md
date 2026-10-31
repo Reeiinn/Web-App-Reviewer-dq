@@ -1,8 +1,9 @@
 # Exam choice, licensing results and bulk removal — design
 
 **Date:** 2026-10-30
-**Status:** approved; rebuilt on the Prisma data layer and focus tracks (see
-"Amendment" at the end)
+**Status:** shipped to `main` on 2026-10-31 in PR 96, with both migrations on
+Railway; rebuilt on the Prisma data layer and focus tracks (see "Amendment" at
+the end)
 **Branch:** `dev`
 **Mockup:** a throwaway clickable mockup of the four screens was reviewed and
 approved before this was written. It is not part of the codebase.
@@ -502,7 +503,27 @@ marks the answer itself and ignores any `is_correct` or `mastered` it is sent.
 Flashcards stay self-rated: "Got it" is the reviewee's own call, with nothing
 for the server to check.
 
-## Production checklist (Nelson runs this, before merging to `main`)
+## Amendment: sign-in fixes found in pre-release testing (2026-10-31)
+
+Testing the real login screen turned up four faults, all fixed in this release:
+
+- A Turnstile token is good for one attempt, and the page never fetched another.
+  Each failed sign-in now remounts the widget for a new token.
+- At the per-account limit the page said the password was wrong. It now says
+  "Too many login attempts. Please try again later."
+- At the per-address limit the middleware's reply made `signIn` throw, and the
+  button spun forever. The page now recovers and says so, as does signup.
+- A limiter that could not answer stopped every login. `authorize()` now fails
+  open, as the middleware does. Sign-in is slow while Upstash's client retries.
+
+## Production checklist (done 2026-10-31)
+
+Kept for the rollback notes and for future releases. The migrations finished at
+02:52:49 UTC and PR 96 merged at 02:52:54 UTC.
+
+Without `MIGRATE_DATABASE_URL` set in the shell, Prisma uses the local one from
+`.env.local` and reports "No pending migrations". Check that the `Datasource`
+line names the Railway host before trusting the output.
 
 Merging to `main` is the live deploy, so the migrations come first. The build
 at `e82ba0e` runs fine on the migrated schema. This build without the two new
