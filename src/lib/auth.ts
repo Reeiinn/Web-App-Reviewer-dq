@@ -89,6 +89,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           role: user.role,
           managerId: user.managerId,
           onboardingToursSeen: user.onboardingToursSeen,
+          focusTracks: user.focusTracks,
         };
       },
     }),
@@ -128,6 +129,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         base.role = account.role;
         base.managerId = account.managerId;
         base.onboardingToursSeen = account.onboardingToursSeen;
+        base.focusTracks = account.focusTracks;
       } catch (error) {
         // A database that cannot answer is not grounds for signing everyone
         // out; the claims already in the token stand until the next refresh.
