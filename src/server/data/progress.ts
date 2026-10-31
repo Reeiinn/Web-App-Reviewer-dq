@@ -1,5 +1,6 @@
 import "server-only";
 import prisma from "@/server/db/prisma";
+import { isUuid } from "@/lib/helper/removal";
 import { nextStreak, streakMilestone } from "@/lib/helper/streaks";
 import type { SavedSession } from "@/lib/helper/study-session";
 import type { ExamType } from "@/lib/types/common";
@@ -195,6 +196,7 @@ export async function clearSession(
 
 /** The track a flashcard belongs to; null if there is no such card. */
 export async function findFlashcardTrack(flashcardId: string): Promise<ExamType | null> {
+  if (!isUuid(flashcardId)) return null;
   const card = await prisma.flashcard.findUnique({
     where: { id: flashcardId },
     select: { examType: true },
@@ -233,6 +235,7 @@ export async function recordFlashcardReview(
 export async function findMemorizationTrack(
   memorizationId: string,
 ): Promise<ExamType | null> {
+  if (!isUuid(memorizationId)) return null;
   const item = await prisma.memorization.findUnique({
     where: { id: memorizationId },
     select: { examType: true },
@@ -240,16 +243,17 @@ export async function findMemorizationTrack(
   return (item?.examType as ExamType | undefined) ?? null;
 }
 
-/** Whether the choice is one of this item's options. */
-export async function choiceBelongsTo(
+/** Whether a choice is right; null if it is not one of this item's options. */
+export async function memorizationChoiceCorrectness(
   choiceId: string,
   memorizationId: string,
-): Promise<boolean> {
-  return (
-    (await prisma.memorizationChoice.count({
-      where: { id: choiceId, memorizationId },
-    })) > 0
-  );
+): Promise<boolean | null> {
+  if (!isUuid(choiceId)) return null;
+  const choice = await prisma.memorizationChoice.findFirst({
+    where: { id: choiceId, memorizationId },
+    select: { isCorrect: true },
+  });
+  return choice?.isCorrect ?? null;
 }
 
 export type MemorizationAnswer = {

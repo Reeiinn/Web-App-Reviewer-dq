@@ -497,6 +497,11 @@ answer was right, all during an open sitting.
 This protects the exam in progress. Flashcards and memorization still teach the
 same material, so studying a track still shows its answers.
 
+Mastery opens the practice exam, so `POST /api/memorization/[id]/progress` now
+marks the answer itself and ignores any `is_correct` or `mastered` it is sent.
+Flashcards stay self-rated: "Got it" is the reviewee's own call, with nothing
+for the server to check.
+
 ## Production checklist (Nelson runs this, before merging to `main`)
 
 Merging to `main` is the live deploy, so the migrations come first. The build

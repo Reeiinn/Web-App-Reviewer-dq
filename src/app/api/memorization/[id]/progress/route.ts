@@ -2,8 +2,8 @@
 import { auth } from "@/lib/auth";
 import {
   applyStreak,
-  choiceBelongsTo,
   findMemorizationTrack,
+  memorizationChoiceCorrectness,
   recordMemorizationAnswer,
 } from "@/server/data/progress";
 import { NextResponse } from "next/server";
@@ -21,18 +21,11 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { selected_choice_id, is_correct, mastered } = body;
+    const { selected_choice_id } = body;
 
-    if (
-      !selected_choice_id ||
-      typeof is_correct !== "boolean" ||
-      typeof mastered !== "boolean"
-    ) {
+    if (typeof selected_choice_id !== "string" || !selected_choice_id) {
       return NextResponse.json(
-        {
-          error:
-            "selected_choice_id, is_correct, and mastered (boolean) are required",
-        },
+        { error: "selected_choice_id is required" },
         { status: 400 },
       );
     }
@@ -46,7 +39,13 @@ export async function POST(
       );
     }
 
-    if (!(await choiceBelongsTo(selected_choice_id, memorizationId))) {
+    // Marked here, whatever the client claims: mastery opens the practice exam.
+    const isCorrect = await memorizationChoiceCorrectness(
+      selected_choice_id,
+      memorizationId,
+    );
+
+    if (isCorrect === null) {
       return NextResponse.json(
         { error: "Choice not found for this memorization item" },
         { status: 404 },
@@ -60,12 +59,12 @@ export async function POST(
       userId: session.user.id,
       memorizationId,
       selectedChoiceId: selected_choice_id,
-      isCorrect: is_correct,
-      mastered,
+      isCorrect,
+      mastered: isCorrect,
     });
 
     // Returned with the answer so the client can celebrate without a second call.
-    const streak = await applyStreak(session.user.id, examType, is_correct);
+    const streak = await applyStreak(session.user.id, examType, isCorrect);
 
     return NextResponse.json({
       id: answer.id,

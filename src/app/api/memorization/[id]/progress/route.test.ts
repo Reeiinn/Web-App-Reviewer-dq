@@ -1,18 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, findMemorizationTrack, choiceBelongsTo, recordMemorizationAnswer, applyStreak } =
-  vi.hoisted(() => ({
-    auth: vi.fn(),
-    findMemorizationTrack: vi.fn(),
-    choiceBelongsTo: vi.fn(),
-    recordMemorizationAnswer: vi.fn(),
-    applyStreak: vi.fn(),
-  }));
+const {
+  auth,
+  findMemorizationTrack,
+  memorizationChoiceCorrectness,
+  recordMemorizationAnswer,
+  applyStreak,
+} = vi.hoisted(() => ({
+  auth: vi.fn(),
+  findMemorizationTrack: vi.fn(),
+  memorizationChoiceCorrectness: vi.fn(),
+  recordMemorizationAnswer: vi.fn(),
+  applyStreak: vi.fn(),
+}));
 
 vi.mock("@/lib/auth", () => ({ auth }));
 vi.mock("@/server/data/progress", () => ({
   findMemorizationTrack,
-  choiceBelongsTo,
+  memorizationChoiceCorrectness,
   recordMemorizationAnswer,
   applyStreak,
 }));
@@ -20,7 +25,7 @@ vi.mock("@/server/data/progress", () => ({
 import { POST } from "./route";
 
 const streak = { current: 0, best: 4, isNewBest: false, milestone: null };
-const body = { selected_choice_id: "c1", is_correct: false, mastered: false };
+const body = { selected_choice_id: "c1" };
 const post = (payload: unknown = body) =>
   POST(
     new Request("http://internal.local/api/memorization/m1/progress", {
@@ -35,7 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   auth.mockResolvedValue({ user: { id: "u1", role: "USER" } });
   findMemorizationTrack.mockResolvedValue("IIAP_A");
-  choiceBelongsTo.mockResolvedValue(true);
+  memorizationChoiceCorrectness.mockResolvedValue(false);
   recordMemorizationAnswer.mockResolvedValue({
     id: "p1",
     userId: "u1",
@@ -75,8 +80,25 @@ describe("POST /api/memorization/[id]/progress", () => {
     expect(applyStreak).toHaveBeenCalledWith("u1", "IIAP_A", false);
   });
 
-  it("answers 400 when a field is missing", async () => {
-    expect((await post({ selected_choice_id: "c1", is_correct: true })).status).toBe(400);
+  it("marks the answer itself, whatever the client claims", async () => {
+    await post({ selected_choice_id: "c1", is_correct: true, mastered: true });
+    expect(recordMemorizationAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({ isCorrect: false, mastered: false }),
+    );
+    expect(applyStreak).toHaveBeenCalledWith("u1", "IIAP_A", false);
+  });
+
+  it("masters an item on a right answer", async () => {
+    memorizationChoiceCorrectness.mockResolvedValue(true);
+    await post();
+    expect(recordMemorizationAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({ isCorrect: true, mastered: true }),
+    );
+  });
+
+  it("answers 400 without a choice", async () => {
+    expect((await post({})).status).toBe(400);
+    expect((await post({ selected_choice_id: 7 })).status).toBe(400);
   });
 
   it("answers 404 for an unknown item", async () => {
@@ -87,7 +109,7 @@ describe("POST /api/memorization/[id]/progress", () => {
   });
 
   it("answers 404 for another item's choice", async () => {
-    choiceBelongsTo.mockResolvedValue(false);
+    memorizationChoiceCorrectness.mockResolvedValue(null);
     const response = await post();
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "Choice not found for this memorization item" });
